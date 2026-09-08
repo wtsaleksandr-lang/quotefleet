@@ -1,0 +1,32 @@
+{
+  "format": "USPLACES1",
+  "gazetteerVintage": "2024",
+  "sourceUrl": "https://www2.census.gov/geo/docs/maps-data/data/gazetteer/2024_Gazetteer/2024_Gaz_place_national.zip",
+  "licence": "US Census Bureau Gazetteer — a work of the US federal government, public domain (17 U.S.C. § 105).",
+  "builtBy": "scripts/places/build.mjs",
+  "placeCount": 32041,
+  "skippedTerritoryRows": 292,
+  "classCounts": {
+    "CDP": 12528,
+    "city": 10221,
+    "town": 4326,
+    "village": 3719,
+    "borough": 1218,
+    "township": 5,
+    "municipality": 4,
+    "unified government": 3,
+    "city (balance)": 2,
+    "unified government (balance)": 2,
+    "consolidated government (balance)": 1,
+    "consolidated government": 1,
+    "urban county": 1,
+    "metro government (balance)": 1,
+    "(balance)": 1,
+    "metropolitan government": 1,
+    "metropolitan government (balance)": 1,
+    "corporation": 1
+  },
+  "uncompressedBytes": 964714,
+  "gzipBytes": 425201,
+  "sha256": "e9b69413c8a010703b05bc829cd2a576af403d987bcfa33e5175fea54936de51"
+}

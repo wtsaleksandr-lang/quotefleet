@@ -523,6 +523,42 @@ const HH_CSS = `
   .hh-field .hh-lab { position: absolute; left: 12px; top: 6px; font-size: 11px; letter-spacing: 0.02em; color: var(--muted); pointer-events: none; }
   .hh-field input:placeholder-shown:not(:focus) + .hh-lab { top: 16px; font-size: 14px; color: var(--muted); }
   .hh-field input:focus + .hh-lab, .hh-field select:focus + .hh-lab { color: var(--accent); }
+  /* ── Address autosuggest ──────────────────────────────────────────────
+     Built from the SAME tokens as the field it drops out of, so the one
+     "smart" control on the form does not look imported from another site.
+     A native <datalist> cannot be styled to match in any browser, which is
+     why this is a real listbox — see /place-suggest.js. */
+  .ps-list {
+    position: absolute; z-index: 40; left: 0; right: 0; top: calc(100% + 4px);
+    margin: 0; padding: 4px; list-style: none;
+    max-height: 264px; overflow-y: auto;
+    background: var(--bg); border: 1px solid var(--accent);
+    border-radius: var(--radius);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.28);
+  }
+  .ps-item {
+    display: flex; align-items: baseline; justify-content: space-between; gap: 8px;
+    padding: 8px 10px; border-radius: 8px; cursor: pointer;
+    font-size: 15px; color: var(--ink);
+  }
+  /* Hover and keyboard share ONE highlighted state. Two different-looking
+     "current" rows is how a list ends up with two cursors. */
+  /* The --accent-ink token already flips per theme for text sitting ON an
+     accent fill. A raw white literal would read correctly in dark and be
+     invisible in light, which is what the page's no-raw-hex guard catches.
+     (These comments are inside the scanned CSS, so they must not SPELL the
+     patterns they are explaining — writing the literal here fails the guard
+     just as surely as using it would.) */
+  .ps-item.is-active { background: var(--accent); color: var(--accent-ink); }
+  /* Clipped rather than the other value, because that other value breaks
+     position:sticky in an ancestor and this page has a sticky column.
+     text-overflow: ellipsis works with either. */
+  .ps-name { overflow: clip; text-overflow: ellipsis; white-space: nowrap; }
+  .ps-state {
+    flex: none; font-size: 12px; letter-spacing: 0.04em;
+    font-family: var(--font-mono); color: var(--muted);
+  }
+  .ps-item.is-active .ps-state { color: var(--accent-ink); }
 
   /* Route-class pills: 4 options in a 2-column grid, so they wrap 2x2 and a
      single pill can never sit alone on a line. Selected = outline + tint. */
@@ -831,7 +867,15 @@ const HH_CSS = `
 function field(
   id: string,
   label: string,
-  opts: { step?: string; type?: string; imperial?: string; metric?: string; unit?: 'weight' | 'length' } = {},
+  opts: {
+    step?: string;
+    type?: string;
+    imperial?: string;
+    metric?: string;
+    unit?: 'weight' | 'length';
+    /** Opt this text field into the city autosuggest. See `suggestAttr` below. */
+    suggestPlaces?: boolean;
+  } = {},
 ): string {
   /**
    * THE UNIT-AWARE FIELD. `imperial`/`metric` carry the two titles and `unit`
@@ -842,7 +886,15 @@ function field(
   const unitAttrs = opts.unit
     ? ` data-unit="${esc(opts.unit)}" data-imperial="${esc(opts.imperial ?? label)}" data-metric="${esc(opts.metric ?? label)}"`
     : '';
-  return `<label class="hh-field"><input id="${esc(id)}" type="${esc(opts.type ?? 'number')}" ${opts.type === 'text' ? '' : `inputmode="decimal" step="${esc(opts.step ?? 'any')}" min="0"`} placeholder=" " autocomplete="off"${unitAttrs}><span class="hh-lab">${esc(label)}</span></label>`;
+  /**
+   * `data-place-suggest` opts a text field into the city autosuggest in
+   * `/place-suggest.js`. It is an ATTRIBUTE rather than a wrapper component so
+   * the field keeps its exact markup, label behaviour and styling — the
+   * suggestion list is appended next to the input at runtime and the field is
+   * a working plain input if the script never loads.
+   */
+  const suggestAttr = opts.suggestPlaces === true ? ' data-place-suggest' : '';
+  return `<label class="hh-field"><input id="${esc(id)}" type="${esc(opts.type ?? 'number')}" ${opts.type === 'text' ? '' : `inputmode="decimal" step="${esc(opts.step ?? 'any')}" min="0"`} placeholder=" " autocomplete="off"${unitAttrs}${suggestAttr}><span class="hh-lab">${esc(label)}</span></label>`;
 }
 
 /** The help cue. ALWAYS top-left of the section header, exactly one per section. */
@@ -904,8 +956,8 @@ export function renderHeavyHaulToolPage(): string {
           ${cueBody('cue-lane', 'Full US street addresses — number, street, city, state and ZIP. They are resolved by the US Census geocoder, which is free, keyless and public domain, and which refuses an address it cannot place rather than matching a different town. Two addresses are enough: we route the lane over the federal primary-road network (US Census TIGER/Line, public domain) and split it against state lines, so permits are priced per state. LOADING IS THE ONE QUESTION ONLY YOU CAN ANSWER. A filed heavy-haul tariff says cranes, hoists and winches "shall be supplied by the Consignor or Consignee" together with the people to run them — so if nobody at your pickup or your delivery has the machine, it is a real cost that nobody in your quote chain has priced. Untick the end that has none and we price it.')}
           <div class="hh-stack">
             <div class="hh-row2 hh-row2--addr">
-              ${field('hh-origin', 'Pickup address', { type: 'text' })}
-              ${field('hh-destination', 'Delivery address', { type: 'text' })}
+              ${field('hh-origin', 'Pickup address', { type: 'text', suggestPlaces: true })}
+              ${field('hh-destination', 'Delivery address', { type: 'text', suggestPlaces: true })}
             </div>
             <div class="hh-checks">
               <label class="hh-check"><input type="checkbox" id="hh-load-origin" checked><span>Loading provided at pickup</span></label>
@@ -1091,6 +1143,7 @@ export function renderHeavyHaulToolPage(): string {
     <button type="button" class="hh-legdrop" aria-label="Remove this state">&times;</button>
   </div></template>
   <script src="/heavy-haul-quote.js" defer></script>
+  <script src="/place-suggest.js" defer></script>
   <script src="/marketing-chat.js" defer></script>
   <script src="/theme-toggle.js" defer></script>
 </body>
