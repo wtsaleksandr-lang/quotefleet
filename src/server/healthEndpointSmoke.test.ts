@@ -83,9 +83,15 @@ type HealthResponse = {
   body: string;
 };
 
-function requestHealth(port: number, timeoutMs: number): Promise<HealthResponse> {
+function requestPath(
+  port: number,
+  path: string,
+  timeoutMs: number,
+  headers?: Record<string, string>,
+): Promise<HealthResponse> {
   return new Promise((resolveRequest, rejectRequest) => {
-    const request = fetch(`http://127.0.0.1:${port}/healthz`, {
+    const request = fetch(`http://127.0.0.1:${port}${path}`, {
+      headers,
       signal: AbortSignal.timeout(timeoutMs),
     });
 
@@ -106,7 +112,7 @@ async function waitForHealth(port: number, budgetMs: number): Promise<HealthResp
 
   while (Date.now() < deadline) {
     try {
-      return await requestHealth(port, Math.max(1, deadline - Date.now()));
+      return await requestPath(port, '/healthz', Math.max(1, deadline - Date.now()));
     } catch (err) {
       lastError = err;
       await new Promise((resolveDelay) => setTimeout(resolveDelay, 50));
@@ -131,13 +137,15 @@ describe('production health endpoint', () => {
     expect(app).not.toContain('causeMessage');
   });
 
-  it('configures production probes to use the dedicated health endpoint', async () => {
+  it('keeps Replit root probes on a database-free loopback path', async () => {
     const replitConfig = await read('.replit');
     const app = await read('src/server/app.ts');
 
-    expect(replitConfig).toContain('healthcheckPath = "/healthz"');
-    expect(replitConfig).not.toContain('healthcheckPath = "/"');
-    expect(app).toContain("res.json({ ok: true, status: 'up'");
+    expect(replitConfig).not.toContain('healthcheckPath');
+    expect(app).toContain("userAgent.startsWith('go-http-client/')");
+    expect(app.indexOf("app.get('/', (req, res, next)")).toBeLessThan(
+      app.indexOf('app.use(hostInfoMiddleware)'),
+    );
   });
 
   it('opens the compiled production listener before post-listen jobs', async () => {
@@ -160,6 +168,9 @@ describe('production health endpoint', () => {
     expect(postListenJobs).toContain('await seedDirectoryTerminals()');
     expect(postListenJobs).toContain('void maybeAutoHealCarrierDirectory()');
     expect(postListenJobs).toContain('void maybeBackfillNearestPortCodes()');
+    expect(postListenJobs).not.toMatch(
+      /ensureSelfHeal|ensureAuthorityRevalidationColumns|ensureJobRunsTable|ensureOpsAlertsTable|ensureSeasonalRestrictionsTable|ensurePilotCarTable/,
+    );
 
     const port = await unusedLocalPort();
     const databaseBlackhole = await startDatabaseBlackhole();
@@ -192,6 +203,9 @@ describe('production health endpoint', () => {
       // before verifying the listener's liveness response.
       await databaseBlackhole.waitForConnection(STARTUP_READINESS_BUDGET_MS);
       const health = await waitForHealth(port, STARTUP_READINESS_BUDGET_MS);
+      const rootProbe = await requestPath(port, '/', STARTUP_READINESS_BUDGET_MS, {
+        'user-agent': 'Go-http-client/1.1',
+      });
 
       // The blackhole accepts the database connection but never responds. The
       // liveness endpoint must still return within the readiness budget while
@@ -200,6 +214,10 @@ describe('production health endpoint', () => {
       expect(JSON.parse(health.body)).toMatchObject({
         ok: true,
         status: 'up',
+      });
+      expect(rootProbe).toMatchObject({
+        statusCode: 200,
+        body: 'ok',
       });
       expect(output).toContain('QuoteFleet listening');
     } finally {

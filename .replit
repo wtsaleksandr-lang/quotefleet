@@ -36,7 +36,6 @@ localPort = 5000
 externalPort = 80
 
 [deployment]
-healthcheckPath = "/healthz"
 deploymentTarget = "vm"
 run = ["node", "dist/server/index.js"]
 build = ["sh", "-c", "pnpm install --frozen-lockfile && pnpm build"]

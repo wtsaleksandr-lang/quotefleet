@@ -126,6 +126,29 @@ export function createApp(): express.Express {
     next();
   });
 
+  // Replit's VM supervisor probes GET / on the loopback listener; it does not
+  // honor a custom healthcheckPath. Answer that internal probe before tenant
+  // host resolution, which may need the database on a cache miss. Public-domain
+  // homepage requests continue through the normal marketing/tenant routes.
+  app.get('/', (req, res, next) => {
+    const host = (req.headers.host ?? '').trim().toLowerCase();
+    const userAgent = (req.headers['user-agent'] ?? '').trim().toLowerCase();
+    const isLoopback =
+      host === '127.0.0.1' ||
+      host.startsWith('127.0.0.1:') ||
+      host === 'localhost' ||
+      host.startsWith('localhost:') ||
+      host === '[::1]' ||
+      host.startsWith('[::1]:');
+    const isMachineProbe =
+      userAgent === '' ||
+      userAgent.startsWith('go-http-client/') ||
+      userAgent.startsWith('kube-probe/');
+    if (!isLoopback || !isMachineProbe) return next();
+    res.setHeader('Cache-Control', 'no-store');
+    return res.status(200).type('text/plain').send('ok');
+  });
+
   // Deployment readiness must never wait on the database, tenant host lookup, or
   // other request middleware. Keep this liveness response ahead of hostInfo so a
   // stalled optional startup dependency cannot make a process that already bound
