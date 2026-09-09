@@ -24,12 +24,44 @@
  */
 import type { Page } from '@playwright/test';
 
+/**
+ * BOUNDED, because one of these pages has JavaScript DISABLED.
+ *
+ * `/oversize/texas — every disclosure works with JavaScript DISABLED` runs in a
+ * context where page scripts never execute, so `requestAnimationFrame` schedules
+ * a callback that is never called and `document.fonts.ready` may never settle.
+ * A wait on either simply hangs, and the first version of this helper turned
+ * four passing tests into 60-second timeouts.
+ *
+ * The ceiling is therefore enforced from Node, where the timer always fires,
+ * rather than from inside the page. If the page cannot tell us it has settled we
+ * measure it as it stands — which is the correct outcome, because a page with no
+ * JavaScript has no font-swap reflow to wait for in the first place.
+ */
+const SETTLE_CEILING_MS = 3_000;
+
 export async function settledLayout(page: Page): Promise<void> {
-  // Fonts first — they are what moves the text.
-  await page.evaluate(() => document.fonts.ready);
-  // Then two frames, so the re-layout the font swap triggers has been painted
-  // before anything is read back. One frame schedules it; the second observes it.
-  await page.evaluate(
-    () => new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))),
-  );
+  const settled = (async () => {
+    // Fonts first — they are what moves the text. `.then(() => undefined)` because
+    // `document.fonts.ready` resolves to a FontFaceSet, which cannot cross the
+    // evaluate boundary.
+    await page.evaluate(() => document.fonts.ready.then(() => undefined));
+    // Then two frames, so the re-layout the font swap triggers has been painted
+    // before anything is read back. One frame schedules it; the second observes it.
+    await page.evaluate(
+      () => new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))),
+    );
+  })().catch(() => {
+    // The page navigated, closed, or runs no scripts. Measure what is there.
+  });
+
+  let timer: NodeJS.Timeout | undefined;
+  const ceiling = new Promise<void>((resolve) => {
+    timer = setTimeout(resolve, SETTLE_CEILING_MS);
+  });
+  try {
+    await Promise.race([settled, ceiling]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
 }
