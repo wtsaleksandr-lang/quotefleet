@@ -153,6 +153,14 @@ const SEASONAL_CSS = `
 
   .sr-empty { color: var(--muted); font-size: 14px; margin: 0; }
 
+  /* Foldable prose — keeps the page concise without losing content. */
+  details.qt-fold { margin: 8px 0 16px; }
+  details.qt-fold > summary { cursor: pointer; color: var(--accent); font-size: 13px; list-style: none; display: inline-flex; align-items: center; gap: 4px; }
+  details.qt-fold > summary::-webkit-details-marker { display: none; }
+  details.qt-fold > summary::before { content: '▸'; transition: transform .2s; }
+  details.qt-fold[open] > summary::before { transform: rotate(90deg); }
+  details.qt-fold > .qt-fold-body { padding: 8px 0 0; color: var(--muted); font-size: 14px; line-height: 1.5; }
+
   @media (max-width: 760px) {
     .sr-hero h1 { font-size: 28px; }
     .sr-hero { padding: 32px 16px 12px; }
@@ -238,10 +246,12 @@ function renderIndex(snapshots: ReadonlyMap<string, StateSeasonalSnapshot>, asOf
       <p class="sr-eyebrow">Free reference &middot; no account needed</p>
       <h1>Spring Thaw Weight Restrictions by State</h1>
       <p class="lead">Which states cut axle and gross weight during the spring thaw, what each one publishes, when we last read it, and a direct link to the state's own bulletin. A load that is legal on a road in July can be illegal on the same road in March.</p>
-      <div class="sr-truth">
-        <h2>The state's own page is the authority. This one is a mirror with a timestamp.</h2>
-        <p><strong>We never tell you a road is clear.</strong> Restrictions are posted road by road and lift with a few days' notice, so we publish what each state's own document says, the date we read it, and the link. Where a state publishes only a map or a PDF we say so rather than inventing a limit from it, and where our copy is old we say how old and which way that errs.</p>
-      </div>
+      <details class="qt-fold">
+        <summary>About this reference</summary>
+        <div class="qt-fold-body">
+          <p><strong>The state's own page is the authority. This one is a mirror with a timestamp.</strong> We never tell you a road is clear. Restrictions are posted road by road and lift with a few days' notice, so we publish what each state's own document says, the date we read it, and the link. Where a state publishes only a map or a PDF we say so rather than inventing a limit from it, and where our copy is old we say how old and which way that errs.</p>
+        </div>
+      </details>
     </div>
   </section>
 

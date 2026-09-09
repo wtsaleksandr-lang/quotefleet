@@ -318,7 +318,7 @@ describe('"Find your company" carrier finder', () => {
     // Input, placeholder, combobox/listbox wiring, and the FMCSA microcopy.
     expect(html).toContain('data-carrier-finder');
     expect(html).toContain('id="qf-finder-input"');
-    expect(html).toContain('placeholder="Enter your trucking company name"');
+    expect(html).toContain('placeholder="Enter your company name"');
     expect(html).toContain('role="combobox"');
     expect(html).toContain('id="qf-finder-listbox"');
     expect(html).toContain('role="listbox"');

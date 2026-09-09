@@ -738,6 +738,14 @@ const OSOW_CSS = `
   .ow-cov span { font-size: 11px; font-family: var(--font-mono); letter-spacing: 0.04em; padding: 4px; text-align: center; border-radius: var(--radius-pill); border: 1px solid var(--border); color: var(--muted); }
 
   .ow-empty { color: var(--muted); font-size: 14px; line-height: 1.6; margin: 0; }
+
+  /* Foldable prose — keeps the page concise without losing content. */
+  details.qt-fold { margin: 8px 0 16px; }
+  details.qt-fold > summary { cursor: pointer; color: var(--accent); font-size: 13px; list-style: none; display: inline-flex; align-items: center; gap: 4px; }
+  details.qt-fold > summary::-webkit-details-marker { display: none; }
+  details.qt-fold > summary::before { content: '▸'; transition: transform .2s; }
+  details.qt-fold[open] > summary::before { transform: rotate(90deg); }
+  details.qt-fold > .qt-fold-body { padding: 8px 0 0; color: var(--muted); font-size: 14px; line-height: 1.5; }
   .ow-busy { color: var(--muted); font-size: 14px; margin: 0; }
 
   /* ── THE ALL-STATES SUMMARY — every state on one screen. ──────────────────
@@ -936,10 +944,12 @@ export function renderOsowToolPage(): string {
            only lists what is left out; the exclusions list is a disclosure. The
            disclaimer that matters most — the one 4px under the number — is
            unchanged and still renders beside every total this page prints. -->
-      <div class="ow-truth">
-        <h2>This prices state permit fees. It is not a freight quote.</h2>
-        <p><strong>STATE PERMIT FEES ONLY: no line haul, no fuel, no margin.</strong> It also excludes the cost of any pilot car a state requires — we hold no pilot-car rates, so enter your own and we apply it as a separate figure, never inside the permit total. On a long lane one escort can cost more than every permit below combined.</p>
-      </div>
+      <details class="qt-fold">
+        <summary>About this calculator</summary>
+        <div class="qt-fold-body">
+          <p><strong>STATE PERMIT FEES ONLY: no line haul, no fuel, no margin.</strong> It also excludes the cost of any pilot car a state requires — we hold no pilot-car rates, so enter your own and we apply it as a separate figure, never inside the permit total. On a long lane one escort can cost more than every permit below combined.</p>
+        </div>
+      </details>
     </div>
   </section>
 
