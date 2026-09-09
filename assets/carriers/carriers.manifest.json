@@ -1,0 +1,13 @@
+{
+  "format": "CARRIERS2",
+  "sourceUrl": "https://data.transportation.gov/resource/6eyk-hxee.json",
+  "sourceFilter": "(common_stat='A' OR contract_stat='A') AND property_chk='Y'",
+  "licence": "FMCSA Licensing & Insurance, via data.transportation.gov — US federal government open data, public domain.",
+  "builtBy": "scripts/carriers/build.mjs",
+  "carrierCount": 370142,
+  "droppedNoNameOrDot": 0,
+  "droppedDuplicateDot": 610,
+  "uncompressedBytes": 23515696,
+  "gzipBytes": 7900150,
+  "sha256": "55eaeb0ed64a25dbcde877a3b4748126423abd7186c1042cd761b91e3f6f61d3"
+}

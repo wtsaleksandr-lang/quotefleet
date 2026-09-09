@@ -51,7 +51,7 @@
       </div>
 
       <form id="signup-form" style="display:flex; flex-direction:column; gap: 18px;" novalidate>
-        <div class="field"><label class="field-label required" for="companyName">Company name</label><input class="input" id="companyName" name="companyName" placeholder="Acme Drayage" autocomplete="organization" required maxlength="120"></div>
+        <div class="field"><label class="field-label required" for="companyName">Company name</label><input class="input" id="companyName" name="companyName" placeholder="Acme Drayage" autocomplete="off" required maxlength="120" data-suggest-endpoint="/api/tools/company-suggest" data-suggest-key="companies" data-suggest-min="3"></div>
         <div class="field"><label class="field-label required" for="slug-input">Your link</label><div class="url-builder"><input class="input" name="slug" id="slug-input" placeholder="acme" autocomplete="off" autocapitalize="none" spellcheck="false" required pattern="^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$" minlength="3" maxlength="30"><select class="select" name="hostDomain" id="host-input" aria-label="Host domain"></select></div><div class="url-builder-preview" id="url-preview"><span class="live">acme.quotefleet.net</span></div><span class="field-hint" id="slug-hint">Letters, numbers, dashes. No spaces.</span></div>
         <div class="grid-2"><div class="field"><label class="field-label required" for="email">Email</label><input class="input" id="email" type="email" name="email" required autocomplete="email" inputmode="email" autocapitalize="none" spellcheck="false"></div><div class="field"><label class="field-label" for="contactPhone">Phone</label><input class="input" id="contactPhone" name="contactPhone" type="tel" autocomplete="tel" placeholder="For account recovery"></div></div>
         <div class="grid-2"><div class="field"><label class="field-label required" for="password-input">Password</label><input class="input" type="password" name="password" id="password-input" minlength="10" maxlength="200" autocomplete="new-password" required><span class="field-hint" id="password-hint">Minimum 10 characters. Use a unique password.</span></div><div class="field"><label class="field-label required" for="confirm-password-input">Confirm password</label><input class="input" type="password" name="confirmPassword" id="confirm-password-input" minlength="10" maxlength="200" autocomplete="new-password" required><span class="field-hint" id="confirm-hint">Re-enter the same password.</span></div></div>
@@ -284,5 +284,6 @@
   </script>
   <script src="/marketing-chat.js" defer></script>
   <script src="/theme-toggle.js" defer></script>
+  <script src="/suggest-field.js" defer></script>
 </body>
 </html>

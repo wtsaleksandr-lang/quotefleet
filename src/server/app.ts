@@ -47,6 +47,7 @@ import { registerLeadsBillingRoutes } from './routes/leadsBilling.js';
 import { registerToolsRoutes } from './routes/tools.js';
 import { registerOsowPermitRoutes } from './routes/osowPermits.js';
 import { registerHeavyHaulQuoteRoutes } from './routes/heavyHaulQuote.js';
+import { registerPlacesRoutes } from './routes/places.js';
 import { registerSeasonalRestrictionRoutes } from './routes/seasonalRestrictions.js';
 import { registerOsowToolRoutes } from './routes/osowTools.js';
 import { registerOsowHubRoutes } from './routes/osowHub.js';
@@ -191,6 +192,7 @@ export function createApp(): express.Express {
   // crack at the shared /api/public/{widget,quote,lead,route-preview}/:slug
   // paths and call next() when the slug is not a demo token (see prospectDemo.ts).
   registerProspectDemoRoutes(app);
+  registerPlacesRoutes(app);
   registerPublicRoutes(app);
   // Affiliate + referral program. Registered BEFORE the tenant/static routes so
   // its `?ref=` capture middleware + `/r/:code` run ahead of the `/` handler and

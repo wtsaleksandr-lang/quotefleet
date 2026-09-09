@@ -330,6 +330,7 @@ function page(title: string, description: string, path: string, body: string, ex
   ${body}
   ${PREMIUM_FOOTER}
   ${HEADER_SCRIPTS}
+  <script src="/suggest-field.js" defer></script>
   <script src="/pilot-cars.js" defer></script>
   <script src="/marketing-chat.js" defer></script>
   <script src="/theme-toggle.js" defer></script>
@@ -810,7 +811,7 @@ export function renderJoinPage(): string {
       <div class="pc-card--form">
         <h2>Your business</h2>
         <p class="pc-help">The name a dispatcher will book you under.</p>
-        <label class="pc-field"><input id="pc-name" type="text" maxlength="120" placeholder=" " autocomplete="organization"><span class="pc-lab">Business name</span></label>
+        <label class="pc-field"><input id="pc-name" type="text" maxlength="120" placeholder=" " autocomplete="off" data-suggest-endpoint="/api/tools/company-suggest" data-suggest-key="companies" data-suggest-min="3"><span class="pc-lab">Business name</span></label>
         <div class="pc-row2">
           <label class="pc-field"><input id="pc-contact" type="text" maxlength="120" placeholder=" " autocomplete="name"><span class="pc-lab">Your name (optional)</span></label>
           <label class="pc-field"><input id="pc-website" type="url" maxlength="300" placeholder=" " autocomplete="url"><span class="pc-lab">Website (optional)</span></label>

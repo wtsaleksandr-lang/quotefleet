@@ -11,7 +11,23 @@ async function file(name: string) {
 describe('signin UI smoke coverage', () => {
   it('keeps signup guidance mounted', async () => {
     const signup = await file('signup.html');
-    expect(signup).toContain('autocomplete="organization"');
+    /*
+     * The company field is a COMBOBOX now, so it carries autocomplete="off"
+     * rather than "organization".
+     *
+     * That is deliberate and it is the standard for the ARIA combobox pattern:
+     * the browser's own organization autofill renders its dropdown in the same
+     * place as the suggestion list, and two overlapping dropdowns is a worse
+     * experience than either alone. What replaces the hint is a far more useful
+     * list — 370,000 active FMCSA carriers, each carrying its DOT number, so a
+     * carrier picking itself hands us its verified identity.
+     *
+     * The intent this assertion has always guarded — that the signup field
+     * semantics are deliberate rather than accidental — is asserted below
+     * against what the field actually is.
+     */
+    expect(signup).toContain('data-suggest-endpoint="/api/tools/company-suggest"');
+    expect(signup).toContain('id="companyName"');
     expect(signup).toContain('Confirm');
     expect(signup).toContain('normalizeEmail');
     // Two-tier signup: plan chooser + card-required all-inclusive trial copy.
