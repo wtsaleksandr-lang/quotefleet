@@ -366,6 +366,14 @@ export function renderPrivacyApply(opts: {
     <section class="mcp-card" data-panel="0">
       <h2>Your business</h2>
       <p class="mcp-steplead">The legal entity to protect. This becomes the Principal on the authorization, so every field here has to match your CBP records exactly.</p>
+      <!--
+        NO COMPANY AUTOSUGGEST HERE, deliberately. The suggester on the signup,
+        widget and pilot-car forms is backed by the FMCSA carrier index, and the
+        businesses filing here are IMPORTERS rather than motor carriers — most
+        are simply absent from it. Worse, CBP suppresses only an EXACT match to
+        the name in ACE, so offering a near-miss from an unrelated dataset would
+        cost the filer their suppression. This field stays plain on purpose.
+      -->
       <div class="mcp-field"><label for="f-legal">Legal business name</label><input id="f-legal" type="text" placeholder="Acme Imports LLC" autocomplete="organization"><p class="mcp-hint">Exactly as it appears in CBP’s ACE system. CBP suppresses only exact matches.</p></div>
       <div class="mcp-field"><label>DBA / trade names <span style="font-weight:500;color:var(--muted)">(optional)</span></label>
         <div class="mcp-chips" data-chips="dba"></div>
