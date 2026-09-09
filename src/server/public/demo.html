@@ -11,10 +11,13 @@
   <link rel="stylesheet" href="/demo.css">
   <script>
     // Restore the viewer's preferred theme before paint (no flash).
+    // Light is the default; system dark-mode respected for new visitors.
     try {
       var t = localStorage.getItem('qf-theme');
-      if (t === 'light') document.documentElement.setAttribute('data-theme', 'light');
-    } catch (e) {}
+      if (t === 'dark' || (!t && window.matchMedia && matchMedia('(prefers-color-scheme:dark)').matches))
+        document.documentElement.setAttribute('data-theme', 'dark');
+      else document.documentElement.setAttribute('data-theme', 'light');
+    } catch (e) { document.documentElement.setAttribute('data-theme', 'light'); }
   </script>
 </head>
 <body class="qf-demo-body">

@@ -158,7 +158,7 @@ html[data-theme="light"] body.landing-v2.qf-wft .hero .qf-hero-media::before {
 }
 
 /* ── Theme toggle — read as a distinct CONTROL in the top-right cluster ────
-   The .qf-theme-btn already ships a 40×40 hairline-bordered icon button
+   The .qf-theme-btn already ships a 32×32 hairline-bordered icon button
    (style.css). Sitting flush among the text nav links it still read as "just
    another link", so give it clear breathing room from the links on its left
    and the Sign in / View demo actions on its right, and firm the resting

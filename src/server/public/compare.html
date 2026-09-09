@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <script>(function(){try{var t=localStorage.getItem('qf-theme');if(t==='light'||t==='dark')document.documentElement.setAttribute('data-theme',t);}catch(e){}})();</script>
+  <script>(function(){try{var t=localStorage.getItem('qf-theme');if(t==='dark'||(!t&&window.matchMedia&&matchMedia('(prefers-color-scheme:dark)').matches))document.documentElement.setAttribute('data-theme','dark');else document.documentElement.setAttribute('data-theme','light');}catch(e){document.documentElement.setAttribute('data-theme','light');}})();</script>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Why QuoteFleet — vs a TMS, form builders &amp; spreadsheets</title>
   <meta name="description" content="How QuoteFleet compares to a traditional TMS (Samsara, Motive), B2B form builders (Jotform, Typeform), and Excel/Sheets templates for quoting freight — instant branded quote pages, lead capture, and the FMCSA carrier directory from $14.80/mo.">
@@ -15,7 +15,7 @@
   <link rel="icon" href="/favicon.ico" sizes="any">
   <link rel="icon" type="image/png" sizes="32x32" href="/brand/favicon-32.png">
   <link rel="apple-touch-icon" sizes="180x180" href="/brand/apple-touch-icon-180.png">
-  <meta name="theme-color" content="#0b0f15">
+  <meta name="theme-color" content="#F6F8FA">
   <style>
     /* Compare page — scoped to .cmp-*, loaded after the linked sheets so it wins.
        Left-aligned headers, blue (white-on-blue) + dark-grey buttons only.

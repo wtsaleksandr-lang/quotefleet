@@ -638,7 +638,7 @@
     var label = document.getElementById('qf-theme-label');
     if (!btn) return;
     function paint() {
-      var isLight = document.documentElement.getAttribute('data-theme') === 'light';
+      var isLight = document.documentElement.getAttribute('data-theme') !== 'dark';
       // Icon + label both reflect the CURRENT theme. The control is a real
       // role="switch"; aria-checked (=Light) drives the sliding knob via CSS.
       if (icon) icon.innerHTML = isLight ? SUN_SVG : MOON_SVG;
@@ -648,14 +648,10 @@
     }
     paint();
     btn.addEventListener('click', function () {
-      var isLight = document.documentElement.getAttribute('data-theme') === 'light';
-      if (isLight) {
-        document.documentElement.removeAttribute('data-theme');
-        try { localStorage.setItem('qf-theme', 'dark'); } catch (e) {}
-      } else {
-        document.documentElement.setAttribute('data-theme', 'light');
-        try { localStorage.setItem('qf-theme', 'light'); } catch (e) {}
-      }
+      var isLight = document.documentElement.getAttribute('data-theme') !== 'dark';
+      var next = isLight ? 'dark' : 'light';
+      document.documentElement.setAttribute('data-theme', next);
+      try { localStorage.setItem('qf-theme', next); } catch (e) {}
       paint();
     });
   }
