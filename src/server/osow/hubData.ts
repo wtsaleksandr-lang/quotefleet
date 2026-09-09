@@ -4,7 +4,7 @@
  *
  * Every page under `/oversize` is a rendering of a computation, not a written
  * document. The engine already holds hundreds of source documents and cited,
- * effective-dated value rows across 21 states; until this module the only
+ * effective-dated value rows across dozens of states; until this module the only
  * public consumers were two calculators. This file turns that corpus into
  * table rows, provenance bands and conflict entries — and it is deliberately a
  * pure, one-directional read: **nothing here writes to `src/calc/osow`, and no

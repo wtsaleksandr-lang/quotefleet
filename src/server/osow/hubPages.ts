@@ -4,7 +4,7 @@
  *
  * EVERY PAGE HERE IS GENERATED FROM `hubData.ts`, WHICH IS GENERATED FROM
  * `src/calc/osow`. Nothing on these pages is typed prose about a number. A
- * jurisdiction file changing changes the page; adding a 22nd state adds a page,
+ * jurisdiction file changing changes the page; adding a state adds a page,
  * a row on four tables, and its own source list, with no second list to update.
  *
  * THE TEST EVERY PAGE HAD TO PASS BEFORE IT WAS WRITTEN
@@ -14,13 +14,14 @@
  * A TABLE, not a page — which is why there is no `/oversize/texas/escorts`:
  * `/oversize/texas#escorts` is the same answer, and the escort table links
  * straight to that anchor. Fifty states × thirteen topics would be 650 URLs
- * saying what 21 pages and a handful of tables already say, and the market
+ * saying what the state pages and a handful of tables already say, and the market
  * already demonstrates where that ends — a competitor's state superload page
  * carries no threshold for that state at all.
  *
- * NO STATE PAGE SHIPS WITHOUT A JURISDICTION FILE BEHIND IT. The 30 states we
- * do not hold appear as an honest row on every topic table and on the coverage
- * page, and nowhere else.
+ * NO STATE PAGE SHIPS WITHOUT A JURISDICTION FILE BEHIND IT. The states we
+ * do not hold (HUB_STATES.length − HUB_COVERED_STATES.length at build time)
+ * appear as an honest row on every topic table and on the coverage page, and
+ * nowhere else.
  */
 import type { IsoDate } from '../../calc/osow/provenance.js';
 import { osowRulesFor } from '../../calc/osow/jurisdictions/index.js';
@@ -180,7 +181,7 @@ export const HUB_ENTRIES: readonly HubEntry[] = [
     path: `${OSOW_HUB_PATH}/coverage`,
     name: 'What we cover, and what we do not',
     blurb:
-      '21 states with a jurisdiction file behind them, 30 without, and a plain statement of what "not covered" means here.',
+      `${HUB_COVERED_STATES.length} states with a jurisdiction file behind them, ${HUB_STATES.length - HUB_COVERED_STATES.length} without, and a plain statement of what "not covered" means here.`,
     kind: 'own',
   },
 ];
@@ -387,7 +388,7 @@ export function renderHub(asOf: IsoDate): string {
     },
     {
       q: 'How many states does this cover?',
-      a: `Twenty-one, each with its own jurisdiction file behind it. The other thirty states and DC appear on every topic table as an honest "not yet covered" row rather than being filled in from a secondary source.`,
+      a: `${HUB_COVERED_STATES.length}, each with its own jurisdiction file behind it. The other ${HUB_STATES.length - HUB_COVERED_STATES.length} states appear on every topic table as an honest "not yet covered" row rather than being filled in from a secondary source.`,
     },
     {
       q: 'Where do the numbers come from?',
@@ -415,7 +416,7 @@ export function renderHub(asOf: IsoDate): string {
     sec(
       'states',
       'By state',
-      `<p>Twenty-one states have a full profile: legal limits, escort triggers, the fee schedule, the superload line, route-survey triggers, the police escort rate or the finding that there is none, and every source document behind them. ${HUB_STATES.length - HUB_COVERED_STATES.length} states and DC are not yet covered and are shown greyed rather than linked to a page that would have nothing in it.</p>
+      `<p>${HUB_COVERED_STATES.length} states have a full profile: legal limits, escort triggers, the fee schedule, the superload line, route-survey triggers, the police escort rate or the finding that there is none, and every source document behind them. ${HUB_STATES.length - HUB_COVERED_STATES.length} states are not yet covered and are shown greyed rather than linked to a page that would have nothing in it.</p>
        ${statesHtml}`,
     ),
     sec(
@@ -435,7 +436,7 @@ export function renderHub(asOf: IsoDate): string {
 
   return hubPage({
     title: 'Oversize & Overweight Permits: Limits, Fees and Escorts by State | QuoteFleet',
-    description: `A cited, effective-dated reference for US oversize and overweight moves: legal limits, permit fees, escort triggers and superload thresholds across 21 states, built from ${prov.count} state statutes, administrative codes and DOT fee schedules. Free, no account.`,
+    description: `A cited, effective-dated reference for US oversize and overweight moves: legal limits, permit fees, escort triggers and superload thresholds across ${HUB_COVERED_STATES.length} states, built from ${prov.count} state statutes, administrative codes and DOT fee schedules. Free, no account.`,
     path: OSOW_HUB_PATH,
     crumbs: [{ name: 'Oversize & overweight' }],
     eyebrow: 'Free reference · no account needed',
@@ -481,7 +482,7 @@ export function renderCoverage(asOf: IsoDate): string {
   const uncovered = HUB_STATES.filter((s) => !s.covered);
 
   const rail = [
-    { id: 'covered', label: 'The 21 covered states' },
+    { id: 'covered', label: `The ${HUB_COVERED_STATES.length} covered states` },
     { id: 'not-covered', label: 'What "not covered" means' },
     { id: 'rules', label: 'The rules we hold ourselves to' },
   ];
@@ -524,7 +525,7 @@ export function renderCoverage(asOf: IsoDate): string {
     crumbs: [{ name: 'Oversize & overweight', path: OSOW_HUB_PATH }, { name: 'Coverage' }],
     eyebrow: 'Coverage · stated plainly',
     h1: 'What we cover, and what we do not',
-    lead: `Twenty-one states have a jurisdiction file behind them and get a page. Thirty states and the District of Columbia do not, and they get an honest row instead of a page with nothing in it.`,
+    lead: `${HUB_COVERED_STATES.length} states have a jurisdiction file behind them and get a page. ${HUB_STATES.length - HUB_COVERED_STATES.length} do not, and they get an honest row instead of a page with nothing in it.`,
     bandHtml: provenanceBand(prov, [`${HUB_COVERED_STATES.length} covered`, `${uncovered.length} not covered`]),
     rail,
     bodyHtml: body,
@@ -806,7 +807,8 @@ export function renderEscortRequirements(asOf: IsoDate): string {
       'police',
       'Escorts are a cost, not a footnote',
       `<p>On a long lane a single pilot car above roughly seventy-seven cents a mile costs more than the entire state permit total. Escorts are also a feasibility gate before they are a price — an operator who is not certified in the next state cannot take the load at any rate. Neither the permit calculator nor these tables price a civilian pilot car, because the two commercial sites that publish market rates disagree by nearly a factor of two on the same service.</p>
-       ${compareLink(`${OSOW_HUB_PATH}/police-escorts`, 'Published police escort rates, and the fifteen states with none')}`,
+       ${compareLink(`${OSOW_HUB_PATH}/police-escorts`, 'Published police escort rates, and the fifteen states with none')}
+       <p>Looking for a pilot car operator? Browse the <a href="/pilot-cars">pilot car &amp; escort directory</a> — operators listed by service area.</p>`,
     ),
     sec('sourcing', 'How this is sourced', SOURCING_NOTE),
     sec('faq', 'Questions', faqBlock(faqs)),
@@ -1584,6 +1586,7 @@ export function renderStatePage(state: HubState, asOf: IsoDate): string {
       '11. What this does not include',
       `<p>Named rather than gestured at, because each of these can exceed the permit itself. Every item is listed; open one for why it is excluded.</p>
        ${folds(NOT_INCLUDED.map((n) => ({ label: n.item, bodyHtml: `<p>${esc(n.why)}</p>` })))}
+       <p>Need a pilot car for this lane? Browse the <a href="/pilot-cars">pilot car &amp; escort directory</a>.</p>
        <p><a href="${esc(OSOW_TOOL)}">Price a lane through ${esc(state.name)} →</a></p>`,
       'Scope',
     ),
