@@ -41,6 +41,42 @@ const RESERVED_SUBDOMAINS = new Set([
 ]);
 
 /**
+ * Can this host possibly be a tenant's custom domain?
+ *
+ * WHY THIS GUARD EXISTS. Path 3 below runs a DATABASE QUERY for any host that
+ * is neither the base domain nor a subdomain of it — and that set includes
+ * `127.0.0.1`, which is the host Replit's VM supervisor uses when it probes
+ * `GET /` on the loopback listener. A platform health probe reaching the
+ * database is the shape of the failure that took production down for a day on
+ * 2026-09-08, so it is worth making structurally impossible rather than
+ * merely unlikely.
+ *
+ * There is already a loopback shortcut registered ahead of this middleware in
+ * app.ts, but it identifies a probe partly by USER-AGENT — empty,
+ * `go-http-client/`, `kube-probe/`. That is a guess about someone else's
+ * client, and it silently stops being true the day the supervisor changes its
+ * agent string. This guard does not depend on knowing who is calling.
+ *
+ * The rule itself is simply what a custom domain IS. An operator points a real
+ * hostname at us with a CNAME and proves ownership with a TXT record, so
+ * `tenants.custom_domain` can only ever hold a registrable domain name. An IP
+ * literal cannot be CNAMEd and cannot carry a TXT claim; a dotless label
+ * (`localhost`, `[::1]` once the port is stripped) is not a registrable name
+ * either. Neither can match a row, so the query can only ever return nothing.
+ *
+ * This changes no routing decision — it removes a lookup whose answer was
+ * already known.
+ */
+function couldBeACustomDomain(host: string): boolean {
+  // A registrable name has at least one dot. This also excludes `localhost`
+  // and the `[` left behind when `[::1]:5000` is split on its colon.
+  if (!host.includes('.')) return false;
+  // An IPv4 literal has dots but is not a name.
+  if (/^\d{1,3}(?:\.\d{1,3}){3}$/.test(host)) return false;
+  return true;
+}
+
+/**
  * Parses the Host header and decorates the request with one of:
  *   - `tenantSubdomain` — the slug from `<slug>.<HOST_DOMAINS entry>`
  *   - `tenantCustomDomainSlug` — slug looked up from `tenants.custom_domain`
@@ -102,11 +138,28 @@ export async function hostInfoMiddleware(
     }
   }
 
-  // Path 2: bare base domain — fall through to marketing site.
-  if (baseDomain && rawHost === baseDomain) return next();
+  /*
+   * Path 2: ANY host on a domain we own is us, not a customer's custom domain.
+   *
+   * This used to read `rawHost === baseDomain`, which let `www.quotefleet.net`
+   * and every reserved subdomain — app, admin, api, mail, docs, help, status,
+   * static, cdn, assets — fall past Path 1 (which deliberately declines them)
+   * into the Path 3 CUSTOM-DOMAIN LOOKUP, and run a database query on every
+   * request until the 60-second cache filled. The comment above this function
+   * has always said those hosts are "treated as the bare site"; they were not.
+   *
+   * The query could never have matched. `tenants.custom_domain` holds domains an
+   * operator pointed at us and proved with a TXT record, and nobody proves
+   * ownership of a subdomain of ours. `matchHostDomain` is true only for our own
+   * HOST_DOMAINS entries and their subdomains, so this is the same statement the
+   * old line made, applied to the whole set it should always have covered.
+   */
+  if (baseDomain) return next();
 
   // Path 3: custom domain (`quote.astova.com`). Look up tenants.custom_domain.
-  if (rawHost) {
+  // Only for a host that could actually BE one — see couldBeACustomDomain, which
+  // keeps loopback health probes off the database entirely.
+  if (rawHost && couldBeACustomDomain(rawHost)) {
     const cached = customDomainCache.get(rawHost);
     if (cached !== undefined) {
       if (cached) req.tenantCustomDomainSlug = cached;
