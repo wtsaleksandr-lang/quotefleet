@@ -310,3 +310,30 @@ html body.qf-wft .site-actions .signin { white-space: nowrap; }
   html body.qf-wft .premium-footer .premium-footer-inner > .footer-col:last-child h4 { column-span: all; }
   html body.qf-wft .premium-footer .premium-footer-inner > .footer-col:last-child a { break-inside: avoid; }
 }
+
+/* ── NARROW PHONES: THE BURGER MUST FIT ON SCREEN ──────────────────────────
+   MEASURED, at 320px, on the settled homepage: brand 106px ending at 122,
+   then `.site-actions` 233px wide — theme toggle 40, "View demo" 113, burger
+   40 — which puts the burger at 327-367. `.site-header-inner` is 320px and
+   does not wrap, so the burger hung 47px PAST the right edge and took the
+   document's horizontal scrollbar with it.
+
+   The header renders at that same 367px on every width, so the real boundary
+   is 367px rather than anything in the existing ladder: the mobile menu
+   button was clipped on a 360px Android and an iPhone SE alike, and the whole
+   page scrolled sideways underneath it. Only the homepage carries the extra
+   CTA, which is why /pricing, /directory and /tools/heavy-haul-quote measure
+   clean at the same width.
+
+   "View demo" is the one item that can go. It is a SECONDARY CTA that the
+   burger panel already offers twice — as "See a Live Demo" and "Start Free" —
+   so nothing becomes unreachable, and the ladder above already hides
+   `.site-oog` and `.signin` on the same principle. The cut is at 390px rather
+   than 367px because 375px cleared the edge by 8px, which is thinner than the
+   variation between a fallback font and a loaded one. */
+@media (max-width: 390px) {
+  /* `!important` because landing-home-fixes.css declares this same button
+     `display: inline-flex !important`, which no amount of specificity beats.
+     Same reason the `.signin` rule at the top of this file carries one. */
+  html body.qf-wft .site-actions .btn-secondary { display: none !important; }
+}
