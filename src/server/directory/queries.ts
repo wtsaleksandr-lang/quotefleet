@@ -2391,9 +2391,9 @@ export const HERO_CARRIER_LIMIT = 8;
  *  falling back to the legal name when the DBA is too short to identify). Kept
  *  local to avoid a queries→pages import cycle. */
 function heroDisplayName(legalName: string, dbaName: string | null): string {
-  const dba = (dbaName ?? '').trim();
+  const dba = (dbaName ?? '').replace(/\s+/g, ' ').trim();
   if (dba && (dba.includes(' ') || dba.length >= 8)) return dba;
-  return legalName;
+  return legalName.replace(/\s+/g, ' ').trim();
 }
 
 /**
