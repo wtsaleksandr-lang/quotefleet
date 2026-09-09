@@ -396,7 +396,7 @@ const TOOL_CSS = `
   .qt-field { position: relative; display: block; }
   .qt-field input, .qt-field select { width: 100%; min-height: 48px; box-sizing: border-box; padding: 20px 12px 6px; font: inherit; font-size: 15px; color: var(--ink); background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius); appearance: none; }
   .qt-field input:focus, .qt-field select:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
-  .qt-field .qt-lab { position: absolute; left: 12px; top: 6px; font-size: 11px; letter-spacing: 0.02em; color: var(--muted); pointer-events: none; }
+  .qt-field .qt-lab { position: absolute; left: 12px; top: 6px; right: 12px; font-size: 11px; letter-spacing: 0.02em; color: var(--muted); pointer-events: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .qt-field input:focus + .qt-lab, .qt-field select:focus + .qt-lab { color: var(--accent); }
 
   /* Preset pills: exactly four, in two columns, so they wrap 2x2 and none is
