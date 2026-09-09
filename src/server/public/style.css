@@ -1823,3 +1823,42 @@ html[data-theme="light"] .site-footer strong { color: var(--ink); }
   /* One source per line is a deliberate stack, not an orphaned wrap. */
   .qf-ds-list { grid-template-columns: minmax(0, 1fr); }
 }
+
+/* ── Tool promo CTA ─────────────────────────────────────────────── */
+.qf-tool-promo {
+  max-width: 880px;
+  margin: 48px auto 0;
+  padding: 0 24px;
+}
+.qf-tool-promo-inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 24px 32px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+}
+.qf-tool-promo-text {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--ink);
+}
+.qf-tool-promo-btn {
+  flex-shrink: 0;
+  padding: 12px 24px;
+  border-radius: var(--radius-btn);
+  background: var(--accent-fill);
+  color: var(--accent-ink);
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: none;
+  letter-spacing: 0.02em;
+  transition: opacity 0.15s;
+}
+.qf-tool-promo-btn:hover { opacity: 0.85; }
+@media (max-width: 600px) {
+  .qf-tool-promo-inner { flex-direction: column; text-align: center; padding: 24px; }
+}

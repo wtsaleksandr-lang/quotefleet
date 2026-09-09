@@ -77,7 +77,7 @@ import { US_STATES, US_STATE_CODES, stateByCode } from '../directory/usStates.js
 import { escortDirectoryHref } from '../pilotCars/model.js';
 import { publicCalcLimiter } from '../rateLimits.js';
 import { setPublicDirectoryCache } from '../directory/httpCache.js';
-import { FULL_SITE_HEADER, PREMIUM_FOOTER, HEADER_SCRIPTS } from '../siteChrome.js';
+import { FULL_SITE_HEADER, PREMIUM_FOOTER, HEADER_SCRIPTS, TOOL_PROMO_CTA } from '../siteChrome.js';
 
 const SITE = 'https://quotefleet.net';
 export const OSOW_TOOL_PATH = '/tools/oversize-permits';
@@ -1111,6 +1111,7 @@ export function renderOsowToolPage(): string {
 <body class="qf-mc-hide-sm">
   ${FULL_SITE_HEADER}
   ${body}
+  ${TOOL_PROMO_CTA}
   ${PREMIUM_FOOTER}
   ${HEADER_SCRIPTS}
   <template id="ow-leg-tpl"><div class="ow-leg">

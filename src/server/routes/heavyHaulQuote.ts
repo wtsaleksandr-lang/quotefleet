@@ -85,7 +85,7 @@ import { US_STATE_CODES, stateByCode, US_STATES } from '../directory/usStates.js
 import { publicCalcLimiter } from '../rateLimits.js';
 import { setPublicDirectoryCache } from '../directory/httpCache.js';
 import { escortDirectoryHref } from '../pilotCars/model.js';
-import { FULL_SITE_HEADER, PREMIUM_FOOTER, HEADER_SCRIPTS } from '../siteChrome.js';
+import { FULL_SITE_HEADER, PREMIUM_FOOTER, HEADER_SCRIPTS, TOOL_PROMO_CTA } from '../siteChrome.js';
 
 const SITE = 'https://quotefleet.net';
 export const HEAVY_HAUL_TOOL_PATH = '/tools/heavy-haul-quote';
@@ -1092,6 +1092,7 @@ export function renderHeavyHaulToolPage(): string {
 <body class="qf-mc-hide-sm">
   ${FULL_SITE_HEADER}
   ${body}
+  ${TOOL_PROMO_CTA}
   ${PREMIUM_FOOTER}
   ${HEADER_SCRIPTS}
   <template id="hh-tier-legend"><details class="hh-legend"><summary>What the four ratings mean</summary><dl>${tierLegend}</dl></details></template>

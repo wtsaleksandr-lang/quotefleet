@@ -43,7 +43,7 @@ import { activeRestrictions } from '../../calc/osow/seasonal/advisory.js';
 import type { StateSeasonalSnapshot } from '../../calc/osow/seasonal/types.js';
 import { loadSeasonalContext } from '../seasonal/store.js';
 import { setPublicDirectoryCache } from '../directory/httpCache.js';
-import { FULL_SITE_HEADER, PREMIUM_FOOTER, HEADER_SCRIPTS } from '../siteChrome.js';
+import { FULL_SITE_HEADER, PREMIUM_FOOTER, HEADER_SCRIPTS, TOOL_PROMO_CTA } from '../siteChrome.js';
 import { OSOW_TOOL_PATH } from './osowPermits.js';
 
 const SITE = 'https://quotefleet.net';
@@ -398,6 +398,7 @@ function page(title: string, description: string, path: string, body: string): s
 <body>
   ${FULL_SITE_HEADER}
   ${body}
+  ${TOOL_PROMO_CTA}
   ${PREMIUM_FOOTER}
   ${HEADER_SCRIPTS}
   <script src="/marketing-chat.js" defer></script>
