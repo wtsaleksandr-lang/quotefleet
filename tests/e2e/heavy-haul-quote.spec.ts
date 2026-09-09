@@ -30,6 +30,7 @@
  * Run: `pnpm test:e2e tests/e2e/heavy-haul-quote.spec.ts`
  */
 import { test, expect, type Page } from '@playwright/test';
+import { settledLayout } from './_settled';
 
 import { anUncoveredState } from './_uncovered';
 
@@ -923,6 +924,10 @@ test.describe('the OOG call to action', () => {
         await page.setViewportSize({ width, height: 800 });
         const res = await page.goto(path, { waitUntil: 'domcontentloaded', timeout: 45_000 });
         expect(res?.status(), `${path} must serve`).toBe(200);
+        // The layout is not final until the web fonts have swapped in; measuring
+        // before that reads a wider fallback and fails at a different path and
+        // width on every run. See tests/e2e/_settled.ts.
+        await settledLayout(page);
         const m = await page.evaluate(() => {
           const inner = document.querySelector('.site-header-inner') as HTMLElement | null;
           return {

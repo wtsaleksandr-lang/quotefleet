@@ -19,6 +19,7 @@
  */
 import { expect, test, type Page } from '@playwright/test';
 import { anUncoveredState } from './_uncovered';
+import { settledLayout } from './_settled';
 
 const MOBILE = { width: 375, height: 812 };
 const DESKTOP = { width: 1440, height: 900 };
@@ -58,6 +59,9 @@ async function setTheme(page: Page, theme: 'light' | 'dark') {
  * layout rounding; anything above that is a real overflow a reader would feel.
  */
 async function assertNoDocumentOverflow(page: Page, label: string) {
+  // Measured only once the layout is final — see tests/e2e/_settled.ts for the
+  // font-swap transient this used to catch instead.
+  await settledLayout(page);
   const overflow = await page.evaluate(() => {
     const de = document.documentElement;
     return {
