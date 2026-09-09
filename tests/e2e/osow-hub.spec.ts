@@ -18,6 +18,7 @@
  * table header and first column are painted from tokens that must exist in both.
  */
 import { expect, test, type Page } from '@playwright/test';
+import { anUncoveredState } from './_uncovered';
 
 const MOBILE = { width: 375, height: 812 };
 const DESKTOP = { width: 1440, height: 900 };
@@ -133,8 +134,19 @@ test('the hub links to every reference page it advertises', async ({ page }) => 
 });
 
 test('an uncovered state has no page rather than an empty one', async ({ page }) => {
-  const res = await page.goto('/oversize/wyoming', { waitUntil: 'domcontentloaded' });
-  expect(res?.status()).toBe(404);
+  /*
+   * ASKED OF THE ENGINE, NOT WRITTEN DOWN. This line said '/oversize/wyoming'
+   * and broke the moment Wyoming was encoded — the FIFTH time a hardcoded state
+   * has failed this suite (Mississippi, then West Virginia, then Wyoming). The
+   * refusal worked perfectly every time; the state had simply stopped needing
+   * it. See src/calc/osow/uncoveredState.ts for the full history and why the
+   * helper is shared between both suites.
+   */
+  const state = anUncoveredState();
+  // Same slug rule the hub itself uses (see hub.test.ts).
+  const slug = state.name.toLowerCase().replace(/ /g, '-');
+  const res = await page.goto(`/oversize/${slug}`, { waitUntil: 'domcontentloaded' });
+  expect(res?.status(), `${state.name} is uncovered, so it must have no page`).toBe(404);
 });
 
 test('the bridge formula calculator answers on load and after an edit', async ({ page }) => {

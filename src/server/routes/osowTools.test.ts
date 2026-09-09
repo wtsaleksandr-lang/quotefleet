@@ -13,6 +13,7 @@
  *   - and that the endpoint refuses bad geometry instead of computing on it.
  */
 import { describe, expect, it } from 'vitest';
+import { anUncoveredState } from '../../calc/osow/uncoveredState';
 import {
   AXLE_PRESETS,
   axleGroups,
@@ -121,9 +122,12 @@ describe('state limits', () => {
   });
 
   it('warns rather than silently ignoring an uncovered state', () => {
-    const r = evaluateAxles({ axles: FIVE_AXLE, state: 'WY', asOf: ASOF });
+    // Asked of the registry — see src/calc/osow/uncoveredState.ts. This named
+    // Wyoming until Wyoming was encoded.
+    const missing = anUncoveredState();
+    const r = evaluateAxles({ axles: FIVE_AXLE, state: missing.code, asOf: ASOF });
     expect(r.state).toBeNull();
-    expect(r.warnings.some((w) => w.includes('WY'))).toBe(true);
+    expect(r.warnings.some((w) => w.includes(missing.code))).toBe(true);
   });
 
   it('applies no state limits when none was asked for', () => {
