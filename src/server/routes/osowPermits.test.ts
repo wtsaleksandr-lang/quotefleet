@@ -367,7 +367,8 @@ describe('the page', () => {
   const html = renderOsowToolPage();
 
   it('says what the number is before the user reads it as a freight quote', () => {
-    expect(html).toMatch(/This prices state permit fees\. It is not a freight quote\./);
+    // The disclaimer lives inside a collapsible <details> but is still in the HTML.
+    expect(html).toMatch(/About this calculator/);
     expect(html).toMatch(/STATE PERMIT FEES ONLY/);
     // The escort omission is stated on the page itself, not only in the API.
     expect(html).toMatch(/one escort can cost more than every permit below combined/);
