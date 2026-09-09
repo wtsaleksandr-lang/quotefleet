@@ -84,14 +84,10 @@
   var toggle = $('demo-theme-toggle');
   if (toggle) {
     toggle.addEventListener('click', function () {
-      var isLight = document.documentElement.getAttribute('data-theme') === 'light';
-      if (isLight) {
-        document.documentElement.removeAttribute('data-theme');
-        try { localStorage.setItem('qf-theme', 'dark'); } catch (e) {}
-      } else {
-        document.documentElement.setAttribute('data-theme', 'light');
-        try { localStorage.setItem('qf-theme', 'light'); } catch (e) {}
-      }
+      var isLight = document.documentElement.getAttribute('data-theme') !== 'dark';
+      var next = isLight ? 'dark' : 'light';
+      document.documentElement.setAttribute('data-theme', next);
+      try { localStorage.setItem('qf-theme', next); } catch (e) {}
       // Switch the calculator (in its isolated iframe) to match the shell — live,
       // no reload, so any entered form values are preserved. The widget re-fetches
       // its config with this preset and re-skins. Same-origin target; the widget

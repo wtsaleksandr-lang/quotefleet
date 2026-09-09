@@ -6,11 +6,10 @@
 (function () {
   var KEY = 'qf-theme';
   function current() {
-    return document.documentElement.getAttribute('data-theme') === 'light' ? 'light' : 'dark';
+    return document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'light';
   }
   function apply(theme) {
-    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
-    else document.documentElement.removeAttribute('data-theme');
+    document.documentElement.setAttribute('data-theme', theme === 'dark' ? 'dark' : 'light');
   }
   function sync(btns, theme) {
     for (var i = 0; i < btns.length; i++) btns[i].setAttribute('aria-pressed', theme === 'light' ? 'true' : 'false');

@@ -480,7 +480,7 @@ export function renderMarketingShell(opts: MarketingShellOpts): string {
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <script>(function(){try{var t=localStorage.getItem('qf-theme');if(t==='light'||t==='dark')document.documentElement.setAttribute('data-theme',t);}catch(e){}})();</script>
+  <script>(function(){try{var t=localStorage.getItem('qf-theme');if(t==='dark'||(!t&&window.matchMedia&&matchMedia('(prefers-color-scheme:dark)').matches))document.documentElement.setAttribute('data-theme','dark');else document.documentElement.setAttribute('data-theme','light');}catch(e){document.documentElement.setAttribute('data-theme','light');}})();</script>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>${esc(opts.title)}</title>
   <meta name="description" content="${esc(opts.description)}">

@@ -704,7 +704,7 @@ export function hubPage(opts: HubPageOpts): string {
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <script>(function(){try{var t=localStorage.getItem('qf-theme');if(t==='light'||t==='dark')document.documentElement.setAttribute('data-theme',t);}catch(e){}})();</script>
+  <script>(function(){try{var t=localStorage.getItem('qf-theme');if(t==='dark'||(!t&&window.matchMedia&&matchMedia('(prefers-color-scheme:dark)').matches))document.documentElement.setAttribute('data-theme','dark');else document.documentElement.setAttribute('data-theme','light');}catch(e){document.documentElement.setAttribute('data-theme','light');}})();</script>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>${esc(opts.title)}</title>
   <meta name="description" content="${esc(opts.description)}">
@@ -721,7 +721,7 @@ export function hubPage(opts: HubPageOpts): string {
   <link rel="icon" type="image/png" sizes="16x16" href="/brand/favicon-16.png">
   <link rel="apple-touch-icon" sizes="180x180" href="/brand/apple-touch-icon-180.png">
   <link rel="manifest" href="/site.webmanifest">
-  <meta name="theme-color" content="#0b0f15">
+  <meta name="theme-color" content="#F6F8FA">
   <meta property="og:title" content="${esc(opts.title)}">
   <meta property="og:description" content="${esc(opts.description)}">
   <meta property="og:image" content="${SITE}/brand/og-image-1200x630.png">
