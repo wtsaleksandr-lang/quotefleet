@@ -170,12 +170,12 @@ const PC_CSS = `
   .pc-down h2 { font-size: 16px; margin: 0 0 4px; color: var(--error); text-align: left; }
   .pc-down p { margin: 0; color: var(--ink-soft); font-size: 14px; line-height: 1.55; }
 
-  .pc-grid { display: grid; grid-template-columns: minmax(0, 300px) minmax(0, 1fr); gap: 24px; align-items: start; margin-top: 16px; }
+  .pc-grid { display: grid; gap: 16px; margin-top: 16px; }
 
   /* ── Filters. A plain GET form: every view is a shareable URL. ─────────── */
-  .pc-filters { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 16px; display: grid; gap: 16px; }
-  .pc-filters h2 { font-size: 16px; margin: 0; color: var(--ink); text-align: left; }
-  .pc-fset { border: 0; margin: 0; padding: 0; display: grid; gap: 8px; }
+  .pc-filters { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 16px; display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end; }
+  .pc-filters h2 { font-size: 16px; margin: 0; color: var(--ink); text-align: left; width: 100%; flex: 0 0 100%; }
+  .pc-fset { border: 0; margin: 0; padding: 0; display: grid; gap: 8px; min-width: 200px; flex: 1 1 200px; }
   .pc-fset > legend { padding: 0; font-size: 12px; font-family: var(--font-mono); letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
   /* The help cue is TOP-LEFT of its group and never inline with a control. */
   .pc-help { margin: 0; font-size: 12px; line-height: 1.5; color: var(--muted); }
@@ -200,8 +200,8 @@ const PC_CSS = `
   .pc-field--list select:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
   .pc-field--list + .pc-help { margin-top: 2px; }
 
-  .pc-actions { display: grid; gap: 8px; }
-  .pc-actions .btn { width: 100%; min-height: 48px; display: inline-flex; align-items: center; justify-content: center; }
+  .pc-actions { display: flex; gap: 8px; flex: 0 0 100%; width: 100%; }
+  .pc-actions .btn { min-height: 48px; display: inline-flex; align-items: center; justify-content: center; flex: 1; }
 
   /* ── Results. ─────────────────────────────────────────────────────────── */
   .pc-results { display: grid; gap: 16px; }
@@ -261,6 +261,14 @@ const PC_CSS = `
 
   .pc-link { color: var(--accent); font-size: 13px; overflow-wrap: anywhere; }
 
+  /* Foldable prose — keeps the page concise without losing content. */
+  details.qt-fold { margin: 8px 0 16px; }
+  details.qt-fold > summary { cursor: pointer; color: var(--accent); font-size: 13px; list-style: none; display: inline-flex; align-items: center; gap: 4px; }
+  details.qt-fold > summary::-webkit-details-marker { display: none; }
+  details.qt-fold > summary::before { content: '▸'; transition: transform .2s; }
+  details.qt-fold[open] > summary::before { transform: rotate(90deg); }
+  details.qt-fold > .qt-fold-body { padding: 8px 0 0; color: var(--muted); font-size: 14px; line-height: 1.5; }
+
   /* ── The submission / manage form. ────────────────────────────────────── */
   .pc-form { max-width: 780px; display: grid; gap: 16px; }
   .pc-card--form { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 16px; display: grid; gap: 12px; }
@@ -273,8 +281,9 @@ const PC_CSS = `
   .pc-say.is-ok { border-color: var(--success); color: var(--ink-soft); }
   .pc-token { font-family: var(--font-mono); font-size: 13px; overflow-wrap: anywhere; color: var(--ink); }
 
-  @media (max-width: 960px) {
-    .pc-grid { grid-template-columns: minmax(0, 1fr); }
+  @media (max-width: 768px) {
+    .pc-fset { min-width: 100%; flex: 0 0 100%; }
+    .pc-actions { flex-direction: column; }
   }
   @media (max-width: 760px) {
     .pc-hero h1 { font-size: 28px; }
@@ -597,14 +606,14 @@ export function renderIndexPage(
       <p class="pc-eyebrow">Free directory &middot; no account needed</p>
       <h1>Pilot Car &amp; Escort Operator Directory</h1>
       <p class="lead">Filter escort operators by the things that decide whether they can legally take your load: the states they run, the certificate they hold in each one and when it expires, the equipment on the truck, the escort vehicle's own weight rating, and their insurance.</p>
-      <div class="pc-truth">
-        <h2>Every record here is self-reported unless it says otherwise, and it says otherwise on the card.</h2>
-        <p><strong>Operators list themselves; we do not import anyone.</strong> A record marked <em>Self-reported</em> is the operator's own statement and nobody here has checked it — ask for the certificate and the insurance certificate before you dispatch. Where we have checked something, the card says what we checked, when, and links the register we checked it against.</p>
-      </div>
-      <div class="pc-truth">
-        <h2>Whether a state requires certification is genuinely disputed, and we publish the disagreement.</h2>
-        <p>Two pages of the same Virginia DMV give different reciprocity answers and neither carries a date. Colorado, Oklahoma and Washington publish who they ACCEPT and no list of who accepts them. New York accepts nobody. The table below records each state's published position and links the document — it does not average them into a single confident answer.</p>
-      </div>
+      <p style="margin:12px 0 0;font-size:14px;color:var(--ink-soft);">Listings are self-reported and unverified unless the card says otherwise.</p>
+      <details class="qt-fold">
+        <summary>About this directory's data</summary>
+        <div class="qt-fold-body">
+          <p><strong>Operators list themselves; we do not import anyone.</strong> A record marked <em>Self-reported</em> is the operator's own statement and nobody here has checked it — ask for the certificate and the insurance certificate before you dispatch. Where we have checked something, the card says what we checked, when, and links the register we checked it against.</p>
+          <p style="margin-top:8px;"><strong>Whether a state requires certification is genuinely disputed, and we publish the disagreement.</strong> Two pages of the same Virginia DMV give different reciprocity answers and neither carries a date. Colorado, Oklahoma and Washington publish who they ACCEPT and no list of who accepts them. New York accepts nobody. The table below records each state's published position and links the document — it does not average them into a single confident answer.</p>
+        </div>
+      </details>
     </div>
   </section>
 

@@ -668,6 +668,14 @@ const HH_CSS = `
   .hh-fold a { color: var(--accent); overflow-wrap: anywhere; }
 
   .hh-empty { color: var(--muted); font-size: 14px; line-height: 1.6; margin: 0; }
+
+  /* Foldable prose — keeps the page concise without losing content. */
+  details.qt-fold { margin: 8px 0 16px; }
+  details.qt-fold > summary { cursor: pointer; color: var(--accent); font-size: 13px; list-style: none; display: inline-flex; align-items: center; gap: 4px; }
+  details.qt-fold > summary::-webkit-details-marker { display: none; }
+  details.qt-fold > summary::before { content: '▸'; transition: transform .2s; }
+  details.qt-fold[open] > summary::before { transform: rotate(90deg); }
+  details.qt-fold > .qt-fold-body { padding: 8px 0 0; color: var(--muted); font-size: 14px; line-height: 1.5; }
   .hh-busy { color: var(--muted); font-size: 14px; margin: 0; }
   .hh-eglist { margin: 8px 0 0; padding-left: 20px; display: grid; gap: 4px; }
   .hh-eglist li { font-size: 13px; line-height: 1.55; color: var(--ink-soft); }
@@ -889,10 +897,12 @@ export function renderHeavyHaulToolPage(): string {
       <p class="hh-eyebrow">Free tool &middot; no account needed</p>
       <h1>Heavy-Haul &amp; OOG Delivered-Cost Estimator</h1>
       <p class="lead">Two addresses and your cargo. That is the whole form. Axle count, trailer class and route class are worked out from the load rather than asked for, and every charge that comes back says what kind of evidence stands behind it.</p>
-      <div class="hh-truth">
-        <h2>Every line says what kind of number it is.</h2>
-        <p><strong>State permit fees are cited to the statute or fee schedule they came from, and carry no range. Fuel is indexed to the EIA weekly diesel price. Line haul, pilot cars and accessorials are a benchmark band from published market data, always shown as a range, and replaced outright by any rates YOU enter.</strong> No margin is added, ever. A component we cannot price is named and left out, never counted as $0.</p>
-      </div>
+      <details class="qt-fold">
+        <summary>How this estimate works</summary>
+        <div class="qt-fold-body">
+          <p><strong>State permit fees are cited to the statute or fee schedule they came from, and carry no range. Fuel is indexed to the EIA weekly diesel price. Line haul, pilot cars and accessorials are a benchmark band from published market data, always shown as a range, and replaced outright by any rates YOU enter.</strong> No margin is added, ever. A component we cannot price is named and left out, never counted as $0.</p>
+        </div>
+      </details>
     </div>
   </section>
 
