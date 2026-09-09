@@ -2026,9 +2026,9 @@ export const NAV_SHIPPER_SCRIPT = `
  * carrier on its own (e.g. FMCSA lists "SELECT" for "SELECT WATER SOLUTIONS LLC").
  */
 export function carrierName(c: { dbaName?: string | null; legalName: string }): string {
-  const dba = (c.dbaName ?? '').trim();
+  const dba = (c.dbaName ?? '').replace(/\s+/g, ' ').trim();
   if (dba && (dba.includes(' ') || dba.length >= 8)) return dba;
-  return c.legalName;
+  return c.legalName.replace(/\s+/g, ' ').trim();
 }
 
 /**

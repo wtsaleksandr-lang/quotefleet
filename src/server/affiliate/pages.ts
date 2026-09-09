@@ -212,6 +212,15 @@ export function renderPartnersTerms(): string {
   </section>
   <main class="pt-shell">
     <div class="pt-terms">
+      <div class="meta-strip" style="display:flex;flex-wrap:wrap;gap:8px 20px;margin-bottom:24px;font-size:13.5px;color:var(--muted);">
+        <span><strong>Last updated:</strong> 2026-09-09</span>
+        <span><strong>Operator:</strong> MR Holdings &amp; Trade LLC, d/b/a QuoteFleet</span>
+      </div>
+
+      <h2>0. Identity &amp; governing law</h2>
+      <p>These Partner Program Terms (&#8220;Terms&#8221;) are between you and <strong>MR Holdings &amp; Trade LLC</strong>, a Wyoming limited liability company doing business as (<strong>d/b/a</strong>) <strong>QuoteFleet</strong> (&#8220;QuoteFleet,&#8221; &#8220;we,&#8221; or &#8220;us&#8221;). Registered office: 30 N Gould St, Ste R, Sheridan, WY 82801, United States.</p>
+      <p>These Terms are governed by the laws of the <strong>State of Wyoming, United States</strong>, without regard to conflict-of-laws rules. Any dispute arising under or relating to these Terms that cannot be resolved informally within thirty (30) days of written notice shall be submitted to the exclusive jurisdiction of the state and federal courts located in Wyoming. Nothing in this section limits either party&#8217;s ability to seek injunctive relief to protect intellectual property or confidential information.</p>
+
       <h2>1. Referral program (for customers)</h2>
       <p>Every QuoteFleet customer has a unique referral link. When someone signs up through your link and becomes a paying subscriber:</p>
       <ul>

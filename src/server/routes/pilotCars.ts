@@ -909,7 +909,16 @@ export function renderJoinPage(): string {
   const title = 'List Your Pilot Car / Escort Service — Free | QuoteFleet';
   const description =
     'Add your pilot car or escort vehicle service to QuoteFleet\'s opt-in directory. Structured per-state certification, equipment and insurance fields. You choose what is public and you can delete the record at any time.';
-  return page(title, description, PILOT_CAR_JOIN_PATH, body);
+  const breadcrumbLd = `<script type="application/ld+json">${JSON.stringify({
+    '@context': 'https://schema.org',
+    '@type': 'BreadcrumbList',
+    itemListElement: [
+      { '@type': 'ListItem', position: 1, name: 'Home', item: `${SITE}/` },
+      { '@type': 'ListItem', position: 2, name: 'Pilot Cars', item: `${SITE}${PILOT_CAR_PATH}` },
+      { '@type': 'ListItem', position: 3, name: 'Join', item: `${SITE}${PILOT_CAR_JOIN_PATH}` },
+    ],
+  })}</script>`;
+  return page(title, description, PILOT_CAR_JOIN_PATH, body, breadcrumbLd);
 }
 
 // ── The manage page ────────────────────────────────────────────────────────
