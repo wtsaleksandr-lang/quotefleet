@@ -5,8 +5,11 @@
 // (soft no-op when DOPPLER_TOKEN is unset) BEFORE config.ts / db read env.
 import './bootstrapDoppler.js';
 import { loadEnv } from '../config.js';
+import { ensureSelfHealTables, ensureSelfHealColumns } from '../db/migrate.js';
+import { ensureAuthorityRevalidationColumns } from './directory/authorityRevalidation.js';
 import { maybeAutoHealCarrierDirectory } from './directory/autoHeal.js';
 import { maybeBackfillNearestPortCodes } from './directory/backfillNearestPort.js';
+import { ensureFreshDirectoryAggregates } from './directory/queries.js';
 import { seedDirectoryTerminals } from './directory/terminals.js';
 import { createApp } from './app.js';
 import { startMarketplaceCron } from '../marketplace/cron.js';
@@ -18,10 +21,14 @@ import { startManifestRenewalCron } from '../email/manifestRenewalCron.js';
 import { startFuelSurchargeCron } from '../eia/dieselPrice.js';
 import { startDirectoryRefreshCron } from './directoryRefreshCron.js';
 import { runCronSafely } from './cronSafety.js';
+import { ensureJobRunsTable } from './jobHealth.js';
+import { ensureOpsAlertsTable } from './opsAlerts.js';
 import { startJobHealthWatchdogCron } from './jobHealthWatchdogCron.js';
 import { startOpsDigestCron } from './opsDigestCron.js';
 import { startCardExpiryCron } from './cardExpiryCron.js';
 import { startRfqResponseCron } from './rfq/responseCron.js';
+import { ensureSeasonalRestrictionsTable } from './seasonal/store.js';
+import { ensurePilotCarTable } from './pilotCars/store.js';
 import { startSeasonalRestrictionsCron } from './seasonalRestrictionsCron.js';
 import {
   decideUncaughtExceptionAction,
@@ -98,6 +105,79 @@ async function runPostListenJobs(): Promise<void> {
     // batched, fire-and-forget, never throws into boot (see backfillNearestPort.ts).
     void maybeBackfillNearestPortCodes().catch((err) => {
       console.error('[directory-backfill] startup check failed (non-fatal):', err);
+    });
+    // JOURNAL-INDEPENDENT SCHEMA SELF-HEAL. Replit's deploy skips db:migrate and
+    // its publish tool can DROP tables/columns, so these idempotent
+    // CREATE/ALTER ... IF NOT EXISTS statements must re-assert the at-risk schema
+    // on EVERY boot (exactly what their own docstrings promise). This wiring was
+    // MISSING on the boot path, so directory_aggregate_cache was never created in
+    // prod — silently disabling the persisted-aggregate precompute (the recurring
+    // all-domains-down outage fix) and making the hourly aggregate-refresh cron
+    // full-table-scan then fail its INSERT into the absent table.
+    //
+    // Fired POST-LISTEN and non-blocking (`void ... .catch`) — identical to the
+    // data heals above — so a brief DDL lock can NEVER delay a healthz probe. Each
+    // heal contains ONLY idempotent CREATE TABLE / CREATE INDEX / ADD COLUMN
+    // IF NOT EXISTS statements (no backfill / heavy ALTER), each a no-op round-trip
+    // on a healthy DB. The directory TABLE heal is chained to the aggregate
+    // precompute so directory_aggregate_cache exists before the precompute writes
+    // its singleton row; the precompute itself is limiter+timeout bounded and
+    // never throws into boot, and the weekly cron keeps the row fresh thereafter.
+    //
+    // The live-authority cache columns are chained onto this SAME promise rather
+    // than fired beside it: they ALTER carrier_directory, which the table heal has
+    // just finished touching, and two concurrent ACCESS EXCLUSIVE requests on one
+    // table are precisely the lock pile-up that took prod down on 2026-08-28. They
+    // run BEFORE the aggregate precompute (a plain read/write that does not need
+    // them) so the DDL window closes as early as possible. Their absence is a plain
+    // cache miss to the endpoint that reads them, so a deferred heal degrades to
+    // the stored snapshot rather than erroring.
+    void ensureSelfHealTables()
+      .then(() => ensureAuthorityRevalidationColumns())
+      .then(() => ensureFreshDirectoryAggregates())
+      .catch((err) => {
+        console.error(
+          '[server] directory table self-heal + aggregate precompute failed (non-fatal):',
+          err,
+        );
+      });
+    // brand_configs at-risk columns — same journal-independent phantom-drop guard,
+    // independent of the table heal above (different tables → no lock contention),
+    // so it neither blocks nor is blocked by it.
+    void ensureSelfHealColumns().catch((err) => {
+      console.error('[server] brand_configs column self-heal failed (non-fatal):', err);
+    });
+    // job_runs ledger — a brand-new table touched by nothing else, so it is
+    // fired independently of the carrier_directory chain above (no shared lock).
+    // Crons begin writing 30s–2min from now and the watchdog first reads at
+    // +5min, so this CREATE TABLE IF NOT EXISTS wins the race comfortably; a
+    // ledger write that loses it is swallowed and the next tick records fine.
+    void ensureJobRunsTable().catch((err) => {
+      console.error('[server] job_runs ledger self-heal failed (non-fatal):', err);
+    });
+    // ops_alerts ledger — same reasoning as job_runs: a brand-new table nothing
+    // else touches, so no shared lock. The Stripe webhook can write to it as
+    // soon as the port is open, which is why it heals here rather than lazily.
+    void ensureOpsAlertsTable().catch((err) => {
+      console.error('[server] ops_alerts ledger self-heal failed (non-fatal):', err);
+    });
+    // seasonal_restrictions — a brand-new table nothing else touches, so it
+    // takes no shared lock and cannot queue behind the carrier_directory chain.
+    // Non-blocking and non-fatal for the same reason as the two above: an
+    // OS/OW quote and the reference page both answer correctly with the table
+    // absent (they degrade to "we hold no current data" with the state's own
+    // link), so a failed heal must never delay a healthz probe or stop boot.
+    void ensureSeasonalRestrictionsTable().catch((err) => {
+      console.error('[server] seasonal_restrictions self-heal failed (non-fatal):', err);
+    });
+    // pilot_car_operators — same shape again: a brand-new table nothing else
+    // touches, so no shared lock and no place in the carrier_directory queue.
+    // Non-blocking and non-fatal because every pilot-car page renders with the
+    // table absent — the store returns `unavailable: true` and the page says
+    // "we cannot reach the directory right now", which is the honest output and
+    // is emphatically not "no operators found".
+    void ensurePilotCarTable().catch((err) => {
+      console.error('[server] pilot_car_operators self-heal failed (non-fatal):', err);
     });
     // Register every scheduled cron through runCronSafely. This wrapper (a) catches
     // a throw at registration so one cron failing to register can NEVER stop the

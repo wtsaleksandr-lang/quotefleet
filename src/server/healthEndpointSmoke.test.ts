@@ -7,7 +7,23 @@ import { once } from 'node:events';
 import { describe, expect, it } from 'vitest';
 
 const rootDir = process.cwd();
-const STARTUP_READINESS_BUDGET_MS = 5_000;
+/*
+ * How long the compiled server gets to answer /healthz while the database is
+ * blackholed and never answers.
+ *
+ * Raised from 5s. What this test proves is a STRUCTURAL property — the listener
+ * opens even though startup work is blocked on a database that will never
+ * respond — and the failure it guards against is an UNBOUNDED wait, not a slow
+ * one. Five seconds also has to cover spawning a Node process and loading the
+ * whole compiled app, which under the full suite's parallel load exceeded it for
+ * reasons that have nothing to do with the server's design: the test passed
+ * alone and failed in the suite.
+ *
+ * Fifteen seconds keeps the distinction the test exists for (bounded vs never)
+ * while not failing on scheduler noise. For scale, production boot was measured
+ * at ~24s, so this was never a performance budget in the first place.
+ */
+const STARTUP_READINESS_BUDGET_MS = 15_000;
 
 async function read(path: string) {
   return readFile(resolve(rootDir, path), 'utf8');
@@ -168,9 +184,53 @@ describe('production health endpoint', () => {
     expect(postListenJobs).toContain('await seedDirectoryTerminals()');
     expect(postListenJobs).toContain('void maybeAutoHealCarrierDirectory()');
     expect(postListenJobs).toContain('void maybeBackfillNearestPortCodes()');
-    expect(postListenJobs).not.toMatch(
-      /ensureSelfHeal|ensureAuthorityRevalidationColumns|ensureJobRunsTable|ensureOpsAlertsTable|ensureSeasonalRestrictionsTable|ensurePilotCarTable/,
-    );
+    /*
+     * SCHEMA SELF-HEAL MUST BE FIRE-AND-FORGET, NOT ABSENT.
+     *
+     * This assertion used to forbid the self-heal calls outright, and that was
+     * too broad in a way that cost real protection. The September outage was
+     * caused by Replit probing GET / — which went through tenant resolution and
+     * could hit the database — not by the self-heal DDL itself. The probe path
+     * is now database-free (asserted in the test above), so DDL contention can
+     * no longer delay it whatever else is running.
+     *
+     * Removing the self-heal entirely re-opened two failure modes it was
+     * written for, both of which have taken production down before: Replit's
+     * publish tool DROPs tables and columns and its deploy skips db:migrate, and
+     * `directory_aggregate_cache` never being created is the documented cause of
+     * the earlier recurring all-domains-down outage. A boot of the production
+     * build against the production database on 2026-09-08 created
+     * seasonal_restrictions, ops_alerts and pilot_car_operators — so these are
+     * not hypothetical no-ops, they were actively repairing live schema drift.
+     *
+     * What actually has to hold is that the heal can never DELAY the listener or
+     * the probe. That is guaranteed by two things this test already checks — the
+     * listener opens before post-listen jobs run, and the jobs are invoked with
+     * `void` rather than awaited — so those are what is asserted here instead of
+     * the presence or absence of any particular call.
+     */
+    for (const heal of [
+      'ensureSelfHealTables',
+      'ensureSelfHealColumns',
+      'ensureAuthorityRevalidationColumns',
+      'ensureJobRunsTable',
+      'ensureOpsAlertsTable',
+      'ensureSeasonalRestrictionsTable',
+      'ensurePilotCarTable',
+    ]) {
+      if (!postListenJobs.includes(`${heal}(`)) continue;
+      // Never awaited: an awaited heal would serialise boot behind a DDL lock.
+      // A plain string check rather than a built RegExp — the first version of
+      // this line built the pattern in a template literal, where \s and \( are
+      // not valid escapes, and shipped /awaits+ensureSelfHealTables(/ instead.
+      expect(
+        postListenJobs.includes(`await ${heal}(`),
+        `${heal} must not be awaited in the boot path`,
+      ).toBe(false);
+    }
+    // And the whole block stays non-blocking: the heal chain is reached through
+    // a `void` statement, so nothing in it can push the listener later.
+    expect(postListenJobs.includes('void ensureSelfHealTables()')).toBe(true);
 
     const port = await unusedLocalPort();
     const databaseBlackhole = await startDatabaseBlackhole();
