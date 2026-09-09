@@ -772,6 +772,7 @@ export function renderBridgeToolPage(): string {
     bodyHtml: body,
     extraCss: TOOL_CSS,
     extraScripts: toolScript('bridge'),
+    showPromoCta: true,
     jsonLd: [
       jsonLdBreadcrumb([
         { name: 'Free tools', path: '/tools' },
@@ -849,6 +850,7 @@ export function renderAxleToolPage(): string {
     bodyHtml: body,
     extraCss: TOOL_CSS,
     extraScripts: toolScript('axle'),
+    showPromoCta: true,
     jsonLd: [
       jsonLdBreadcrumb([
         { name: 'Free tools', path: '/tools' },

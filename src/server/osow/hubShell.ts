@@ -22,7 +22,7 @@
  * `data-theme` block of our own and no raw hex anywhere in this file.
  */
 import type { SourceDoc } from '../../calc/osow/provenance.js';
-import { FULL_SITE_HEADER, PREMIUM_FOOTER, HEADER_SCRIPTS } from '../siteChrome.js';
+import { FULL_SITE_HEADER, PREMIUM_FOOTER, HEADER_SCRIPTS, TOOL_PROMO_CTA } from '../siteChrome.js';
 import type { HubCell, Provenance } from './hubData.js';
 
 export const SITE = 'https://quotefleet.net';
@@ -656,6 +656,7 @@ export interface HubPageOpts {
   dateModified?: string | null;
   extraCss?: string;
   extraScripts?: string;
+  showPromoCta?: boolean;
 }
 
 export function hubPage(opts: HubPageOpts): string {
@@ -732,6 +733,7 @@ export function hubPage(opts: HubPageOpts): string {
 <body>
   ${FULL_SITE_HEADER}
   ${body}
+  ${opts.showPromoCta ? TOOL_PROMO_CTA : ''}
   ${PREMIUM_FOOTER}
   ${HEADER_SCRIPTS}
   <script src="/marketing-chat.js" defer></script>
