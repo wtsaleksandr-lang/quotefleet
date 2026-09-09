@@ -288,8 +288,8 @@ describe('house UI rules', () => {
     expect(html).toMatch(/\.pc-table \{[^}]*min-width: 560px/);
   });
 
-  it('collapses the two-column layout and the state grid at phone width', () => {
-    expect(html).toMatch(/@media \(max-width: 960px\)[\s\S]*?\.pc-grid \{ grid-template-columns: minmax\(0, 1fr\)/);
+  it('collapses filter groups and the state grid at phone width', () => {
+    expect(html).toMatch(/@media \(max-width: 768px\)[\s\S]*?\.pc-fset \{ min-width: 100%/);
     expect(html).toMatch(/@media \(max-width: 760px\)[\s\S]*?\.pc-statebox \{ grid-template-columns: repeat\(2/);
   });
 
