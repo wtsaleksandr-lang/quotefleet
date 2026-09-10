@@ -147,6 +147,30 @@ function rejectBadPathPage(req: Request, res: Response, hubPath: string): boolea
 const hasFacetParams = (q: Record<string, unknown>): boolean =>
   FACET_QUERY_KEYS.some((k) => q[k] != null && String(q[k]).trim() !== '');
 
+/**
+ * In-page facet navigation: the results pages' client script (pages.ts
+ * DIRECTORY_NAV_SCRIPT) re-fetches the SAME URL with `X-QF-Partial: 1` and
+ * swaps only the `.dir-layout` block, instead of a full navigation per tap.
+ *
+ * The request also carries `?qf_partial=1`. The header alone is not a safe
+ * cache discriminator: Cloudflare (and most CDNs) key on URL + Accept-Encoding
+ * and ignore every other `Vary`, so a partial and the full page for one URL
+ * would otherwise collide in the shared cache. The param changes the cache key;
+ * the server honours EITHER signal so a URL carrying the param is always a
+ * partial and never a full page (consistent no matter how it was reached).
+ */
+const PARTIAL_HEADER = 'X-QF-Partial';
+function wantsPartial(req: Request): boolean {
+  return req.get(PARTIAL_HEADER) === '1' || String(req.query.qf_partial ?? '') === '1';
+}
+
+/** The public cache policy for a faceted results page, which has two shapes
+ *  (full document / partial) at one URL → `Vary` on the partial header too. */
+function setResultsCache(req: Request, res: Response): void {
+  setPublicDirectoryCache(req, res);
+  res.vary(PARTIAL_HEADER);
+}
+
 /** "san-antonio" → "San Antonio" (fallback city display when no DB row seen). */
 const prettifySlug = (slug: string): string =>
   slug
@@ -371,8 +395,8 @@ export function registerDirectoryRoutes(app: Express) {
           getFacetCounts(filters),
           getDirectorySummary(),
         ]);
-        setPublicDirectoryCache(req, res);
-        res.type('html').send(renderDirectoryResults({ filters, list, counts, summary }));
+        setResultsCache(req, res);
+        res.type('html').send(renderDirectoryResults({ filters, list, counts, summary, partial: wantsPartial(req) }));
       } catch (err) {
         next(err);
       }
@@ -421,8 +445,8 @@ export function registerDirectoryRoutes(app: Express) {
         const port = portGroupAsPort(group);
         const filters = normalizeFilters(withPathPage(req), { port: group.code, state: null, citySlug: null });
         const [list, counts] = await Promise.all([listCarriers({ filters }), getFacetCounts(filters)]);
-        setPublicDirectoryCache(req, res);
-        res.type('html').send(renderPortPage({ port, list, counts, filters }));
+        setResultsCache(req, res);
+        res.type('html').send(renderPortPage({ port, list, counts, filters, partial: wantsPartial(req) }));
       } catch (err) {
         next(err);
       }
@@ -541,7 +565,7 @@ export function registerDirectoryRoutes(app: Express) {
         getFacetCounts(filters),
         citiesForState(state.code, 24),
       ]);
-      setPublicDirectoryCache(req, res);
+      setResultsCache(req, res);
       res.type('html').send(
         renderCityPage({
           state,
@@ -550,6 +574,7 @@ export function registerDirectoryRoutes(app: Express) {
           counts,
           filters,
           cities,
+          partial: wantsPartial(req),
         }),
       );
     } catch (err) {
@@ -579,8 +604,8 @@ export function registerDirectoryRoutes(app: Express) {
           getFacetCounts(filters),
           citiesForState(state.code, 24),
         ]);
-        setPublicDirectoryCache(req, res);
-        res.type('html').send(renderStatePage({ state, list, counts, filters, cities }));
+        setResultsCache(req, res);
+        res.type('html').send(renderStatePage({ state, list, counts, filters, cities, partial: wantsPartial(req) }));
       } catch (err) {
         next(err);
       }

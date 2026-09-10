@@ -36,6 +36,7 @@ import {
   CARGO_OPTIONS,
   SORT_OPTIONS,
   SORT_DIR_DEFAULTS,
+  FACET_QUERY_KEYS,
   sortIsDirectional,
   citySlugify,
   titleCaseCity,
@@ -724,8 +725,15 @@ export const DIRECTORY_CSS = `
   .dir-crumbs .sep { opacity: 0.5; }
   .dir-crumbs .cur { color: var(--ink-soft); }
   /* Faceted two-column layout */
-  .dir-layout { display: grid; grid-template-columns: 258px minmax(0, 1fr); gap: 24px; align-items: start; }
-  .dir-rail { position: sticky; top: 16px; }
+  /* Source order is head (search + toolbar) → rail → results, so that on a
+     phone the filter rail unfolds DIRECTLY UNDER the "Filters" button that
+     opened it. Desktop keeps the classic two-column look via explicit grid
+     placement: the rail owns column 1 across both rows, head/results stack in
+     column 2. Row-gap is 0 (the toolbar's own bottom margin spaces the grid). */
+  .dir-layout { display: grid; grid-template-columns: 258px minmax(0, 1fr); grid-template-rows: auto 1fr; gap: 0 24px; align-items: start; }
+  .dir-head { grid-column: 2; grid-row: 1; min-width: 0; }
+  .dir-rail { position: sticky; top: 16px; grid-column: 1; grid-row: 1 / 3; }
+  .dir-results { grid-column: 2; grid-row: 2; min-width: 0; }
   .facet-group { border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--surface); padding: 14px 16px; margin-bottom: 12px; }
   .facet-group h3 { margin: 0 0 4px; font-size: 12px; text-transform: uppercase; letter-spacing: 0.07em; color: var(--muted); font-family: var(--font-mono); }
   .facet-src { font-size: 10px; font-family: var(--font-mono); letter-spacing: 0.04em; color: var(--muted); opacity: 0.8; display: block; margin: 0 0 8px; }
@@ -745,8 +753,11 @@ export const DIRECTORY_CSS = `
   .cap-claim-cta { display: inline-block; margin-top: 12px; font-size: 12px; font-family: var(--font-mono); color: var(--accent); text-decoration: none; }
   .cap-claim-cta:hover { text-decoration: underline; }
   .facet-opt .lbl { display: flex; align-items: center; gap: 7px; }
-  .facet-check { width: 14px; height: 14px; border: 1px solid var(--border-strong); border-radius: 4px; display: inline-block; flex: 0 0 auto; }
+  .facet-check { position: relative; width: 14px; height: 14px; border: 1px solid var(--border-strong); border-radius: 4px; display: inline-block; flex: 0 0 auto; box-sizing: border-box; }
   .facet-opt.active .facet-check { background: var(--accent); border-color: var(--accent); }
+  /* A real ✓ (CSS border-trick, no glyph/emoji) so a checked box reads as
+     checked, not merely as a filled square. */
+  .facet-opt.active .facet-check::after { content: ''; position: absolute; left: 4px; top: 1px; width: 3px; height: 7px; border: solid var(--accent-ink); border-width: 0 2px 2px 0; transform: rotate(45deg); }
   /* Ports & terminals unfolding picker — ONE combined list (seaports + inland
      rail ramps), grouped US / Canada, with a client-side free-text filter. */
   details.port-picker { padding: 0; overflow: hidden; }
@@ -875,8 +886,16 @@ export const DIRECTORY_CSS = `
     .qf-ab-fmts { flex: 1 1 100%; justify-content: flex-start; gap: 12px; }
   }
   @media (max-width: 900px) {
-    .dir-layout { grid-template-columns: 1fr; }
+    /* One column, in SOURCE order: head → rail → results. Zero grid gap: the
+       collapsed rail is a 0-height row, and a 24px gap on each side of it was
+       half of the 112px dead band measured between the hero and the search box. */
+    .dir-layout { grid-template-columns: 1fr; grid-template-rows: none; gap: 0; }
+    .dir-head, .dir-rail, .dir-results { grid-column: auto; grid-row: auto; }
     .dir-rail { position: static; }
+    /* Close the hero→search dead band (was 38 + 22 + 28 + 24 = 112px). */
+    .dir-hero { padding-bottom: 8px; }
+    .dir-hero p.lead { margin-bottom: 12px; }
+    .dir-shell { padding-top: 12px; }
     .rail-toggle { display: block; width: 100%; text-align: left; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 12px 16px; color: var(--ink); font-size: 14px; font-family: var(--font-mono); cursor: pointer; margin-bottom: 12px; }
     .dir-rail[data-collapsed="1"] .facet-group { display: none; }
   }
@@ -1512,7 +1531,10 @@ export const DIRECTORY_CSS = `
   .rt-main .rc b { font-family: var(--font-mono); color: var(--accent); font-size: 20px; }
   .rt-main .sort-ctl { flex: 0 0 auto; }
   .rt-main .rail-toggle { display: none; } /* desktop: rail always visible, no toggle */
-  .results-toolbar .applied-chips { margin: 0; padding-top: 12px; border-top: 1px solid var(--border); }
+  /* Applied chips are the FIRST row of the toolbar (above the count) so the
+     active-filter state is visible the moment the toolbar is — on a phone the
+     old below-the-sort placement landed under the sticky action bar. */
+  .results-toolbar .applied-chips { margin: 0; padding-bottom: 12px; border-bottom: 1px solid var(--border); }
 
   /* ── D4: fold long facet lists (Show more / Show less). Rendered OPEN so no-JS
      + crawlers see every facet link; the fold script collapses it and reveals the
@@ -1688,6 +1710,44 @@ export const DIRECTORY_CSS = `
   @media (max-width: 640px) {
     .site-footer .dirfoot { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px 16px; }
   }
+
+  /* ── In-page facet navigation (DIRECTORY_NAV_SCRIPT) ─────────────────────
+     A facet tap swaps the results in place (fetch + history.pushState). While
+     the swap is in flight the tapped row shows its new checked state at once
+     (optimistic) with a small spinner in place of the count pill, and the
+     results dim. Appended at the END on purpose — see the note above. */
+  .results-toolbar:focus { outline: none; }
+  .dir-layout[aria-busy="true"] .dir-results { opacity: 0.6; transition: opacity 0.15s ease; }
+  .facet-opt .cb { position: relative; }
+  .facet-opt.is-loading .cb { color: transparent; }
+  .facet-opt.is-loading .cb::after { content: ''; position: absolute; top: 0; right: 0; bottom: 0; left: 0; margin: auto; width: 10px; height: 10px; border: 2px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: qf-facet-spin 0.6s linear infinite; }
+  .facet-opt.is-loading .facet-check { opacity: 0.6; }
+  @keyframes qf-facet-spin { to { transform: rotate(360deg); } }
+  @media (prefers-reduced-motion: reduce) { .facet-opt.is-loading .cb::after { animation: none; border-top-color: var(--border); } .dir-layout[aria-busy="true"] .dir-results { transition: none; } }
+
+  /* ── Sticky action bar on phones: ONE ~56px row until expanded ─────────────
+     "22,211 / filtered · Request rates → · ⋯". The bar + chat launcher took 132
+     of 812px on every scroll; collapsed it is one row, and the launcher is
+     hidden only while the bar is expanded (body.qf-ab-open). Desktop unchanged. */
+  .qf-ab-more { display: none; }
+  @media (max-width: 640px) {
+    .qf-ab-more { display: inline-flex; align-items: center; justify-content: center; flex: 0 0 auto; width: 44px; min-height: 44px; margin: 0; padding: 0; background: transparent; border: 1px solid var(--border); border-radius: 8px; color: var(--ink); font-size: 18px; line-height: 1; cursor: pointer; }
+    .qf-ab-more:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+    .qf-actionbar:not([data-expanded="1"]) { flex-direction: row; align-items: center; flex-wrap: nowrap; gap: 8px; padding: 8px 12px; min-height: 56px; box-sizing: border-box; }
+    /* Reserve the bottom-right corner for the chat launcher (56px + 12px inset
+       overlaps the bar's right ~50px) so the ⋯ control never sits under it. */
+    .qf-actionbar:not([data-expanded="1"]) { padding-right: 60px; }
+    .qf-actionbar:not([data-expanded="1"]) .qf-ab-info { flex: 1 1 auto; min-width: 0; gap: 0; }
+    .qf-actionbar:not([data-expanded="1"]) .qf-ab-count { display: flex; flex-direction: column; font-size: 11px; color: var(--muted); line-height: 1.2; min-width: 0; }
+    .qf-actionbar:not([data-expanded="1"]) .qf-ab-count b { font-size: 16px; }
+    .qf-actionbar:not([data-expanded="1"]) .qf-ab-lblw { display: none; }
+    .qf-actionbar:not([data-expanded="1"]) .qf-ab-actions { flex: 0 0 auto; flex-wrap: nowrap; padding-right: 0; gap: 8px; }
+    .qf-actionbar:not([data-expanded="1"]) .qf-ab-save, .qf-actionbar:not([data-expanded="1"]) [data-role="export-view"], .qf-actionbar:not([data-expanded="1"]) .qf-ab-fmts { display: none; }
+    .qf-actionbar:not([data-expanded="1"]) .qf-ab-rfq { flex: 0 0 auto; }
+    .qf-actionbar[data-expanded="1"] { padding-right: 60px; }
+    .qf-actionbar[data-expanded="1"] .qf-ab-more { position: absolute; top: 8px; right: 8px; }
+    body.qf-ab-open .qf-mc-fab { display: none; }
+  }
 `;
 
 /**
@@ -1734,9 +1794,14 @@ export const DIRECTORY_CSS_HREF = `/assets/directory-${DIRECTORY_CSS_HASH}.css`;
  * plain IIFE string (no build step) and defensively null-guarded throughout.
  */
 const ACTION_BAR_SCRIPT = `(function(){
+  if(window.__qfActionBarInit)return;
+  // Re-runnable: DIRECTORY_NAV_SCRIPT swaps the results (and the bar) in place
+  // on every facet tap, so binding is per-bar (bar.__qfApply), and the change
+  // listener is delegated on document once.
+  window.__qfActionBarInit=function(){
   var bar=document.querySelector('.qf-actionbar');
   var results=document.querySelector('.dir-results');
-  if(!bar||!results)return;
+  if(!bar||!results||bar.__qfApply)return;
   var filterQs=bar.getAttribute('data-filter-qs')||'';
   var total=parseInt(bar.getAttribute('data-total')||'0',10)||0;
   var cap=parseInt(bar.getAttribute('data-rfq-cap')||'0',10)||0;
@@ -1762,7 +1827,7 @@ const ACTION_BAR_SCRIPT = `(function(){
     if(rfqnEl)rfqnEl.textContent=fmt(shown);
     if(rfqofEl)rfqofEl.textContent=ofClause;
     if(rfqwEl)rfqwEl.textContent=word;
-    if(lblEl)lblEl.textContent='carrier'+(n===1?'':'s')+(dots.length?' selected':' filtered');
+    if(lblEl){var lw=lblEl.querySelector('.qf-ab-lblw'),ls=lblEl.querySelector('.qf-ab-lbls');if(lw)lw.textContent='carrier'+(n===1?'':'s');if(ls)ls.textContent=dots.length?'selected':'filtered';}
     if(countEl)countEl.setAttribute('data-selected',String(dots.length));
     bar.setAttribute('data-mode',dots.length?'dots':'filter');
     for(var key in links){if(!links.hasOwnProperty(key))continue;var a=bar.querySelector('[data-role="'+key+'"]');if(a)a.setAttribute('href',links[key]+s);}
@@ -1771,8 +1836,21 @@ const ACTION_BAR_SCRIPT = `(function(){
     var saveBtn=bar.querySelector('[data-role="save-selected"]');
     if(saveBtn){saveBtn.setAttribute('data-count',String(dots.length));var sn=saveBtn.querySelector('.qf-ab-saven');if(sn)sn.textContent=' ('+dots.length+')';}
   }
-  results.addEventListener('change',function(e){var t=e.target;if(t&&t.classList&&t.classList.contains('cc-cb'))apply();});
+  bar.__qfApply=apply;
   apply();
+  };
+  document.addEventListener('change',function(e){var t=e.target;if(t&&t.classList&&t.classList.contains('cc-cb')){var bar=document.querySelector('.qf-actionbar');if(bar&&bar.__qfApply)bar.__qfApply();}});
+  // Phone-only "⋯" control: expands the one-row bar to the full action set and
+  // hides the chat launcher (body.qf-ab-open) while it is open.
+  document.addEventListener('click',function(e){
+    var b=e.target&&e.target.closest?e.target.closest('.qf-ab-more'):null; if(!b)return;
+    var bar=b.closest('.qf-actionbar'); if(!bar)return;
+    var open=bar.getAttribute('data-expanded')!=='1';
+    bar.setAttribute('data-expanded',open?'1':'0'); b.setAttribute('aria-expanded',open?'true':'false');
+    b.setAttribute('aria-label',open?'Fewer actions':'More actions'); b.textContent=open?'\\u2715':'\\u22EF';
+    document.body.classList.toggle('qf-ab-open',open);
+  });
+  window.__qfActionBarInit();
 })();`;
 
 /**
@@ -1788,11 +1866,8 @@ const ACTION_BAR_SCRIPT = `(function(){
 const SAVE_SELECTED_SCRIPT = `(function(){
   if(window.__qfSaveSelBound)return; window.__qfSaveSelBound=true;
   function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(m){return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]);});}
-  var results=document.querySelector('.dir-results');
-  var bar=document.querySelector('.qf-actionbar');
-  if(!results||!bar)return;
-  var saveBtn=bar.querySelector('[data-role="save-selected"]');
-  if(!saveBtn)return;
+  // The results + bar are swapped in place by DIRECTORY_NAV_SCRIPT, so they are
+  // resolved at click time (delegated) rather than captured once here.
   var backdrop=document.createElement('div'); backdrop.className='qf-modal-backdrop';
   var modal=document.createElement('div'); modal.className='qf-modal'; modal.setAttribute('role','dialog'); modal.setAttribute('aria-modal','true'); modal.setAttribute('aria-labelledby','qf-modal-title');
   backdrop.appendChild(modal); document.body.appendChild(backdrop);
@@ -1808,7 +1883,7 @@ const SAVE_SELECTED_SCRIPT = `(function(){
       if(e.shiftKey&&document.activeElement===first){ e.preventDefault(); last.focus(); }
       else if(!e.shiftKey&&document.activeElement===last){ e.preventDefault(); first.focus(); } }
   });
-  function selected(){ var out=[]; var cbs=results.querySelectorAll('.cc-cb'); for(var i=0;i<cbs.length;i++){ if(cbs[i].checked){ var d=cbs[i].getAttribute('data-dot'); if(d)out.push(d); } } return out; }
+  function selected(){ var out=[]; var results=document.querySelector('.dir-results'); if(!results)return out; var cbs=results.querySelectorAll('.cc-cb'); for(var i=0;i<cbs.length;i++){ if(cbs[i].checked){ var d=cbs[i].getAttribute('data-dot'); if(d)out.push(d); } } return out; }
   function head(title){ return '<div class="qf-modal-head"><h2 id="qf-modal-title">'+esc(title)+'</h2><button type="button" class="qf-modal-x" data-close aria-label="Close">\\u00d7</button></div>'; }
   function wireClose(){ Array.prototype.forEach.call(modal.querySelectorAll('[data-close]'),function(b){ b.addEventListener('click',closeModal); }); var f=focusables(); if(f.length)f[0].focus(); }
   function msg(text,err){ var m=modal.querySelector('.qf-modal-msg'); if(!m){ m=document.createElement('p'); modal.appendChild(m); } m.hidden=false; m.textContent=text; m.className='qf-modal-msg'+(err?' qf-modal-msg--err':''); }
@@ -1857,7 +1932,7 @@ const SAVE_SELECTED_SCRIPT = `(function(){
       .then(function(r){ return r.json().then(function(j){ return {status:r.status,body:j}; }); })
       .then(function(res){ if(res.body&&res.body.ok){ msg('Saved '+dots.length+' carrier'+(dots.length===1?'':'s')+(listName?(' to '+listName):'')+'.',false); } else if(res.status===409){ msg('That list is full.',true); } else { msg('Could not save. Please try again.',true); } })
       .catch(function(){ msg('Could not save. Please try again.',true); }); }
-  saveBtn.addEventListener('click',function(e){ e.preventDefault(); var dots=selected(); if(!dots.length){ renderEmpty(); } else { renderPicker(dots); } openModal(); });
+  document.addEventListener('click',function(e){ var saveBtn=e.target&&e.target.closest?e.target.closest('[data-role="save-selected"]'):null; if(!saveBtn)return; e.preventDefault(); var dots=selected(); if(!dots.length){ renderEmpty(); } else { renderPicker(dots); } openModal(); });
 })();`;
 
 /**
@@ -2397,8 +2472,11 @@ function hrefWith(scope: FacetScope, f: DirectoryFilters, change: FacetChange, o
  * thousands of matches is the page asserting something false; an absent badge is
  * simply an absent measurement, and the facet stays clickable either way.
  */
-function facetOptionRow(active: boolean, href: string, label: string, count: number | null): string {
-  return `<a class="facet-opt ${active ? 'active' : ''}" href="${href}">
+function facetOptionRow(active: boolean, href: string, label: string, count: number | null, opts?: { multi?: boolean }): string {
+  // aria-pressed: the row is a toggle (a link that flips one facet), and the
+  // client flips it optimistically on tap. data-multi tells the client whether
+  // siblings stay selected (equipment/cargo) or are single-choice (fleet, …).
+  return `<a class="facet-opt ${active ? 'active' : ''}" href="${href}" aria-pressed="${active ? 'true' : 'false'}"${opts?.multi ? ' data-multi="1"' : ''}>
     <span class="lbl"><span class="facet-check"></span>${esc(label)}</span>
     ${count == null ? '' : `<span class="cb">${fmtNum(count)}</span>`}
   </a>`;
@@ -2447,7 +2525,7 @@ function portPickerRow(scope: FacetScope, f: DirectoryFilters, counts: FacetCoun
   const active = f.port === g.code;
   const href = hrefWith(scope, f, { port: active ? null : g.code });
   const search = `${g.label} ${g.city} ${g.state}`.toLowerCase();
-  return `<a class="facet-opt${active ? ' active' : ''}" href="${href}" data-pk="${esc(search)}">
+  return `<a class="facet-opt${active ? ' active' : ''}" href="${href}" data-pk="${esc(search)}" aria-pressed="${active ? 'true' : 'false'}">
     <span class="lbl"><span class="facet-check"></span>${esc(g.label)}</span>
     ${counts.unavailable ? '' : `<span class="cb">${fmtNum(counts.ports[g.code] ?? 0)}</span>`}
   </a>`;
@@ -2484,20 +2562,7 @@ function portsPickerGroup(scope: FacetScope, f: DirectoryFilters, counts: FacetC
         <div class="pp-empty" hidden>No ports or terminals match your search.</div>
       </div>
     </div>
-  </details>
-  <script>
-    (function(){
-      var inp=document.getElementById('port-search'),list=document.getElementById('port-picker-list');
-      if(!inp||!list)return;
-      var rows=list.querySelectorAll('.facet-opt'),countries=list.querySelectorAll('.pp-country'),empty=list.querySelector('.pp-empty');
-      inp.addEventListener('input',function(){
-        var q=inp.value.trim().toLowerCase(),any=false;
-        rows.forEach(function(r){var m=!q||(r.getAttribute('data-pk')||'').indexOf(q)!==-1;r.hidden=!m;if(m)any=true;});
-        countries.forEach(function(c){c.hidden=c.querySelectorAll('.facet-opt:not([hidden])').length===0;});
-        if(empty)empty.hidden=any;
-      });
-    })();
-  </script>`;
+  </details>`;
 }
 
 /** D4 — progressive-enhancement fold for a long facet option list. EVERY row
@@ -2514,37 +2579,178 @@ function foldableRows(rows: string[], visible: number, id: string): string {
     <button type="button" class="facet-more" data-fold-toggle aria-controls="${esc(id)}" aria-expanded="true" data-more="${rest.length}" hidden><span class="facet-more-txt">Show ${rest.length} more</span><span class="facet-more-ico" aria-hidden="true">▾</span></button>`;
 }
 
-/** Collapses each [data-fold] region on load and wires its sibling toggle. Runs
- *  once (idempotent). Reduced-motion is handled purely in CSS. */
-const FOLD_SCRIPT = `(function(){
-  if(window.__qfFoldBound)return; window.__qfFoldBound=true;
-  var folds=document.querySelectorAll('[data-fold]');
-  Array.prototype.forEach.call(folds,function(fold){
-    var parent=fold.parentNode; if(!parent)return;
-    var btn=parent.querySelector('[data-fold-toggle][aria-controls="'+fold.id+'"]')||parent.querySelector('[data-fold-toggle]');
-    if(!btn||btn.__foldBound)return; btn.__foldBound=1;
-    var more=btn.getAttribute('data-more')||''; var txt=btn.querySelector('.facet-more-txt');
-    function set(open){ fold.setAttribute('data-collapsed',open?'0':'1'); btn.setAttribute('aria-expanded',open?'true':'false'); if(txt)txt.textContent=open?'Show less':('Show '+more+' more'); }
-    set(false); btn.hidden=false;
-    btn.addEventListener('click',function(){ set(fold.getAttribute('data-collapsed')==='1'); });
-  });
-})();`;
+/**
+ * DIRECTORY_NAV_SCRIPT — the faceted results' single client script. Emitted ONCE
+ * per full page, right after `.dir-layout`, never inside it, so it survives the
+ * in-place swaps it performs. Everything here is progressive enhancement over
+ * the server-rendered GET links (crawlers + no-JS keep the full navigation).
+ *
+ *  1. IN-PAGE FETCH. A tap on a facet row, applied chip, "Clear all", a pager
+ *     link, the sort control or the name-search form fetches the SAME href with
+ *     `X-QF-Partial: 1` (+ `qf_partial=1`, which keys the edge cache — Cloudflare
+ *     ignores Vary) and swaps `.dir-layout`'s inner HTML, updates the title and
+ *     pushes the clean URL. Measured before: every facet tap was a 1.8–2.8 s
+ *     full navigation that landed at scrollY=0 with the rail re-collapsed.
+ *  2. OPTIMISTIC STATE. The tapped row flips its ✓ + aria-pressed immediately
+ *     and shows a spinner in place of the count pill; on error it reverts and
+ *     falls back to a full navigation.
+ *  3. RAIL. The mobile "Filters" toggle opens the rail directly BELOW the button
+ *     (source order), keeps it open across swaps, persists via
+ *     sessionStorage.qfRailOpen, and does not auto-collapse when the URL already
+ *     carries a facet. Accordion / fold state survives a swap.
+ *  4. SCROLL. After a swap (and on a phone when the URL already has facets) the
+ *     results toolbar is scrolled to the top, under the sticky header — never
+ *     the hero, never page top.
+ * Folds + accordions render OPEN on the server (crawlable) and are collapsed
+ * here (Alex: "each category for filters must be folded by default"); their
+ * clicks are delegated on document so a swap needs no re-binding.
+ */
+const DIRECTORY_NAV_SCRIPT = `(function(){
+  if(window.__qfDirNav)return;
+  // Every key that switches /directory into the results view (server parity)…
+  var FACET_KEYS=${JSON.stringify(FACET_QUERY_KEYS)};
+  // …and the subset that is a real FILTER (page/sort/dir alone do not mean the
+  // visitor is filtering, so they neither open the rail nor jump the scroll).
+  var RAIL_KEYS=FACET_KEYS.filter(function(k){return k!=='page'&&k!=='sort'&&k!=='dir';});
+  var mq=window.matchMedia?window.matchMedia('(max-width:900px)'):{matches:false};
+  var STORE='qfRailOpen';
+  function isMobile(){return !!mq.matches;}
+  function layoutEl(){return document.querySelector('.dir-layout');}
+  function store(v){try{sessionStorage.setItem(STORE,v);}catch(e){}}
+  function read(){try{return sessionStorage.getItem(STORE);}catch(e){return null;}}
+  function hasAny(search,keys){var p=new URLSearchParams(search||'');for(var i=0;i<keys.length;i++){var v=p.get(keys[i]);if(v!=null&&v.replace(/\\s/g,'')!=='')return true;}return false;}
+  function hasFacet(search){return hasAny(search,RAIL_KEYS);}
+  function closest(el,sel){return el&&el.closest?el.closest(sel):null;}
 
-/** Collapses every facet-group into an accordion on load: the <h3> header toggles
- *  its body open/closed. Rendered OPEN (no-JS + crawlers see every facet link);
- *  this folds them all on load so the rail is compact and the results lead (Alex:
- *  "each category for filters must be folded by default"). Height animates via the
- *  same grid-rows 0fr↔1fr pattern as the D4 fold, reduced-motion guarded in CSS. */
-const ACCORDION_SCRIPT = `(function(){
-  if(window.__qfAccBound)return; window.__qfAccBound=true;
-  var groups=document.querySelectorAll('.facet-group[data-acc]');
-  Array.prototype.forEach.call(groups,function(g){
-    var btn=g.querySelector('.facet-acc-btn'); var body=g.querySelector('[data-acc-body]');
-    if(!btn||!body||btn.__accBound)return; btn.__accBound=1;
-    function set(o){ g.setAttribute('data-acc',o?'open':'closed'); btn.setAttribute('aria-expanded',o?'true':'false'); }
-    set(false);
-    btn.addEventListener('click',function(){ set(g.getAttribute('data-acc')!=='open'); });
+  // ── Accordions (rendered open; folded on load; click delegated) ──────────
+  function setAcc(g,o){g.setAttribute('data-acc',o?'open':'closed');var b=g.querySelector('.facet-acc-btn');if(b)b.setAttribute('aria-expanded',o?'true':'false');}
+  function accTitle(g){var t=g.querySelector('.facet-acc-ttl');return t?t.textContent:'';}
+  function openAccTitles(){var out=[],gs=document.querySelectorAll('.facet-group[data-acc="open"]');for(var i=0;i<gs.length;i++)out.push(accTitle(gs[i]));return out;}
+  function initAcc(keep){var gs=document.querySelectorAll('.facet-group[data-acc]');for(var i=0;i<gs.length;i++)setAcc(gs[i],!!(keep&&keep.indexOf(accTitle(gs[i]))!==-1));}
+  // On a phone an opened rail should not cost a second tap: open the groups
+  // holding an active facet (so the selection is visible), else the first one.
+  function ensureGroupOpen(){
+    var gs=document.querySelectorAll('.facet-group[data-acc]'); if(!gs.length)return;
+    for(var i=0;i<gs.length;i++)if(gs[i].getAttribute('data-acc')==='open')return;
+    var opened=false;
+    for(var j=0;j<gs.length;j++)if(gs[j].querySelector('.facet-opt.active')){setAcc(gs[j],true);opened=true;}
+    if(!opened)setAcc(gs[0],true);
+  }
+  // ── Show-more folds ──────────────────────────────────────────────────────
+  function foldBtn(fold){var p=fold.parentNode;if(!p)return null;return p.querySelector('[data-fold-toggle][aria-controls="'+fold.id+'"]')||p.querySelector('[data-fold-toggle]');}
+  function setFold(fold,btn,open){fold.setAttribute('data-collapsed',open?'0':'1');btn.setAttribute('aria-expanded',open?'true':'false');var txt=btn.querySelector('.facet-more-txt'),more=btn.getAttribute('data-more')||'';if(txt)txt.textContent=open?'Show less':('Show '+more+' more');}
+  function initFolds(){var folds=document.querySelectorAll('[data-fold]');for(var i=0;i<folds.length;i++){var b=foldBtn(folds[i]);if(!b)continue;setFold(folds[i],b,false);b.hidden=false;}}
+  // ── Ports & terminals free-text filter ───────────────────────────────────
+  function filterPorts(inp){
+    var list=document.getElementById('port-picker-list'); if(!list)return;
+    var q=inp.value.replace(/^\\s+|\\s+$/g,'').toLowerCase(),any=false;
+    var rows=list.querySelectorAll('.facet-opt'),countries=list.querySelectorAll('.pp-country'),empty=list.querySelector('.pp-empty');
+    for(var i=0;i<rows.length;i++){var m=!q||(rows[i].getAttribute('data-pk')||'').indexOf(q)!==-1;rows[i].hidden=!m;if(m)any=true;}
+    for(var j=0;j<countries.length;j++)countries[j].hidden=countries[j].querySelectorAll('.facet-opt:not([hidden])').length===0;
+    if(empty)empty.hidden=any;
+  }
+  // ── Mobile rail toggle ───────────────────────────────────────────────────
+  function railEls(){return {t:document.getElementById('rail-toggle'),r:document.getElementById('dir-rail')};}
+  function railOpen(){var e=railEls();return !!(e.r&&e.r.getAttribute('data-collapsed')!=='1');}
+  function setRail(open,persist){
+    var e=railEls(); if(!e.t||!e.r)return;
+    if(!isMobile()){e.r.removeAttribute('data-collapsed');e.t.setAttribute('aria-expanded','true');e.t.textContent='Filters \\u25BE';return;}
+    if(open){e.r.removeAttribute('data-collapsed');e.t.setAttribute('aria-expanded','true');e.t.textContent='Hide filters \\u25B4';ensureGroupOpen();}
+    else{e.r.setAttribute('data-collapsed','1');e.t.setAttribute('aria-expanded','false');e.t.textContent='Filters \\u25BE';}
+    if(persist)store(open?'1':'0');
+  }
+  function railWanted(){return read()==='1'||hasFacet(location.search);}
+  // ── Scroll target: the results toolbar, under the sticky header ──────────
+  function headerOffset(){var h=document.querySelector('.site-header');if(!h)return 0;var cs=getComputedStyle(h);return (cs.position==='sticky'||cs.position==='fixed')?h.getBoundingClientRect().height:0;}
+  function scrollToToolbar(){var tb=document.querySelector('.results-toolbar');if(!tb)return;var top=tb.getBoundingClientRect().top+window.pageYOffset-headerOffset()-8;window.scrollTo(0,top<0?0:top);}
+  // ── Optimistic facet state ───────────────────────────────────────────────
+  function optimistic(el,on){
+    if(!el||!el.classList||!el.classList.contains('facet-opt'))return;
+    if(on){
+      var active=el.classList.toggle('active'); el.__qfWas=!active;
+      el.setAttribute('aria-pressed',active?'true':'false'); el.classList.add('is-loading');
+      if(active&&el.getAttribute('data-multi')!=='1'){var scope=closest(el,'.facet-acc-inner')||closest(el,'.pp-list');if(scope){var sib=scope.querySelectorAll('.facet-opt.active');for(var i=0;i<sib.length;i++)if(sib[i]!==el){sib[i].classList.remove('active');sib[i].setAttribute('aria-pressed','false');}}}
+    }else{
+      el.classList.remove('is-loading'); el.classList.toggle('active',!!el.__qfWas); el.setAttribute('aria-pressed',el.__qfWas?'true':'false');
+    }
+  }
+  // ── The swap ─────────────────────────────────────────────────────────────
+  var inflight=null;
+  function partialUrl(u){var p=new URL(u.href);p.searchParams.set('qf_partial','1');return p.href;}
+  function findRoot(html){var t=document.createElement('template');t.innerHTML=html;return t.content.querySelector('[data-qf-partial]');}
+  function rebind(state){
+    initAcc(state.openTitles); initFolds();
+    if(window.__qfActionBarInit)window.__qfActionBarInit();
+    if(state.portQuery){var pq=document.getElementById('port-search');if(pq){pq.value=state.portQuery;filterPorts(pq);}}
+    setRail(state.railOpen,false);
+  }
+  function go(href,opts){
+    opts=opts||{};
+    var root=layoutEl();
+    if(!root||!window.fetch||!window.URL||!window.history||!history.pushState){location.href=href;return;}
+    var url; try{url=new URL(href,location.href);}catch(e){location.href=href;return;}
+    if(url.origin!==location.origin){location.href=href;return;}
+    // The bare landing (/directory with no facet) is a different page — not a partial.
+    if(url.pathname.replace(/\\/$/,'')==='/directory'&&!hasAny(url.search,FACET_KEYS)){location.href=url.href;return;}
+    if(inflight)inflight.abort();
+    var ctrl=window.AbortController?new AbortController():null; inflight=ctrl;
+    optimistic(opts.el,true);
+    root.setAttribute('aria-busy','true');
+    var state={railOpen:railOpen(),openTitles:openAccTitles(),portQuery:(document.getElementById('port-search')||{}).value||''};
+    fetch(partialUrl(url),{headers:{'X-QF-Partial':'1'},credentials:'same-origin',signal:ctrl?ctrl.signal:undefined})
+      .then(function(r){if(!r.ok)throw new Error('HTTP '+r.status);return r.text();})
+      .then(function(html){
+        if(ctrl&&inflight!==ctrl)return;
+        inflight=null;
+        var next=findRoot(html);
+        if(!next){location.href=url.href;return;}
+        root.innerHTML=next.innerHTML;
+        root.removeAttribute('aria-busy');
+        var title=next.getAttribute('data-title'); if(title)document.title=title;
+        if(!opts.pop)history.pushState({qf:1},'',url.pathname+url.search);
+        document.body.classList.remove('qf-ab-open');
+        rebind(state);
+        scrollToToolbar();
+        var tb=document.querySelector('.results-toolbar'); if(tb&&tb.focus)try{tb.focus({preventScroll:true});}catch(e){}
+      })
+      .catch(function(err){
+        if(err&&err.name==='AbortError')return;
+        inflight=null; root.removeAttribute('aria-busy'); optimistic(opts.el,false);
+        location.href=url.href;
+      });
+  }
+  window.__qfDirNav={go:go};
+  // ── Delegated handlers (survive every swap) ──────────────────────────────
+  document.addEventListener('click',function(e){
+    var t=e.target; if(!t||!t.closest)return;
+    var acc=t.closest('.facet-acc-btn'); if(acc){var g=acc.closest('.facet-group');if(g)setAcc(g,g.getAttribute('data-acc')!=='open');return;}
+    var fb=t.closest('[data-fold-toggle]'); if(fb){var fold=document.getElementById(fb.getAttribute('aria-controls')||'');if(fold)setFold(fold,fb,fold.getAttribute('data-collapsed')==='1');return;}
+    if(t.closest('#rail-toggle')){setRail(!railOpen(),true);return;}
+    if(e.defaultPrevented||e.button!==0||e.metaKey||e.ctrlKey||e.shiftKey||e.altKey)return;
+    var a=t.closest('a[href]'); if(!a)return;
+    var root=layoutEl(); if(!root||!root.contains(a))return;
+    if(!a.matches('.facet-opt, .applied-chip, .applied-clear, .dir-pagenums a, .dir-pagejumps a, .sort-dir, .dir-empty a'))return;
+    if(a.classList.contains('disabled')||a.getAttribute('target'))return;
+    e.preventDefault();
+    go(a.getAttribute('href'),{el:a});
   });
+  document.addEventListener('change',function(e){var s=e.target;if(s&&s.id==='dir-sort'&&s.value)go(s.value);});
+  document.addEventListener('input',function(e){var i=e.target;if(i&&i.id==='port-search')filterPorts(i);});
+  document.addEventListener('submit',function(e){
+    var f=e.target; if(!f||!f.matches||!f.matches('form.dir-search'))return;
+    if(!window.FormData||!window.URL)return;
+    e.preventDefault();
+    var u=new URL(f.getAttribute('action')||location.pathname,location.href),p=new URLSearchParams();
+    var fd=new FormData(f); fd.forEach(function(v,k){if(String(v).replace(/^\\s+|\\s+$/g,'')!=='')p.set(k,String(v));});
+    u.search=p.toString(); go(u.href);
+  });
+  window.addEventListener('popstate',function(e){if(e.state&&e.state.qf)go(location.href,{pop:true});});
+  if(mq.addEventListener)mq.addEventListener('change',function(){setRail(railWanted(),false);});else if(mq.addListener)mq.addListener(function(){setRail(railWanted(),false);});
+  // ── First load ───────────────────────────────────────────────────────────
+  initAcc([]); initFolds();
+  setRail(railWanted(),false);
+  try{history.replaceState({qf:1},'',location.href);}catch(e){}
+  if(isMobile()&&hasFacet(location.search)&&window.pageYOffset<2)scrollToToolbar();
 })();`;
 
 /** One collapsible facet category. Header is a heading-wrapped button (a11y: a
@@ -2568,6 +2774,7 @@ function renderSidebar(scope: FacetScope, f: DirectoryFilters, counts: FacetCoun
       hrefWith(scope, f, { equipment: toggleMulti(eqOrder, f.equipment, o.id) }),
       o.label,
       facetCount(counts, counts.equipment[o.id]),
+      { multi: true },
     ),
   ).join('\n');
 
@@ -2582,6 +2789,7 @@ function renderSidebar(scope: FacetScope, f: DirectoryFilters, counts: FacetCoun
       hrefWith(scope, f, { cargo: toggleMulti(cargoOrder, f.cargo, o.id) }),
       o.label,
       facetCount(counts, counts.cargo[o.id]),
+      { multi: true },
     ),
   );
   const cargo = foldableRows(cargoRows, 6, 'fold-cargo');
@@ -2633,7 +2841,7 @@ function renderSidebar(scope: FacetScope, f: DirectoryFilters, counts: FacetCoun
       const stateRows = top.map((s) => {
         const st = stateByCode(s.state)!;
         const active = f.state === s.state;
-        return `<a class="facet-opt ${active ? 'active' : ''}" href="${hrefWith(scope, f, { state: active ? null : s.state })}">
+        return `<a class="facet-opt ${active ? 'active' : ''}" href="${hrefWith(scope, f, { state: active ? null : s.state })}" aria-pressed="${active ? 'true' : 'false'}">
             <span class="lbl"><span class="facet-check"></span>${esc(st.name)}</span>
             <span class="cb">${fmtNum(s.count)}</span>
           </a>`;
@@ -2652,8 +2860,9 @@ function renderSidebar(scope: FacetScope, f: DirectoryFilters, counts: FacetCoun
   // (i.e. everywhere except the dedicated /directory/port/:port page).
   const portsGroup = scope.locked.has('port') ? '' : portsPickerGroup(scope, f, counts);
 
-  // NOTE: the mobile "Filters" toggle button now lives in the results toolbar
-  // (co-located with sort — D1); it still drives this rail by id (#rail-toggle).
+  // The mobile "Filters" toggle button lives in the results toolbar, which is
+  // rendered BEFORE this rail (see facetedLayoutInner) so the rail unfolds
+  // directly under the button. DIRECTORY_NAV_SCRIPT wires it (delegated).
   return `<aside class="dir-rail" id="dir-rail">
     ${stateGroup}
     ${portsGroup}
@@ -2664,25 +2873,7 @@ function renderSidebar(scope: FacetScope, f: DirectoryFilters, counts: FacetCoun
     ${facetGroup('Safety', `<span class="facet-src">FMCSA safety rating</span>${goodStanding}`)}
     ${facetGroup('Authority &amp; activity', `<span class="facet-src">FMCSA authority &amp; MCS-150</span>${authority}${recent}`)}
     ${capabilitiesGroup()}
-  </aside>
-  <script>
-    (function(){
-      // #rail-toggle lives in the results toolbar, which is parsed AFTER this
-      // sidebar — so defer wiring until DOMContentLoaded, else getElementById
-      // returns null and the rail never collapses on mobile (the bug Alex saw:
-      // every facet group sat expanded at the top of the phone screen).
-      function init(){
-        var t=document.getElementById('rail-toggle'),r=document.getElementById('dir-rail');
-        if(!t||!r)return;
-        function apply(){var c=window.matchMedia('(max-width:900px)').matches;if(c){r.setAttribute('data-collapsed','1');t.setAttribute('aria-expanded','false');t.textContent='Filters ▾';}else{r.removeAttribute('data-collapsed');t.setAttribute('aria-expanded','true');}}
-        apply();
-        t.addEventListener('click',function(){var c=r.getAttribute('data-collapsed')==='1';if(c){r.removeAttribute('data-collapsed');t.setAttribute('aria-expanded','true');t.textContent='Filters ▴';}else{r.setAttribute('data-collapsed','1');t.setAttribute('aria-expanded','false');t.textContent='Filters ▾';}});
-      }
-      if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init);else init();
-    })();
-  </script>
-  <script>${FOLD_SCRIPT}</script>
-  <script>${ACCORDION_SCRIPT}</script>`;
+  </aside>`;
 }
 
 function appliedChips(scope: FacetScope, f: DirectoryFilters): string {
@@ -2776,8 +2967,7 @@ function sortRow(scope: FacetScope, f: DirectoryFilters): string {
     </span>
     ${dirControl(scope, f)}
     <noscript><span class="sort-noscript">${crawlLinks}</span></noscript>
-  </div>
-  <script>(function(){var s=document.getElementById('dir-sort');if(s)s.addEventListener('change',function(){if(this.value)window.location.href=this.value;});})();</script>`;
+  </div>`;
 }
 
 /** Windowed numbered pagination (1 … n-1 [n] n+1 … last). */
@@ -2865,6 +3055,10 @@ interface FacetedCfg {
    *  the result count. SEO pages (state/city/port) leave this false → keep their
    *  hero H1/intro, which they need for indexing. */
   hideHero?: boolean;
+  /** In-page fetch (X-QF-Partial: 1): return ONLY the `.dir-layout` block —
+   *  everything a facet change can alter — instead of the whole document. The
+   *  root carries the new <title> + total as data-* for the client to apply. */
+  partial?: boolean;
 }
 
 /** A carrier card with a top-right selection checkbox (sibling of the card link
@@ -2903,11 +3097,26 @@ function nameSearchBox(scope: FacetScope, f: DirectoryFilters): string {
         autocomplete="off" enterkeyhint="search" aria-describedby="dir-search-hint">
       <button type="submit" class="btn btn-primary btn-sm dir-search-btn">Search</button>
     </div>
-    <span class="dir-search-hint" id="dir-search-hint">Matches legal or DBA name. Combine with the filters at left.</span>
+    <span class="dir-search-hint" id="dir-search-hint">Matches legal or DBA name. Combine with the filters to narrow results.</span>
   </form>`;
 }
 
-function renderFacetedResults(cfg: FacetedCfg): string {
+/**
+ * The inner HTML of `.dir-layout` — every piece a facet change can alter, in
+ * the source order the phone layout depends on:
+ *
+ *   .dir-head   — name search + results toolbar (applied chips FIRST, then the
+ *                 Filters toggle / count / sort)
+ *   .dir-rail   — the facet rail, so on a phone it unfolds directly UNDER the
+ *                 Filters button that opened it (it used to sit above the search
+ *                 box and pushed the button 419px off-screen when opened)
+ *   .dir-results — cards, pager, extra modules, sticky action bar
+ *
+ * Desktop places these on a two-column grid via CSS (rail left, head + results
+ * stacked right), so it is visually unchanged. Shared by the full page and the
+ * X-QF-Partial response, so the two can never drift apart.
+ */
+function facetedLayoutInner(cfg: FacetedCfg): string {
   const { scope, list, counts, filters } = cfg;
   const hasCarriers = list.carriers.length > 0;
   const cards = hasCarriers
@@ -2934,7 +3143,7 @@ function renderFacetedResults(cfg: FacetedCfg): string {
   const actionBar = hasCarriers
     ? `<div class="qf-actionbar" data-mode="filter" data-filter-qs="${esc(filterQs)}" data-total="${total}" data-rfq-cap="${rfqCap}" role="region" aria-label="Carrier actions">
         <div class="qf-ab-info">
-          <span class="qf-ab-count" data-selected="0"><b class="qf-ab-n">${fmtNum(total)}</b> <span class="qf-ab-lbl">carrier${plural} filtered</span></span>
+          <span class="qf-ab-count" data-selected="0"><b class="qf-ab-n">${fmtNum(total)}</b> <span class="qf-ab-lbl"><span class="qf-ab-lblw">carrier${plural}</span> <span class="qf-ab-lbls">filtered</span></span></span>
           <span class="qf-ab-hint">Tick cards to target specific carriers</span>
         </div>
         <div class="qf-ab-actions">
@@ -2943,10 +3152,39 @@ function renderFacetedResults(cfg: FacetedCfg): string {
           <a class="btn btn-secondary btn-sm qf-ab-btn" data-role="export-view" href="${esc(links0.exportView)}">Export<span class="qf-ab-exportfull"> list</span></a>
           <span class="qf-ab-fmts"><a class="qf-ab-fmt" data-role="export-xlsx" href="${esc(links0.exportXlsx)}">XLSX</a><a class="qf-ab-fmt" data-role="export-csv" href="${esc(links0.exportCsv)}">CSV</a></span>
         </div>
-      </div>
-      <script>${ACTION_BAR_SCRIPT}</script>
-      <script>${SAVE_SELECTED_SCRIPT}</script>`
+        <button type="button" class="qf-ab-more" aria-expanded="false" aria-label="More actions">⋯</button>
+      </div>`
     : '';
+
+  return `<div class="dir-head">
+        ${nameSearchBox(scope, filters)}
+        <div class="results-toolbar" role="group" aria-label="Filter and sort controls" tabindex="-1">
+          ${appliedChips(scope, filters)}
+          <div class="rt-main">
+            <button type="button" class="rail-toggle" id="rail-toggle" aria-expanded="true" aria-controls="dir-rail">Filters ▾</button>
+            <div class="rc"><b>${fmtNum(list.total)}</b> carrier${list.total === 1 ? '' : 's'} match${counts.intermodal ? ` · ${fmtNum(counts.intermodal)} run drayage` : ''}</div>
+            ${sortRow(scope, filters)}
+          </div>
+        </div>
+      </div>
+      ${renderSidebar(scope, filters, counts, cfg.summary)}
+      <div class="dir-results">
+        ${cards}
+        ${numberedPager(scope, filters, list)}
+        ${cfg.extraModulesHtml ?? ''}
+        ${actionBar}
+      </div>`;
+}
+
+/** The `X-QF-Partial` response: the swappable block only, plus the new title
+ *  and total as data-* on its root. No <html>, no hero, no scripts. */
+function facetedPartial(cfg: FacetedCfg): string {
+  return `<div class="dir-layout" data-qf-partial="1" data-title="${esc(cfg.title)}" data-total="${cfg.list.total}">${facetedLayoutInner(cfg)}</div>`;
+}
+
+function renderFacetedResults(cfg: FacetedCfg): string {
+  if (cfg.partial) return facetedPartial(cfg);
+  const { scope, list, filters } = cfg;
 
   // Results view: breadcrumb-only slim header, no hero. SEO pages: full hero.
   const heroHtml = cfg.hideHero
@@ -2959,27 +3197,18 @@ function renderFacetedResults(cfg: FacetedCfg): string {
     </div>
   </section>`;
 
+  // The scripts sit OUTSIDE .dir-layout: the nav script replaces that block's
+  // inner HTML on every facet tap, and inserted <script> tags never execute,
+  // so everything must be bound once here (delegated) and re-init'd from there.
   const body = `
   ${heroHtml}
   <main class="dir-shell${cfg.hideHero ? ' dir-shell--tight' : ''}">
     <div class="dir-layout">
-      ${renderSidebar(scope, filters, counts, cfg.summary)}
-      <div class="dir-results">
-        ${nameSearchBox(scope, filters)}
-        <div class="results-toolbar" role="group" aria-label="Filter and sort controls">
-          <div class="rt-main">
-            <button type="button" class="rail-toggle" id="rail-toggle" aria-expanded="true" aria-controls="dir-rail">Filters ▾</button>
-            <div class="rc"><b>${fmtNum(list.total)}</b> carrier${list.total === 1 ? '' : 's'} match${counts.intermodal ? ` · ${fmtNum(counts.intermodal)} run drayage` : ''}</div>
-            ${sortRow(scope, filters)}
-          </div>
-          ${appliedChips(scope, filters)}
-        </div>
-        ${cards}
-        ${numberedPager(scope, filters, list)}
-        ${cfg.extraModulesHtml ?? ''}
-        ${actionBar}
-      </div>
+      ${facetedLayoutInner(cfg)}
     </div>
+    <script>${DIRECTORY_NAV_SCRIPT}</script>
+    <script>${ACTION_BAR_SCRIPT}</script>
+    <script>${SAVE_SELECTED_SCRIPT}</script>
     ${cfg.faqsHtml ?? ''}
     <p class="muted-small" style="margin: 24px 0 0; max-width: 760px;">Carrier information is sourced from public FMCSA records and shown so shippers can contact carriers directly. Carriers: email us to update or hide your details.</p>
   </main>`;
@@ -3422,6 +3651,7 @@ export function renderDirectoryResults(opts: {
   list: CarrierListResult;
   counts: FacetCounts;
   summary: DirectorySummary;
+  partial?: boolean;
 }): string {
   const { filters, list, counts, summary } = opts;
   const scope: FacetScope = { kind: 'all', basePath: '/directory', locked: new Set() };
@@ -3430,6 +3660,7 @@ export function renderDirectoryResults(opts: {
   const h1 = st ? `${st.name} freight & drayage carriers` : 'Search US freight & drayage carriers';
   const canonicalPath = `/directory${canonicalSuffix(filters, scope.locked)}`;
   return renderFacetedResults({
+    partial: opts.partial,
     scope,
     list,
     counts,
@@ -3463,6 +3694,7 @@ export function renderStatePage(opts: {
   counts: FacetCounts;
   filters: DirectoryFilters;
   cities: CityCount[];
+  partial?: boolean;
 }): string {
   const { state, list, counts, filters, cities } = opts;
   const scope: FacetScope = {
@@ -3474,6 +3706,7 @@ export function renderStatePage(opts: {
   };
   const canonicalPath = hubCanonicalPath(scope, filters);
   return renderFacetedResults({
+    partial: opts.partial,
     scope,
     list,
     counts,
@@ -3624,6 +3857,7 @@ export function renderCityPage(opts: {
   counts: FacetCounts;
   filters: DirectoryFilters;
   cities: CityCount[];
+  partial?: boolean;
 }): string {
   const { state, city, list, counts, filters, cities } = opts;
   const scope: FacetScope = {
@@ -3637,6 +3871,7 @@ export function renderCityPage(opts: {
   const canonicalPath = hubCanonicalPath(scope, filters);
   const otherCities = cities.filter((c) => c.slug !== city.slug).slice(0, 23);
   return renderFacetedResults({
+    partial: opts.partial,
     scope,
     list,
     counts,
@@ -3705,6 +3940,7 @@ export function renderPortPage(opts: {
   list: CarrierListResult;
   counts: FacetCounts;
   filters: DirectoryFilters;
+  partial?: boolean;
 }): string {
   const { port, list, counts, filters } = opts;
   const scope: FacetScope = {
@@ -3730,6 +3966,7 @@ export function renderPortPage(opts: {
       )
       .join('\n')}`;
   return renderFacetedResults({
+    partial: opts.partial,
     scope,
     list,
     counts,
