@@ -33,15 +33,8 @@
 
   <main style="display:flex; align-items:center; justify-content:center; min-height: calc(100vh - 80px); padding: 48px 24px;">
     <div class="card elevated" style="width: 100%; max-width: 560px;">
-      <div id="claim-banner" class="notice" hidden style="margin-bottom:16px; line-height:1.5;"></div>
       <h1 id="signup-title" style="font-size: 28px; margin: 0 0 8px 0; letter-spacing: -0.025em;">Start your 14-day trial</h1>
       <p class="muted-small" style="margin:0 0 20px;">Create your quote desk, then tune rates before going live.</p>
-      <!-- Copy reflects current reality: billing is NOT configured on prod, so
-           signup completes card-free (see src/server/routes/auth.ts — Stripe
-           Checkout only runs when billingConfigured()). If/when billing is turned
-           on, restore the card language ("card validated at $0") alongside the
-           card field so the copy matches the flow again. -->
-      <div class="notice" style="margin-bottom:18px; line-height:1.5;">14-day all-inclusive trial — every Pro feature unlocked. No credit card required. Cancel anytime.</div>
 
       <!-- Social signup — buttons render only for providers whose keys are set
            (fetched from /api/auth/oauth/providers). Hidden entirely otherwise. -->
@@ -57,7 +50,13 @@
         <div class="grid-2"><div class="field"><label class="field-label required" for="email">Email</label><input class="input" id="email" type="email" name="email" required autocomplete="email" inputmode="email" autocapitalize="none" spellcheck="false"></div><div class="field"><label class="field-label" for="contactPhone">Phone</label><input class="input" id="contactPhone" name="contactPhone" type="tel" autocomplete="tel" placeholder="For account recovery"></div></div>
         <div class="grid-2"><div class="field"><label class="field-label required" for="password-input">Password</label><input class="input" type="password" name="password" id="password-input" minlength="10" maxlength="200" autocomplete="new-password" required><span class="field-hint" id="password-hint">Minimum 10 characters. Use a unique password.</span></div><div class="field"><label class="field-label required" for="confirm-password-input">Confirm password</label><input class="input" type="password" name="confirmPassword" id="confirm-password-input" minlength="10" maxlength="200" autocomplete="new-password" required><span class="field-hint" id="confirm-hint">Re-enter the same password.</span></div></div>
         <div class="field"><label class="field-label" for="countryFocus">Where you operate</label><select class="select" id="countryFocus" name="countryFocus"><option value="US" selected>USA</option><option value="CA">Canada</option><option value="BOTH">USA + Canada</option></select></div>
+        <!-- Plan picker + trial notice sit BELOW the account fields: the ask
+             comes after the form, never before it. Copy reflects current
+             reality: billing is NOT configured on prod, so signup completes
+             card-free (see src/server/routes/auth.ts). If/when billing is
+             turned on, restore the card language alongside the card field. -->
         <div class="field">
+          <div class="notice" style="margin-bottom:12px; line-height:1.5;">14-day all-inclusive trial — every Pro feature unlocked. No credit card required. Cancel anytime.</div>
           <label class="field-label required">Choose your plan</label>
           <div id="plan-choice" style="display:flex; flex-direction:column; gap:10px;">
             <label class="plan-opt" data-plan="vital" style="display:flex; gap:10px; align-items:flex-start; padding:12px 14px; background:var(--surface-2); border:1px solid var(--border); border-radius:8px; cursor:pointer;">
@@ -115,24 +114,15 @@
     var preview = document.getElementById('url-preview').querySelector('.live');
     var hint = document.getElementById('slug-hint');
     var companyInput = form.querySelector('[name="companyName"]');
-    // Directory "Claim your listing" context (?claim=<usdot>&name=<carrier>): pre-fill
-    // the carrier name and show a claim banner so the flow reads as claiming an existing
-    // FMCSA directory listing, not a cold signup. (Profile linkage itself is Phase 2.)
+    // Legacy directory links (?claim=<usdot|slug>) belong to the FREE-FOREVER
+    // claim flow, not the trial signup: hand them to /claim/<usdot-or-slug>
+    // (the route resolves a bare USDOT to the slug). ?claim=1 (no id) → finder.
     (function () {
       try {
-        var q = new URLSearchParams(location.search);
-        var claim = q.get('claim'), nm = (q.get('name') || '').slice(0, 120);
+        var claim = new URLSearchParams(location.search).get('claim');
         if (!claim) return;
-        if (nm && companyInput && !companyInput.value) companyInput.value = nm;
-        var banner = document.getElementById('claim-banner');
-        var title = document.getElementById('signup-title');
-        if (title) title.textContent = 'Claim your carrier listing';
-        if (banner) {
-          var who = nm ? nm : 'your company';
-          var dot = (claim && claim !== '1') ? ' · USDOT ' + claim : '';
-          banner.textContent = 'Claiming ' + who + dot + ' — finish signup to publish live rates, take instant quotes, and get booked from your directory profile.';
-          banner.removeAttribute('hidden');
-        }
+        var id = claim === '1' ? '' : claim.replace(/[^A-Za-z0-9-]/g, '');
+        location.replace(id ? '/claim/' + encodeURIComponent(id) : '/claim');
       } catch (e) { /* non-fatal: fall back to the standard signup */ }
     })();
     var emailInput = form.querySelector('[name="email"]');

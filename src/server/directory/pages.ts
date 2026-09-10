@@ -994,6 +994,51 @@ export const DIRECTORY_CSS = `
   .cp-claimline { margin: 14px 0 0; font-size: 13px; color: var(--muted); }
   .cp-claimline a { color: var(--accent); text-decoration: none; }
   .cp-claimline a:hover { text-decoration: underline; }
+  /* "Verified owner" — same chip footprint as .cp-badge-active, accent-toned so
+     it reads as a distinct fact (ownership proven) rather than a second
+     authority signal. Inline SVG check, never an emoji. */
+  .cp-badge-verified { font-size: 10px; font-family: var(--font-mono); letter-spacing: 0.06em; text-transform: uppercase; padding: 5px 9px; border-radius: var(--radius-chip); background: var(--accent-soft); color: var(--accent); border: 1px solid var(--accent); display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+  .cp-badge-verified svg { width: 10px; height: 10px; flex-shrink: 0; }
+  /* ── Free-forever profile claim page (/claim, /claim/:slug) ──────────────
+     Left-aligned hero (dir-hero), title-in-field inputs (.join-field), one
+     card per step; everything on the 8px ramp and design tokens only. */
+  .claim-shell { max-width: 720px; }
+  .claim-eyebrow { font-size: 12px; font-family: var(--font-mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--accent); margin: 0 0 8px; }
+  .claim-stepper { display: flex; gap: 8px; list-style: none; padding: 0; margin: 0 0 16px; counter-reset: claim-step; }
+  .claim-stepper li { flex: 1 1 0; min-width: 0; display: flex; align-items: center; gap: 8px; font-size: 12px; line-height: 1.4; color: var(--muted); padding: 8px 12px; border: 1px solid var(--border); border-radius: var(--radius-chip); background: var(--surface); }
+  .claim-stepper li::before { counter-increment: claim-step; content: counter(claim-step); width: 24px; height: 24px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-family: var(--font-mono); font-size: 11px; border: 1px solid var(--border); flex-shrink: 0; }
+  .claim-stepper li[aria-current="step"] { color: var(--ink); border-color: var(--accent); }
+  .claim-stepper li[aria-current="step"]::before { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+  .claim-stepper li.is-done { color: var(--success); border-color: var(--success); }
+  .claim-stepper li.is-done::before { background: var(--success-bg); color: var(--success); border-color: var(--success); }
+  .claim-step { margin-top: 16px; }
+  .claim-step[hidden] { display: none; }
+  .claim-step h2 { font-size: 18px; margin: 0 0 8px; }
+  .claim-step > p { margin: 0 0 16px; color: var(--ink-soft); line-height: 1.5; }
+  .claim-form { display: grid; gap: 12px; }
+  .claim-form .join-field input { min-height: 24px; }
+  .claim-code input { font-family: var(--font-mono); letter-spacing: 0.24em; }
+  .claim-terms { margin: 0; font-size: 12px; color: var(--muted); line-height: 1.5; }
+  .claim-terms a { color: var(--accent); }
+  .claim-msg { margin: 12px 0 0; font-size: 14px; color: var(--ink-soft); line-height: 1.5; min-height: 20px; }
+  .claim-msg--ok { color: var(--success); }
+  .claim-msg--err { color: var(--error); }
+  .claim-actions { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+  .claim-actions .btn { min-width: 180px; justify-content: center; }
+  .claim-quiet { font-size: 13px; color: var(--muted); text-decoration: none; }
+  .claim-quiet:hover { text-decoration: underline; }
+  .claim-upsell { margin-top: 24px; padding: 24px; border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--surface); }
+  .claim-upsell h2 { font-size: 18px; margin: 0 0 8px; }
+  .claim-upsell p { margin: 0 0 16px; color: var(--ink-soft); line-height: 1.5; }
+  .claim-upsell--bottom { margin-top: 48px; border-style: dashed; }
+  .claim-upsell--bottom h2 { color: var(--ink-soft); }
+  .claim-upsell--bottom p { color: var(--muted); }
+  .claim-done-badge { display: inline-flex; align-items: center; gap: 8px; margin: 0 0 12px; }
+  @media (max-width: 640px) {
+    .claim-stepper li { padding: 8px; font-size: 11px; }
+    .claim-step, .claim-upsell { padding: 16px; }
+    .claim-actions .btn { flex: 1 1 100%; min-width: 0; }
+  }
   .cp-layout { display: grid; grid-template-columns: minmax(0, 1fr) 328px; gap: 24px; align-items: start; margin-top: 24px; }
   .cp-main { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
   .cp-side { display: flex; flex-direction: column; gap: 16px; position: sticky; top: 16px; }
@@ -2048,7 +2093,7 @@ export function layout({ title, description, canonicalPath, bodyHtml, jsonLd, re
     <div class="site-header-inner">
       <a href="/" class="site-brand" aria-label="QuoteFleet home"><span class="site-logo" aria-hidden="true"><img class="qf-brand-mark" src="/brand/mark-keys-ondark.png" alt="QuoteFleet" width="28" height="30" decoding="async"></span>QuoteFleet</a>
       ${SITE_NAV_HTML}
-      <div class="site-actions"><span class="nav-shipper" id="nav-shipper" hidden></span>${HEADER_OOG_CTA}${THEME_TOGGLE_BTN}<a class="signin" href="/login" data-nav-auth="anon">Sign in</a><a class="btn btn-secondary" href="/signup">Claim your listing<span class="tn-free"> — free</span> <span class="arr">→</span></a>${SITE_BURGER_BTN}</div>
+      <div class="site-actions"><span class="nav-shipper" id="nav-shipper" hidden></span>${HEADER_OOG_CTA}${THEME_TOGGLE_BTN}<a class="signin" href="/login" data-nav-auth="anon">Sign in</a><a class="btn btn-secondary" href="/claim">Claim your listing<span class="tn-free"> — free</span> <span class="arr">→</span></a>${SITE_BURGER_BTN}</div>
     </div>
     ${SITE_MOBILE_MENU_HTML}
   </header>
@@ -2143,6 +2188,16 @@ export const NAV_SHIPPER_SCRIPT = `
  * legal name when the DBA is a bare single word too short to identify the
  * carrier on its own (e.g. FMCSA lists "SELECT" for "SELECT WATER SOLUTIONS LLC").
  */
+/**
+ * "Verified owner" head-row badge — rendered ONLY when a tenant has proven
+ * ownership of the profile (carrier_directory.claimed_tenant_id set by the
+ * claim flow). Inline SVG check, no emoji. Same chip footprint as the Active
+ * badge so the name line never grows.
+ */
+export const VERIFIED_OWNER_BADGE =
+  `<span class="cp-badge-verified cp-tip" tabindex="0" role="note" aria-label="Verified owner — the carrier proved ownership of this profile." data-tip="The carrier proved ownership of this profile.">` +
+  `<svg viewBox="0 0 12 12" aria-hidden="true" focusable="false"><path d="M2 6.5 4.8 9 10 3.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>Verified owner</span>`;
+
 export function carrierName(c: { dbaName?: string | null; legalName: string }): string {
   const dba = (c.dbaName ?? '').replace(/\s+/g, ' ').trim();
   if (dba && (dba.includes(' ') || dba.length >= 8)) return dba;
@@ -2551,7 +2606,7 @@ function capabilitiesGroup(): string {
     'Carrier capabilities',
     `<span class="facet-src">Carrier-verified — shown as carriers claim their profiles.</span>
     ${blocks}
-    <a class="cap-claim-cta" href="/signup">Claim a listing to verify these →</a>`,
+    <a class="cap-claim-cta" href="/claim">Claim a listing to verify these →</a>`,
     'facet-group--claim',
   );
 }
@@ -3077,7 +3132,7 @@ function numberedPager(scope: FacetScope, f: DirectoryFilters, list: CarrierList
   </nav>${jumps}`;
 }
 
-function crumbsHtml(crumbs: Crumb[]): string {
+export function crumbsHtml(crumbs: Crumb[]): string {
   return `<nav class="dir-crumbs" aria-label="Breadcrumb">${crumbs
     .map((c, i) =>
       i === crumbs.length - 1
@@ -3642,7 +3697,7 @@ function shipperCarrierBand(summary: DirectorySummary): string {
           <li>Receive shipper rate requests directly</li>
         </ul>
         <div class="aud-cta-row">
-          <a class="btn btn-primary" href="/signup">Claim your listing — free <span class="arr">→</span></a>
+          <a class="btn btn-primary" href="/claim">Claim your listing — free <span class="arr">→</span></a>
         </div>
       </section>
     </div>`;
@@ -4088,7 +4143,11 @@ export function renderCarrierProfile(opts: {
 
   const isCa = !!(c.state && CA_PROVINCE_CODES.has(c.state));
   const isActive = !!c.authorityType;
-  const claimHref = `/signup?claim=${encodeURIComponent(c.usdot)}&amp;name=${encodeURIComponent(carrierName(c))}`;
+  // Free-forever profile claim (routes/claim.ts). A CLAIMED profile shows the
+  // "Verified owner" badge and drops every claim CTA — the id itself is never
+  // rendered, only the fact that ownership was proven.
+  const isClaimed = c.claimedTenantId != null;
+  const claimHref = `/claim/${encodeURIComponent(c.slug)}`;
 
   // ── §3 FMCSA DATA — clean labeled grid (numbers tabular via CSS). ──────────
   const dataItems: Array<[string, string]> = [
@@ -4434,6 +4493,7 @@ export function renderCarrierProfile(opts: {
             <div class="cp-nameline">
               <h1>${esc(carrierName(c))}</h1>
               <span class="cp-badge-active" data-auth-badge${isActive ? '' : ' hidden'}>Active</span>
+              ${isClaimed ? VERIFIED_OWNER_BADGE : ''}
               <span class="cp-fmcsa cp-tip" tabindex="0" role="note" aria-label="FMCSA — Profile built from FMCSA public records." data-tip="Profile built from FMCSA public records.">FMCSA</span>
             </div>
             <p class="lead cp-subtitle">${headerSubtitle}</p>
@@ -4445,7 +4505,7 @@ export function renderCarrierProfile(opts: {
             ${rfqButton}
             ${saveControl(c)}
           </div>
-          <p class="cp-claimline">Own this company? <a href="${claimHref}">Claim this profile — it's free →</a></p>
+          ${isClaimed ? '' : `<p class="cp-claimline">Own this company? <a href="${claimHref}">Claim this profile — free, forever →</a></p>`}
         </div>
       </div>
     </div>
@@ -4548,12 +4608,12 @@ export function renderCarrierProfile(opts: {
 
     ${relatedModule}
 
-    <div class="dir-card cp-claimcard">
+    ${isClaimed ? '' : `<div class="dir-card cp-claimcard">
       <h2 style="font-size: 18px; margin: 0 0 8px;">Is this your company?</h2>
-      <p class="muted" style="margin: 0 auto 16px; max-width: 460px;">Claim your profile to publish live rates, take instant quotes, and get booked directly by shippers — free to list.</p>
-      <a class="btn btn-primary" href="${claimHref}">Claim this profile <span class="arr">→</span></a>
+      <p class="muted" style="margin: 0 auto 16px; max-width: 460px;">Claim your profile to control how it reads, add your lanes and contact details, and receive rate requests directly. Claiming is free, forever — no trial, no card, no plan.</p>
+      <a class="btn btn-primary" href="${claimHref}">Claim this profile — free, forever <span class="arr">→</span></a>
       <p class="muted-small" style="margin: 16px auto 0; max-width: 460px;">Carrier data is sourced from public FMCSA records. To correct or hide your contact details, email support@quotefleet.net with your USDOT number.</p>
-    </div>
+    </div>`}
   </main>
   <script>
     (function () {
