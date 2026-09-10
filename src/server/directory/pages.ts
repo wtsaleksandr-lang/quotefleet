@@ -1753,6 +1753,13 @@ export const DIRECTORY_CSS = `
     .results-toolbar .applied-chips { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
     .results-toolbar .applied-chips::-webkit-scrollbar { display: none; }
     .results-toolbar .applied-chip, .results-toolbar .applied-clear { flex: 0 0 auto; white-space: nowrap; }
+    /* Expanded bar: a fixed 2-column grid so no row holds a single orphan —
+       [Request rates →] / [Save][Export] / [XLSX CSV]. (Flex wrapped it as
+       [Request rates, Save] / [Export] / [XLSX CSV].) The chat launcher is
+       hidden while expanded, so the corner reserve is dropped too. */
+    .qf-actionbar[data-expanded="1"] .qf-ab-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; padding-right: 0; }
+    .qf-actionbar[data-expanded="1"] .qf-ab-rfq, .qf-actionbar[data-expanded="1"] .qf-ab-fmts { grid-column: 1 / -1; }
+    .qf-actionbar[data-expanded="1"] .qf-ab-btn { width: 100%; }
   }
 `;
 
