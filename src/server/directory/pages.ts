@@ -1747,6 +1747,12 @@ export const DIRECTORY_CSS = `
     .qf-actionbar[data-expanded="1"] { padding-right: 60px; }
     .qf-actionbar[data-expanded="1"] .qf-ab-more { position: absolute; top: 8px; right: 8px; }
     body.qf-ab-open .qf-mc-fab { display: none; }
+    /* Applied chips on a phone: ONE horizontally-scrolling strip. Wrapping put a
+       lone chip on its own line (2 chips → 1/1, 3 → 2/1); a strip never
+       strands one and keeps the row a fixed height above the count. */
+    .results-toolbar .applied-chips { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
+    .results-toolbar .applied-chips::-webkit-scrollbar { display: none; }
+    .results-toolbar .applied-chip, .results-toolbar .applied-clear { flex: 0 0 auto; white-space: nowrap; }
   }
 `;
 
