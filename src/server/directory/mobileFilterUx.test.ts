@@ -213,6 +213,10 @@ describe('X-QF-Partial render — only the swappable block', () => {
   it('after a swap the scroll target is the results toolbar under the sticky header — never page top', () => {
     expect(full).toContain('function scrollToToolbar(){var tb=document.querySelector(\'.results-toolbar\')');
     expect(full).toContain('window.pageYOffset-headerOffset()-8');
+    // Desktop never jumps when the toolbar is already on screen (the rail would
+    // move out from under the cursor); phones always land on the toolbar.
+    expect(full).toContain('function scrollAfterSwap(){if(isMobile()||!toolbarInView())scrollToToolbar();}');
+    expect(full).toContain('rebind(state);\n        scrollAfterSwap();');
   });
 });
 

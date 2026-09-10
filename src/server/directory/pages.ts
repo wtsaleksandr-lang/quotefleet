@@ -2663,6 +2663,11 @@ const DIRECTORY_NAV_SCRIPT = `(function(){
   // ── Scroll target: the results toolbar, under the sticky header ──────────
   function headerOffset(){var h=document.querySelector('.site-header');if(!h)return 0;var cs=getComputedStyle(h);return (cs.position==='sticky'||cs.position==='fixed')?h.getBoundingClientRect().height:0;}
   function scrollToToolbar(){var tb=document.querySelector('.results-toolbar');if(!tb)return;var top=tb.getBoundingClientRect().top+window.pageYOffset-headerOffset()-8;window.scrollTo(0,top<0?0:top);}
+  // Desktop: a facet click must NOT move the rail out from under the cursor —
+  // only scroll when the toolbar is not already fully visible. Phones always
+  // scroll (the collapsed rail + chips + count are the post-apply landing).
+  function toolbarInView(){var tb=document.querySelector('.results-toolbar');if(!tb)return false;var r=tb.getBoundingClientRect();return r.top>=headerOffset()&&r.bottom<=window.innerHeight;}
+  function scrollAfterSwap(){if(isMobile()||!toolbarInView())scrollToToolbar();}
   // ── Optimistic facet state ───────────────────────────────────────────────
   function optimistic(el,on){
     if(!el||!el.classList||!el.classList.contains('facet-opt'))return;
@@ -2710,7 +2715,7 @@ const DIRECTORY_NAV_SCRIPT = `(function(){
         if(!opts.pop)history.pushState({qf:1},'',url.pathname+url.search);
         document.body.classList.remove('qf-ab-open');
         rebind(state);
-        scrollToToolbar();
+        scrollAfterSwap();
         var tb=document.querySelector('.results-toolbar'); if(tb&&tb.focus)try{tb.focus({preventScroll:true});}catch(e){}
       })
       .catch(function(err){
