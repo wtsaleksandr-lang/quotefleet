@@ -38,6 +38,12 @@ export interface Env {
    *  matches. If unset, we fall back to trusting the header (legacy
    *  behavior) but log a warning — production deployments MUST set this. */
   WORKER_AUTH_SECRET?: string;
+  /** Cloudflare zone + API token (Cache Purge permission) for best-effort
+   *  purge-by-URL of edge-cached public pages after a write that changes them
+   *  (e.g. a verified profile claim). Both optional: when either is unset the
+   *  purge is skipped and the 24h s-maxage simply ages out. */
+  CLOUDFLARE_ZONE_ID?: string;
+  CLOUDFLARE_API_TOKEN?: string;
   /** Soft global daily spend cap on the platform Anthropic key, in USD.
    *  When usage telemetry exceeds this, marketing chat + AI endpoints
    *  short-circuit with a 503 instead of running another API call.
@@ -186,6 +192,8 @@ export function loadEnv(): Env {
     HOST: opt('HOST') ?? '0.0.0.0',
     HOST_DOMAINS: hostDomains,
     WORKER_AUTH_SECRET: opt('WORKER_AUTH_SECRET'),
+    CLOUDFLARE_ZONE_ID: opt('CLOUDFLARE_ZONE_ID'),
+    CLOUDFLARE_API_TOKEN: opt('CLOUDFLARE_API_TOKEN'),
     AI_DAILY_USD_CAP: opt('AI_DAILY_USD_CAP') ? Number(opt('AI_DAILY_USD_CAP')) : undefined,
     SENTRY_DSN: opt('SENTRY_DSN'),
     SUPER_ADMIN_EMAIL: opt('SUPER_ADMIN_EMAIL'),

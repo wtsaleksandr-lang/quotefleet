@@ -70,7 +70,7 @@ export function renderClaimPage(opts: { carrier: VisibleCarrier; viewer: ClaimVi
     main = `<section class="cp-card claim-step" data-step="3">
       <p class="claim-done-badge">${VERIFIED_OWNER_BADGE}</p>
       <h2>You are the verified owner of ${esc(name)}</h2>
-      <p>Your profile is yours, free, forever.</p>
+      <p>Your profile is yours, free, forever. Your Verified owner badge can take up to a day to appear for visitors.</p>
       <div class="claim-actions"><a class="btn btn-primary" href="${esc(profileHref)}">Open my profile <span class="arr">→</span></a></div>
       ${v.canActivateTrial ? upsellCard({ profileHref, muted: false }) : ''}
     </section>`;
@@ -136,7 +136,7 @@ export function renderClaimPage(opts: { carrier: VisibleCarrier; viewer: ClaimVi
     <section class="cp-card claim-step" data-step="3" hidden>
       <p class="claim-done-badge">${VERIFIED_OWNER_BADGE}</p>
       <h2>Verified owner of ${esc(name)}</h2>
-      <p>Your profile is yours, free, forever. Shippers now see a Verified owner badge and your email on it.</p>
+      <p>Your profile is yours, free, forever. Shippers will see a Verified owner badge and your email on it. Your Verified owner badge can take up to a day to appear for visitors.</p>
       <div class="claim-actions"><a class="btn btn-primary" href="${esc(profileHref)}">Open my profile <span class="arr">→</span></a></div>
       ${upsellCard({ profileHref, muted: false })}
     </section>
