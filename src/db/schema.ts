@@ -2498,12 +2498,11 @@ export const carrierClaims = pgTable(
     id: serial('id').primaryKey(),
     /** USDOT as an integer (carrier_directory.usdot is the same digits as text). */
     usdot: integer('usdot').notNull(),
-    tenantId: integer('tenant_id')
-      .notNull()
-      .references(() => tenants.id, { onDelete: 'cascade' }),
-    userId: integer('user_id')
-      .notNull()
-      .references(() => users.id, { onDelete: 'cascade' }),
+    // No FK constraints — deliberately mirrors 0074_carrier_claims.sql + the
+    // boot self-heal (plain integer columns) so Replit's publish tool never
+    // proposes an ADD CONSTRAINT the SQL does not carry.
+    tenantId: integer('tenant_id').notNull(),
+    userId: integer('user_id').notNull(),
     /** 'email_otp' | 'domain_match' | 'manual' */
     method: text('method').notNull(),
     /** 'pending' | 'verified' | 'rejected' | 'expired' */
