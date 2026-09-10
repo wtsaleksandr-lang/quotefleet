@@ -1038,7 +1038,9 @@ export const DIRECTORY_CSS = `
      no-orphan-wrap rule is moot (never an inline pill group). */
   .cp-gated .cp-gated-teaser { display: flex; flex-direction: column; gap: 6px; margin: 10px 0 12px; }
   .cp-gated-blur { font-family: var(--font-mono); font-size: 12px; color: var(--muted); filter: blur(3px); user-select: none; letter-spacing: 0.5px; }
-  .cp-gated .btn { width: 100%; justify-content: center; }
+  /* The global .btn is nowrap; a full-width CTA ("Reveal more contacts with
+     Directory Pro — $19/mo") was clipped at 375px. Let it wrap, centred. */
+  .cp-gated .btn { width: 100%; justify-content: center; white-space: normal; text-align: center; line-height: 1.3; }
   .cp-gated .cp-unlock-btn { margin-bottom: 8px; }
   .cp-gated .cp-reveal-form { margin: 10px 0 0; }
   /* PR C — the revealed enriched-contacts result (swapped in by the inline
@@ -1188,7 +1190,9 @@ export const DIRECTORY_CSS = `
   /* Profile trailing blocks — desktop defaults (classes replace former inline
      styles so mobile can tighten them below). */
   .cp-crosslinks { margin-top: 24px; }
-  .cp-claimcard { margin-top: 24px; padding: 24px; text-align: center; }
+  /* Left-aligned like every other header on the site ("Is this your company?"
+     was the one centred card header). */
+  .cp-claimcard { margin-top: 24px; padding: 24px; text-align: left; }
   /* The global .site-footer carries a generous marketing gap (72px margin-top +
      44px padding-top). On a short carrier profile that reads as a dead band
      between the claim card and the footer. Trim it — SCOPED to the profile via
@@ -1760,6 +1764,25 @@ export const DIRECTORY_CSS = `
     .qf-actionbar[data-expanded="1"] .qf-ab-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; padding-right: 0; }
     .qf-actionbar[data-expanded="1"] .qf-ab-rfq, .qf-actionbar[data-expanded="1"] .qf-ab-fmts { grid-column: 1 / -1; }
     .qf-actionbar[data-expanded="1"] .qf-ab-btn { width: 100%; }
+  }
+
+  /* ── "Other US ports & intermodal hubs" chip grid ────────────────────────
+     Fixed columns per breakpoint (4 / 3 / 2). The wrapper carries the count
+     remainders (data-odd / data-rem3 / data-rem4) and the ONE chip that would
+     sit alone on the last row spans it instead — the browseGrid data-odd rule,
+     generalised to three column counts. */
+  .dir-chips--grid { display: grid; gap: 8px; grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .dir-chips--grid > .dir-chip { display: flex; align-items: center; justify-content: center; text-align: center; white-space: normal; min-width: 0; }
+  .dir-chips--grid[data-rem4="1"] > .dir-chip:last-child { grid-column: 1 / -1; }
+  @media (max-width: 980px) {
+    .dir-chips--grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .dir-chips--grid[data-rem4="1"] > .dir-chip:last-child { grid-column: auto; }
+    .dir-chips--grid[data-rem3="1"] > .dir-chip:last-child { grid-column: 1 / -1; }
+  }
+  @media (max-width: 640px) {
+    .dir-chips--grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .dir-chips--grid[data-rem3="1"] > .dir-chip:last-child { grid-column: auto; }
+    .dir-chips--grid[data-odd="1"] > .dir-chip:last-child { grid-column: 1 / -1; }
   }
 `;
 
@@ -3980,9 +4003,14 @@ export function renderPortPage(opts: {
   // Other US gateways as their DISPLAY groups (co-located ports as one "/" hub),
   // linking to the canonical group slug so no chip lands on a redirect.
   const usGroupCodes = new Set(CONTAINER_PORTS.map((p) => portGroupForMemberCode(p.code)?.code ?? p.code));
-  const portChips = PORT_GROUPS.filter((g) => usGroupCodes.has(g.code) && g.code !== port.code)
-    .map((g) => `<a class="dir-chip" href="/directory/port/${g.code}">${esc(g.label)}</a>`)
-    .join('\n');
+  const portChipList = PORT_GROUPS.filter((g) => usGroupCodes.has(g.code) && g.code !== port.code);
+  const portChips = portChipList.map((g) => `<a class="dir-chip" href="/directory/port/${g.code}">${esc(g.label)}</a>`).join('\n');
+  // Fixed-column chip grid (4 / 3 / 2 columns by breakpoint) with the count
+  // remainders on the wrapper: when the last row would hold ONE chip at that
+  // column count, CSS spans it across the row (the browseGrid data-odd pattern)
+  // so no breakpoint strands a lone chip. Every hub link is still rendered.
+  const n = portChipList.length;
+  const portChipsGrid = `<div class="dir-chips dir-chips--grid" data-n="${n}"${n % 2 === 1 ? ' data-odd="1"' : ''}${n % 3 === 1 ? ' data-rem3="1"' : ''}${n % 4 === 1 ? ' data-rem4="1"' : ''}>${portChips}</div>`;
   const faqsHtml = `<div class="dir-section-h"><h2>Frequently asked questions</h2></div>
     ${faqs
       .map(
@@ -4000,12 +4028,15 @@ export function renderPortPage(opts: {
     intro: inland
       ? `${fmtNum(list.total)} carriers whose nearest intermodal hub is ${esc(port.name)} (${esc(port.city)}, ${esc(port.state)}), by ZIP proximity from FMCSA data.`
       : `${fmtNum(list.total)} carriers whose nearest ${hubGatewayLabel(port.kind, port.country)} is ${esc(port.name)} (${esc(port.city)}, ${esc(port.state)}), by ZIP proximity from FMCSA data.`,
+    // "Intermodal Hub" is appended only when the hub's own name does not already
+    // say it — "Chicago Intermodal Hub" and "Minneapolis/St. Paul Intermodal" were
+    // rendering as "… Intermodal Hub Intermodal Hub …" / "… Intermodal Intermodal Hub …".
     title: inland
-      ? `${port.name} Intermodal Hub Drayage & Trucking Carriers — ${list.total.toLocaleString('en-US')} Near ${port.city} | QuoteFleet`
+      ? `${port.name}${/intermodal/i.test(port.name) ? '' : ' Intermodal Hub'} Drayage & Trucking Carriers — ${list.total.toLocaleString('en-US')} Near ${port.city} | QuoteFleet`
       : `${port.name} Drayage & Trucking Carriers — ${list.total.toLocaleString('en-US')} Near ${port.city} | QuoteFleet`,
     description: `Directory of ${list.total.toLocaleString('en-US')} carriers near ${port.name} in ${port.city}, ${port.state}. Filter by fleet size, safety rating and drayage service. FMCSA data.`,
     canonicalPath,
-    extraModulesHtml: `<div class="dir-section-h"><h2 style="font-size: 18px;">Other US ports &amp; intermodal hubs</h2></div><div class="dir-chips">${portChips}</div>`,
+    extraModulesHtml: `<div class="dir-section-h"><h2 style="font-size: 18px;">Other US ports &amp; intermodal hubs</h2></div>${portChipsGrid}`,
     faqsHtml,
     jsonLd: [
       jsonLdBreadcrumb([{ name: 'Directory', path: '/directory' }, { name: port.name, path: `/directory/port/${port.code}` }]),

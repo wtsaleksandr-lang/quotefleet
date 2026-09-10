@@ -67,10 +67,10 @@ function list(filters: ReturnType<typeof normalizeFilters>, total = 3): CarrierL
   };
 }
 
-const port = portGroupAsPort(portGroupByCode('USCHI')!);
-
-function hub(opts: { partial?: boolean; query?: Record<string, string> } = {}): string {
-  const filters = normalizeFilters(opts.query ?? { fleet: '1-25' }, { port: 'USCHI', state: null, citySlug: null });
+function hub(opts: { partial?: boolean; query?: Record<string, string>; code?: string } = {}): string {
+  const code = opts.code ?? 'USCHI';
+  const port = portGroupAsPort(portGroupByCode(code)!);
+  const filters = normalizeFilters(opts.query ?? { fleet: '1-25' }, { port: code, state: null, citySlug: null });
   return renderPortPage({ port, list: list(filters), counts: COUNTS, filters, partial: opts.partial });
 }
 
@@ -233,6 +233,30 @@ describe('sticky action bar on phones collapses to one row', () => {
     expect(DIRECTORY_CSS).toContain('body.qf-ab-open .qf-mc-fab { display: none; }');
     // Desktop unchanged: the control is hidden outside the phone breakpoint.
     expect(DIRECTORY_CSS).toContain('.qf-ab-more { display: none; }');
+  });
+});
+
+describe('inland hub <title> — "Intermodal Hub" is not doubled (regression from #526)', () => {
+  const title = (html: string) => /<title>([^<]*)<\/title>/.exec(html)![1];
+
+  it('a hub whose name already says Intermodal gets no extra suffix', () => {
+    expect(title(hub({ code: 'USCHI' }))).toMatch(/^Chicago Intermodal Hub Drayage &amp; Trucking Carriers — 3 Near Chicago/);
+    expect(title(hub({ code: 'INLMSP' }))).toMatch(/^Minneapolis\/St\. Paul Intermodal Drayage &amp; Trucking Carriers — 3 Near /);
+    expect(hub({ code: 'USCHI' })).not.toContain('Intermodal Hub Intermodal Hub');
+    expect(hub({ code: 'INLMSP' })).not.toContain('Intermodal Intermodal');
+  });
+
+  it('the "Other US ports & intermodal hubs" chips render as a remainder-aware grid (no lone last chip)', () => {
+    const html = hub();
+    const m = /<div class="dir-chips dir-chips--grid" data-n="(\d+)"([^>]*)>/.exec(html);
+    expect(m).toBeTruthy();
+    const n = Number(m![1]);
+    const attrs = m![2];
+    expect(n).toBeGreaterThan(3);
+    expect(attrs.includes('data-odd="1"')).toBe(n % 2 === 1);
+    expect(attrs.includes('data-rem3="1"')).toBe(n % 3 === 1);
+    expect(attrs.includes('data-rem4="1"')).toBe(n % 4 === 1);
+    expect(DIRECTORY_CSS).toContain('.dir-chips--grid[data-odd="1"] > .dir-chip:last-child { grid-column: 1 / -1; }');
   });
 });
 
