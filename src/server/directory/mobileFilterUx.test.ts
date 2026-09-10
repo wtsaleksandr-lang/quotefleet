@@ -206,7 +206,10 @@ describe('X-QF-Partial render — only the swappable block', () => {
 
   it('the rail toggle does not auto-collapse when the URL carries a facet or sessionStorage.qfRailOpen is 1', () => {
     expect(full).toContain("var STORE='qfRailOpen';");
-    expect(full).toContain("function railWanted(){return read()==='1'||hasFacet(location.search);}");
+    expect(full).toContain("function railWanted(){var s=read();if(s==='0')return false;return s==='1'||hasFacet(location.search);}");
+    // …but after a swap on a phone the rail collapses (persisted) so the first
+    // result card is back above the fold; desktop keeps its rail as it was.
+    expect(full).toContain('if(isMobile())setRail(false,true);else setRail(state.railOpen,false);');
     expect(full).toContain("if(open){e.r.removeAttribute('data-collapsed');e.t.setAttribute('aria-expanded','true');e.t.textContent='Hide filters \\u25B4';ensureGroupOpen();}");
   });
 

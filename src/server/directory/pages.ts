@@ -2659,7 +2659,10 @@ const DIRECTORY_NAV_SCRIPT = `(function(){
     else{e.r.setAttribute('data-collapsed','1');e.t.setAttribute('aria-expanded','false');e.t.textContent='Filters \\u25BE';}
     if(persist)store(open?'1':'0');
   }
-  function railWanted(){return read()==='1'||hasFacet(location.search);}
+  // An explicit close (a swap on a phone, or the user's tap) wins over the
+  // "URL has a facet" default, so a filtered page reloads with the rail shut
+  // and the results in view; the Filters button re-opens it in one tap.
+  function railWanted(){var s=read();if(s==='0')return false;return s==='1'||hasFacet(location.search);}
   // ── Scroll target: the results toolbar, under the sticky header ──────────
   function headerOffset(){var h=document.querySelector('.site-header');if(!h)return 0;var cs=getComputedStyle(h);return (cs.position==='sticky'||cs.position==='fixed')?h.getBoundingClientRect().height:0;}
   function scrollToToolbar(){var tb=document.querySelector('.results-toolbar');if(!tb)return;var top=tb.getBoundingClientRect().top+window.pageYOffset-headerOffset()-8;window.scrollTo(0,top<0?0:top);}
@@ -2687,7 +2690,10 @@ const DIRECTORY_NAV_SCRIPT = `(function(){
     initAcc(state.openTitles); initFolds();
     if(window.__qfActionBarInit)window.__qfActionBarInit();
     if(state.portQuery){var pq=document.getElementById('port-search');if(pq){pq.value=state.portQuery;filterPorts(pq);}}
-    setRail(state.railOpen,false);
+    // Phone: the open rail (700px+) pushed the first result 260-320px below the
+    // fold after every apply. Collapse it after a swap (persisted), so the
+    // landing is chips + count + "Filters" + results; desktop rail unchanged.
+    if(isMobile())setRail(false,true);else setRail(state.railOpen,false);
   }
   function go(href,opts){
     opts=opts||{};
