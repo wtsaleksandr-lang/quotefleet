@@ -62,10 +62,41 @@ describe('free calculator disclaimer', () => {
   });
 });
 
-describe('carrier-profile claim CTAs are explicitly free', () => {
+describe('carrier-profile claim CTAs are explicitly free, forever', () => {
   const html = renderCarrierProfile({ carrier: carrier() });
 
-  it("the 'Own this company?' line states claiming is free", () => {
-    expect(html).toContain("Claim this profile — it's free →");
+  it("the 'Own this company?' line states claiming is free, forever", () => {
+    expect(html).toContain('Own this company?');
+    expect(html).toContain('Claim this profile — free, forever →');
+  });
+
+  it('every claim CTA points at the free claim page, never the trial signup', () => {
+    expect(html).toContain('href="/claim/acme-drayage-inc-107080"');
+    expect(html).not.toContain('/signup?claim=');
+    expect(html).toContain('Is this your company?');
+    expect(html).toContain('Claim this profile — free, forever <span class="arr">→</span>');
+    expect(html).toContain('no trial, no card, no plan');
+  });
+
+  it('an unclaimed profile shows no Verified owner badge', () => {
+    expect(html).not.toContain('cp-badge-verified');
+  });
+});
+
+describe('a CLAIMED carrier profile', () => {
+  const html = renderCarrierProfile({ carrier: carrier({ claimedTenantId: 42, claimedAt: new Date('2026-09-01T00:00:00Z') }) });
+
+  it('renders the Verified owner badge in the head row', () => {
+    expect(html).toContain('cp-badge-verified');
+    expect(html).toContain('Verified owner</span>');
+    // The owning tenant id is never rendered.
+    expect(html).not.toMatch(/tenant[-_ ]?id/i);
+  });
+
+  it('hides every claim CTA', () => {
+    expect(html).not.toContain('Own this company?');
+    expect(html).not.toContain('Is this your company?');
+    expect(html).not.toContain('cp-claimcard');
+    expect(html).not.toContain('href="/claim/');
   });
 });
