@@ -171,7 +171,7 @@ export interface SufficientCarrierData {
   /** FMCSA safety ratings are sparse (~8% of the census is rated), so this is
    *  null unless the cut has enough RATED carriers to say anything honest. */
   safety: { rated: number; satisfactory: number; conditional: number } | null;
-  /** Most common nearest port for the cut, when the corpus knows one. */
+  /** Most common nearest port/hub for the cut, when the corpus knows one. */
   topPort: { code: string; count: number } | null;
   /** ISO timestamp the aggregate was computed — provenance for citations. */
   computedAt: string;

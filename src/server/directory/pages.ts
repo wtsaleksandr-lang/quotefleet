@@ -42,7 +42,15 @@ import {
 } from './queries.js';
 import { createHash } from 'node:crypto';
 import { US_STATES, stateByCode, type UsState } from './usStates.js';
-import { CONTAINER_PORTS, portByCode, PORT_GROUPS, portGroupForMemberCode, type ContainerPort } from './containerPorts.js';
+import {
+  CONTAINER_PORTS,
+  portByCode,
+  PORT_GROUPS,
+  portGroupForMemberCode,
+  hubNoun,
+  hubGatewayLabel,
+  type ContainerPort,
+} from './containerPorts.js';
 import { CA_PROVINCE_CODES } from './caProvinces.js';
 import {
   NATIONAL_DRIVER_OOS_RATE,
@@ -2067,7 +2075,15 @@ export function carrierAbout(c: VisibleCarrier): string {
   let s3 = '';
   if (c.intermodal) {
     const p = portByCode(c.nearestPortCode);
-    const ports = isCa ? 'North American container ports' : 'US container ports';
+    // An inland rail ramp is not a "container port" — name the hub for what it is.
+    const ports =
+      p?.kind === 'inland-hub'
+        ? isCa
+          ? 'North American intermodal hubs'
+          : 'US intermodal hubs'
+        : isCa
+          ? 'North American container ports'
+          : 'US container ports';
     s3 = ` It runs container drayage and intermodal moves, serving shippers at ${ports}${p ? ` such as ${p.name}` : ''}.`;
   }
 
@@ -3255,7 +3271,7 @@ export function renderDirectoryLanding(
     <div class="container-narrow">
       <div class="eyebrow" style="color: var(--accent); font-family: var(--font-mono); font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 10px;">US carrier directory</div>
       <h1>Find US freight &amp; drayage carriers</h1>
-      <p class="lead">Browse ${fmtNum(summary.total)} active US motor carriers by port and by state — fleet size, authority, safety rating, and which run container drayage. Sourced from FMCSA public data.</p>
+      <p class="lead">Browse ${fmtNum(summary.total)} active US motor carriers by port, intermodal hub and state — fleet size, authority, safety rating, and which run container drayage. Sourced from FMCSA public data.</p>
       <div class="dir-stats">
         <div class="dir-stat"><b>${fmtNum(summary.total)}</b><span>Carriers</span></div>
         <div class="dir-stat"><b>${fmtNum(summary.intermodalTotal)}</b><span>Drayage / intermodal</span></div>
@@ -3277,7 +3293,7 @@ export function renderDirectoryLanding(
     }
     ${shipperCarrierBand(summary)}
     <div class="dir-section-h">
-      <h2>Top US ports</h2>
+      <h2>Top US ports &amp; hubs</h2>
       <a class="muted-small" href="/compliance">Compliance tools →</a>
     </div>
     ${browseGrid(portCards, summary.byPort.length)}
@@ -3291,14 +3307,14 @@ export function renderDirectoryLanding(
 
   return layout({
     title: `US Freight & Drayage Carrier Directory — ${summary.total.toLocaleString('en-US')} Carriers | QuoteFleet`,
-    description: `Browse ${summary.total.toLocaleString('en-US')} US trucking and drayage carriers by port and state. Fleet size, operating authority, safety ratings and intermodal status from FMCSA data.`,
+    description: `Browse ${summary.total.toLocaleString('en-US')} US trucking and drayage carriers by port, intermodal hub and state. Fleet size, operating authority, safety ratings and intermodal status from FMCSA data.`,
     canonicalPath: '/directory',
     bodyHtml: body,
     jsonLd: [
       jsonLdBreadcrumb([{ name: 'Directory', path: '/directory' }]),
       jsonLdItemListAndCollection({
         name: 'US Freight & Drayage Carrier Directory',
-        description: `Browse ${summary.total} US motor carriers by port and state from FMCSA public data.`,
+        description: `Browse ${summary.total} US motor carriers by port, intermodal hub and state from FMCSA public data.`,
         path: '/directory',
         carriers: [],
         total: summary.total,
@@ -3655,8 +3671,13 @@ export function renderCityPage(opts: {
   });
 }
 
-// ─── 4a. Port page (faceted, + FAQ schema) ────────────────────────────────
-function portFaqs(port: { name: string; city: string; state: string }): Array<{ q: string; a: string }> {
+// ─── 4a. Hub page (port OR inland intermodal hub; faceted, + FAQ schema) ───
+// One route + template serves both kinds (/directory/port/:code is the canonical
+// URL for all 61 hubs), but the COPY is kind-aware: an inland rail ramp has no
+// marine terminals and receives no ocean vessels, so the seaport wording would
+// be factually wrong there (and it is emitted as FAQPage JSON-LD).
+function portFaqs(port: { name: string; city: string; state: string; kind?: ContainerPort['kind'] }): Array<{ q: string; a: string }> {
+  const inland = port.kind === 'inland-hub';
   return [
     {
       q: `How many carriers serve ${port.name}?`,
@@ -3664,7 +3685,9 @@ function portFaqs(port: { name: string; city: string; state: string }): Array<{ 
     },
     {
       q: `What is drayage at ${port.city}?`,
-      a: `Drayage is the short-haul trucking of ocean containers between ${port.name}'s marine terminals and nearby warehouses, rail ramps or transload facilities. Carriers flagged "Drayage / intermodal" here report intermodal container operations to FMCSA.`,
+      a: inland
+        ? `Drayage is the short-haul trucking of intermodal containers between ${port.name}'s rail ramps and intermodal terminals and nearby warehouses, distribution centers or transload facilities. Carriers flagged "Drayage / intermodal" here report intermodal container operations to FMCSA.`
+        : `Drayage is the short-haul trucking of ocean containers between ${port.name}'s marine terminals and nearby warehouses, rail ramps or transload facilities. Carriers flagged "Drayage / intermodal" here report intermodal container operations to FMCSA.`,
     },
     {
       q: `How do I verify a carrier's authority and insurance?`,
@@ -3692,6 +3715,7 @@ export function renderPortPage(opts: {
     pagePaths: true,
   };
   const canonicalPath = hubCanonicalPath(scope, filters);
+  const inland = port.kind === 'inland-hub';
   const faqs = portFaqs(port);
   // Other US gateways as their DISPLAY groups (co-located ports as one "/" hub),
   // linking to the canonical group slug so no chip lands on a redirect.
@@ -3712,11 +3736,15 @@ export function renderPortPage(opts: {
     filters,
     crumbs: [{ name: 'Directory', path: '/directory' }, { name: port.name }],
     h1: `Drayage & trucking carriers near ${port.name}`,
-    intro: `${fmtNum(list.total)} carriers whose nearest US container gateway is ${esc(port.name)} (${esc(port.city)}, ${esc(port.state)}), by ZIP proximity from FMCSA data.`,
-    title: `${port.name} Drayage & Trucking Carriers — ${list.total.toLocaleString('en-US')} Near ${port.city} | QuoteFleet`,
+    intro: inland
+      ? `${fmtNum(list.total)} carriers whose nearest intermodal hub is ${esc(port.name)} (${esc(port.city)}, ${esc(port.state)}), by ZIP proximity from FMCSA data.`
+      : `${fmtNum(list.total)} carriers whose nearest ${hubGatewayLabel(port.kind, port.country)} is ${esc(port.name)} (${esc(port.city)}, ${esc(port.state)}), by ZIP proximity from FMCSA data.`,
+    title: inland
+      ? `${port.name} Intermodal Hub Drayage & Trucking Carriers — ${list.total.toLocaleString('en-US')} Near ${port.city} | QuoteFleet`
+      : `${port.name} Drayage & Trucking Carriers — ${list.total.toLocaleString('en-US')} Near ${port.city} | QuoteFleet`,
     description: `Directory of ${list.total.toLocaleString('en-US')} carriers near ${port.name} in ${port.city}, ${port.state}. Filter by fleet size, safety rating and drayage service. FMCSA data.`,
     canonicalPath,
-    extraModulesHtml: `<div class="dir-section-h"><h2 style="font-size: 18px;">Other US ports</h2></div><div class="dir-chips">${portChips}</div>`,
+    extraModulesHtml: `<div class="dir-section-h"><h2 style="font-size: 18px;">Other US ports &amp; intermodal hubs</h2></div><div class="dir-chips">${portChips}</div>`,
     faqsHtml,
     jsonLd: [
       jsonLdBreadcrumb([{ name: 'Directory', path: '/directory' }, { name: port.name, path: `/directory/port/${port.code}` }]),
@@ -4161,7 +4189,7 @@ export function renderCarrierProfile(opts: {
         <section class="cp-card">
           <h2 class="cp-h">Services &amp; equipment</h2>
           ${equipmentGroup || cargoGroup ? `${equipmentGroup}${cargoGroup}` : `<p class="cp-loc">No FMCSA equipment or cargo-class flags on this carrier's record yet.</p>`}
-          ${c.intermodal ? `<p class="cp-loc" style="margin-top: 12px;"><span class="lk">Container drayage / intermodal</span>${port ? ` · nearest port ${esc(port.name)}` : ''}</p>` : ''}
+          ${c.intermodal ? `<p class="cp-loc" style="margin-top: 12px;"><span class="lk">Container drayage / intermodal</span>${port ? ` · nearest ${hubNoun(port.kind)} ${esc(port.name)}` : ''}</p>` : ''}
         </section>
 
         <section class="cp-card">
@@ -4212,8 +4240,8 @@ export function renderCarrierProfile(opts: {
         <section class="cp-card">
           <h2 class="cp-h">Location &amp; service area</h2>
           <p class="cp-loc">Based in ${locBased}.</p>
-          <p class="cp-loc">Serving shippers, brokers and forwarders ${isCa ? 'across Canadian trade lanes' : 'at US container ports'}.</p>
-          ${port ? `<p class="cp-loc"><span class="lk">Nearest port</span> ${esc(port.name)}${port.city || port.state ? ` · ${esc([port.city, port.state].filter(Boolean).join(', '))}` : ''}</p>` : ''}
+          <p class="cp-loc">Serving shippers, brokers and forwarders ${isCa ? 'across Canadian trade lanes' : 'at US ports and rail ramps'}.</p>
+          ${port ? `<p class="cp-loc"><span class="lk">${port.kind === 'inland-hub' ? 'Nearest hub' : 'Nearest port'}</span> ${esc(port.name)}${port.city || port.state ? ` · ${esc([port.city, port.state].filter(Boolean).join(', '))}` : ''}</p>` : ''}
           ${alsoOperatingBlock}
         </section>
       </div>

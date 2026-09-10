@@ -93,6 +93,16 @@ describe('PORT_GROUPS — the combined, deduped display-hub list', () => {
     expect(codes.has('INLMEM')).toBe(true); // inland rail ramp
   });
 
+  it('but every group KNOWS which kind it is (seaport vs inland-hub) for page wording', () => {
+    expect(portGroupByCode('USLALB')?.kind).toBe('seaport');
+    expect(portGroupByCode('CAVAN')?.kind).toBe('seaport');
+    expect(portGroupByCode('USCHI')?.kind).toBe('inland-hub');
+    expect(portGroupByCode('INLMEM')?.kind).toBe('inland-hub');
+    for (const g of PORT_GROUPS.filter((g) => g.code.startsWith('INL'))) {
+      expect(g.kind, g.code).toBe('inland-hub');
+    }
+  });
+
   it('exposes the newly-added metros as their own standalone display hubs', () => {
     for (const code of ['USMOB', 'USTPA', 'INLOMA', 'INLCLT', 'INLSAS', 'INLREG']) {
       const g = portGroupByCode(code);
@@ -125,6 +135,7 @@ describe('portGroupForMemberCode / portGroupAsPort', () => {
     expect(p.code).toBe('USLALB');
     expect(p.name).toContain('/');
     expect(p.country).toBe('US');
+    expect(p.kind).toBe('seaport');
     expect(Number.isFinite(p.lat)).toBe(true);
   });
 

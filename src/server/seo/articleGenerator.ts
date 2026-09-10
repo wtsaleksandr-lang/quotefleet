@@ -211,7 +211,7 @@ export function buildDataCitation(data: SufficientCarrierData): string {
   }
   if (data.topPort) {
     lines.push(
-      `The most common nearest port for this group is **${data.topPort.code}** (${num(data.topPort.count)} carriers).`,
+      `The most common nearest port/hub for this group is **${data.topPort.code}** (${num(data.topPort.count)} carriers).`,
     );
   }
   return lines.join('\n\n');
