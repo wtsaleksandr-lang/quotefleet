@@ -164,7 +164,7 @@ describe('renderCarrierProfile — NO new gating (public FMCSA data stays free)'
   it('renders the additional-contacts gate (free teaser) without touching public FMCSA contact', () => {
     const html = renderCarrierProfile({ carrier: carrier() });
     expect(html).toContain('More dispatch contacts');
-    expect(html).toContain('Unlock with Directory Pro — $19/mo');
+    expect(html).toContain('Reveal more contacts with Directory Pro — $19/mo');
     // Public FMCSA phone + email stay FREE + visible regardless of the gate.
     expect(html).toContain('href="tel:9125550921"');
     expect(html).toContain('href="mailto:dispatch%40acme.com"');

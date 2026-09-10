@@ -131,11 +131,14 @@ describe('renderCarrierProfile — contact display', () => {
  * (see directory/httpCache.ts). These tests pin BOTH halves of that contract.
  */
 describe('renderCarrierProfile — Directory Pro contacts gate', () => {
-  it('always server-renders the FREE variant: teaser + "$19/mo" CTA + disabled reveal', () => {
+  it('always server-renders the FREE variant: teaser + ONE "$19/mo" CTA, no dead disabled button', () => {
     const html = renderCarrierProfile({ carrier: carrier() });
-    expect(html).toContain('Unlock with Directory Pro — $19/mo');
+    expect(html).toContain('Reveal more contacts with Directory Pro — $19/mo');
     expect(html).toContain('href="/directory/join?intent=subscribe"');
-    expect(html).toMatch(/<button[^>]*disabled[^>]*>Reveal contacts<\/button>/);
+    // The old permanently-disabled "Reveal contacts" teaser button is gone — it
+    // did nothing on click and read as a bug. The Pro-hydrated form still uses
+    // an ENABLED .cp-reveal-btn, so only assert the disabled variant is absent.
+    expect(html).not.toMatch(/cp-reveal-btn[^>]*disabled/);
     // The gate ELEMENT served to everyone is the free one. (The Pro markup does
     // appear in the page — as a STRING inside the hydrate script — so assert on
     // the rendered element, not on raw substring absence.)
