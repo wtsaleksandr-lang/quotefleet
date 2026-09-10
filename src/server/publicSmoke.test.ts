@@ -406,7 +406,7 @@ describe('"Find your company" carrier finder', () => {
   it('demo shell FORWARDS the carrier params onto the iframe (initial + theme toggle)', async () => {
     const html = await file('widget-demo-shell.html');
     expect(html).toContain('buildFrameSrc');
-    expect(html).toContain("CARRIER_PARAMS = ['company', 'usdot', 'mc', 'city', 'state', 'phone']");
+    expect(html).toContain("CARRIER_PARAMS = ['company', 'usdot', 'mc', 'city', 'state', 'phone', 'email']");
     // The theme-toggle rebuild uses buildFrameSrc, so a theme click keeps the carrier.
     expect(html).toContain('frame.src = buildFrameSrc(t)');
     // Initial load rebuilds ONCE when carrier params are present.
