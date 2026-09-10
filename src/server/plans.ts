@@ -49,6 +49,11 @@ export const PLAN_LABELS: Record<PlanId, string> = {
  *  `trial_period_days` and the tenant's `trialEndsAt`. */
 export const TRIAL_DAYS = 14;
 
+/** Quote-tool trial length for a VERIFIED directory-profile owner who opts in
+ *  via POST /api/tenant/trial/activate — the "30 days free, not 14" upsell on
+ *  the claim page. The profile itself stays free forever regardless. */
+export const CLAIM_OWNER_TRIAL_DAYS = 30;
+
 /** Pro-only capabilities. Vital gets NONE of these; a trialing tenant of
  *  either tier gets ALL of them (via `effectivePlan` → 'pro'). */
 export type ProFeature =

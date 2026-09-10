@@ -101,6 +101,14 @@ export interface ProvisionTenantInput {
   /** When present, stamps the provider sub on the new owner user so a repeat
    *  social login matches this account directly. */
   oauth?: { column: OAuthSubColumn; sub: string };
+  /** Explicit trial end. Omit for the standard TRIAL_DAYS trial; pass `null`
+   *  for a FREE-FOREVER directory-profile owner (no trial at all — see
+   *  `isDirectoryOwner`; the 30-day quote-tool trial is opt-in later). */
+  trialEndsAt?: Date | null;
+  /** Marks the tenant as a directory-profile owner (claim flow). */
+  isDirectoryOwner?: boolean;
+  /** Provenance tag stored on the tenant row ('claim'); null for signup/OAuth. */
+  signupSource?: string | null;
 }
 
 export interface ProvisionTenantResult {
@@ -109,7 +117,8 @@ export interface ProvisionTenantResult {
   slug: string;
   hostDomain: string;
   embedToken: string;
-  trialEndsAt: Date;
+  /** Null for a free-forever directory-profile owner (no trial). */
+  trialEndsAt: Date | null;
 }
 
 /**
@@ -122,7 +131,12 @@ export async function provisionTrialTenant(
   input: ProvisionTenantInput
 ): Promise<ProvisionTenantResult> {
   const hostDomain = input.hostDomain || defaultHostDomain();
-  const trialEndsAt = new Date(Date.now() + TRIAL_DAYS * 24 * 60 * 60 * 1000);
+  // `undefined` → the standard 14-day trial; an explicit `null` → no trial
+  // (free-forever directory-profile owner).
+  const trialEndsAt =
+    input.trialEndsAt === undefined
+      ? new Date(Date.now() + TRIAL_DAYS * 24 * 60 * 60 * 1000)
+      : input.trialEndsAt;
   const embedToken = nanoid(24);
   const ownerName = input.ownerName?.trim() || input.companyName;
   // Every tenant gets a shareable referral code at creation (like slug/embedToken).
@@ -151,6 +165,8 @@ export async function provisionTrialTenant(
         plan: 'free',
         status: 'active',
         trialEndsAt,
+        isDirectoryOwner: input.isDirectoryOwner ?? false,
+        signupSource: input.signupSource ?? null,
         dpaAcceptedAt: new Date(),
         dpaVersion: input.dpaVersion,
       })

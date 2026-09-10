@@ -52,6 +52,8 @@ const baseT: Tenant = {
   anthropicKeyEncrypted: null,
   dpaAcceptedAt: null,
   dpaVersion: null,
+  isDirectoryOwner: false,
+  signupSource: null,
   createdAt: now,
   updatedAt: now,
 };
@@ -124,5 +126,30 @@ describe('getTrialState', () => {
     const { getTrialState } = await import('./trialGating.js');
     const r = await getTrialState({ ...baseT, status: 'suspended' });
     expect(r.acceptingLeads).toBe(false);
+  });
+
+  // Free-forever directory-profile owner (claim flow): there was never a
+  // trial, so nothing can be "expired". No trial-ended copy, ever.
+  it('directory-profile owner with no trial reads as `directory`, never trial_expired', async () => {
+    const { getTrialState } = await import('./trialGating.js');
+    const r = await getTrialState({ ...baseT, plan: 'free', trialEndsAt: null, isDirectoryOwner: true });
+    expect(r.status).toBe('directory');
+    expect(r.acceptingLeads).toBe(false);
+    expect(r.plan).toBe('free');
+    expect(r.trialEndsAt).toBeNull();
+    expect(r.reason).not.toMatch(/ended|expired/i);
+  });
+
+  it('directory-profile owner who ACTIVATED the 30-day trial is an ordinary trialing tenant', async () => {
+    const { getTrialState } = await import('./trialGating.js');
+    const r = await getTrialState({ ...baseT, plan: 'free', trialEndsAt: inFuture, isDirectoryOwner: true });
+    expect(r.status).toBe('trial');
+    expect(r.plan).toBe('pro');
+  });
+
+  it('directory-profile owner whose activated trial ENDED is expired like anyone else', async () => {
+    const { getTrialState } = await import('./trialGating.js');
+    const r = await getTrialState({ ...baseT, plan: 'free', trialEndsAt: inPast, isDirectoryOwner: true });
+    expect(r.status).toBe('trial_expired');
   });
 });
