@@ -852,7 +852,7 @@ body.qf-app-calculator .qf-header .brand-name[data-tagline-style="plain"]::after
   content: '';
   display: inline-block;
   width: 11px; height: 11px;
-  margin-right: 3px;
+  margin-right: 4px;
   vertical-align: -1.5px;
   background: currentColor;
   opacity: 0.65;
