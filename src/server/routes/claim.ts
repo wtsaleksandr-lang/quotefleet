@@ -170,7 +170,7 @@ export function registerClaimRoutes(app: Express, store: ClaimStore = dbClaimSto
           dpaVersion: CURRENT_DPA_VERSION,
           // NEUTRAL slug until the claim is verified: starting a claim must
           // not let anyone squat the company's name (finalizeClaim brands it).
-          slug: neutralClaimSlug(carrier.usdot, nanoid(8)),
+          slug: neutralClaimSlug(carrier.usdot),
           // FREE FOREVER: no trial, no card, no plan. NOT an owner yet — only a
           // verified claim flips isDirectoryOwner (and unlocks the 30-day trial).
           trialEndsAt: null,

@@ -30,7 +30,7 @@
  * carrierIngest's CarrierStore) so every transition is unit-tested against an
  * in-memory store; `dbClaimStore` is the production implementation.
  */
-import { createHash, randomInt, timingSafeEqual } from 'node:crypto';
+import { createHash, randomBytes, randomInt, timingSafeEqual } from 'node:crypto';
 import { and, eq, isNull, isNotNull, sql } from 'drizzle-orm';
 import { db } from '../../db/client.js';
 import {
@@ -152,8 +152,14 @@ export function otpMatches(code: string, storedHash: string | null | undefined):
 /** The placeholder slug a claim-created tenant carries until its claim is
  *  verified — `claim-<usdot>-<random>`. Nobody can squat a company's name by
  *  merely STARTING a claim; the branded slug is derived in finalizeClaim. */
-export function neutralClaimSlug(usdot: string, random: string): string {
+export function neutralClaimSlug(usdot: string, random: string = neutralSlugSuffix()): string {
   return `claim-${usdot}-${random.toLowerCase().replace(/[^a-z0-9]/g, '')}`;
+}
+/** Exactly 8 lowercase hex chars from the CSPRNG — a fixed-width suffix, so
+ *  the neutral slug's shape is deterministic (nanoid's alphabet includes `_`
+ *  and `-`, which the [a-z0-9] cleanup would strip to a variable length). */
+export function neutralSlugSuffix(): string {
+  return randomBytes(4).toString('hex');
 }
 export function isNeutralClaimSlug(slug: string | null | undefined): boolean {
   return /^claim-\d+-[a-z0-9]+$/.test(String(slug ?? ''));

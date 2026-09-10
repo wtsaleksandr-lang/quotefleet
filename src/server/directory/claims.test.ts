@@ -73,6 +73,8 @@ describe('pure helpers', () => {
   });
   it('neutral claim slugs are recognisable; branded ones are not', () => {
     expect(neutralClaimSlug('107080', 'AbC123')).toBe('claim-107080-abc123');
+    // Default suffix: always exactly 8 lowercase hex chars (never length-flaky).
+    for (let i = 0; i < 200; i++) expect(neutralClaimSlug('107080')).toMatch(/^claim-107080-[a-f0-9]{8}$/);
     expect(isNeutralClaimSlug('claim-107080-abc123')).toBe(true);
     expect(isNeutralClaimSlug('acme-drayage')).toBe(false);
   });

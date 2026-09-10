@@ -161,7 +161,8 @@ describe('POST /api/claim/:usdot/start — anonymous', () => {
       signupSource: 'claim',
     });
     // Neutral slug — starting a claim can never squat the company's name.
-    expect(h.state.provisioned[0].slug).toMatch(/^claim-107080-[a-z0-9]{8}$/);
+    expect(h.state.provisioned[0].slug).toMatch(/^claim-107080-[a-f0-9]{8}$/);
+    expect(String(h.state.provisioned[0].slug)).toHaveLength('claim-107080-'.length + 8);
     expect(store.sentCodes[0].to).toBe('dispatch@acme.com');
     expect(store.claims[0]).toMatchObject({ tenantId: 42, userId: 7, method: 'email_otp', status: 'pending' });
   });
