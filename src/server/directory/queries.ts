@@ -155,6 +155,15 @@ export interface VisibleCarrier {
   operatingLocations?: CarrierOperatingLocation[];
   /** Per-field source (FMCSA vs admin/carrier-edited). All `'fmcsa'` on list/card. */
   provenance: CarrierProvenance;
+  /**
+   * The tenant that PROVED ownership of this profile (carrier_directory
+   * .claimed_tenant_id, written only by the verified-claim flow). OPTIONAL so
+   * the hand-built fixtures stay valid; null/absent = unclaimed. The profile
+   * renders the "Verified owner" badge and hides the claim CTAs when set. The
+   * id itself is never rendered.
+   */
+  claimedTenantId?: number | null;
+  claimedAt?: Date | null;
 }
 
 /** Shape one carrier row for the public list/profile (drops internal ids). */
@@ -218,6 +227,8 @@ export function visibleCarrier(r: typeof carrierDirectory.$inferSelect): Visible
       safetyRatingDate: r.safetyRatingDate,
     },
     country: r.country,
+    claimedTenantId: r.claimedTenantId,
+    claimedAt: r.claimedAt,
     // FMCSA-only base shape: no override applied. The profile read
     // (carrierBySlug) merges carrier_overrides on top via mergeCarrierOverride;
     // list/card rows keep these FMCSA defaults so those surfaces are unchanged.
