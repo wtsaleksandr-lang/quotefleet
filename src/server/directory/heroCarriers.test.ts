@@ -172,6 +172,15 @@ describe('heroCarrierCard — safe projection', () => {
     expect(card.chips.map((c) => c.label)).toEqual(['Motor carrier']);
   });
 
+  it('labels the location line "Nearest port" for a seaport and "Nearest hub" for an inland rail ramp', () => {
+    const sea = heroCarrierCard(fakeRow({ nearestPortCode: 'USLGB' }));
+    expect(sea.locLabel).toBe('Nearest port');
+    expect(sea.locValue).toBe('Los Angeles');
+    const inland = heroCarrierCard(fakeRow({ nearestPortCode: 'INLMSP', city: 'ST. PAUL', state: 'MN' }));
+    expect(inland.locLabel).toBe('Nearest hub');
+    expect(inland.locValue).toBe('St. Paul');
+  });
+
   it('shows a "Based in City, ST" location when no nearest port is known', () => {
     const card = heroCarrierCard(fakeRow({ nearestPortCode: null, city: 'DALLAS', state: 'TX' }));
     expect(card.locLabel).toBe('Based in');

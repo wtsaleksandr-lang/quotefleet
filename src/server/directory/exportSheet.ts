@@ -76,7 +76,7 @@ export const EXPORT_COLUMNS = [
   { key: 'safety', label: 'Safety' },
   { key: 'equipment', label: 'Equipment' },
   { key: 'cargo', label: 'Cargo specialties' },
-  { key: 'nearestPort', label: 'Nearest port' },
+  { key: 'nearestPort', label: 'Nearest port / hub' },
 ] as const;
 
 export interface ExportRow {
@@ -425,7 +425,7 @@ export function buildExportXlsx(r: ResolvedExport): Buffer {
     { wch: 14 }, // Safety
     { wch: 30 }, // Equipment
     { wch: 30 }, // Cargo specialties
-    { wch: 26 }, // Nearest port
+    { wch: 26 }, // Nearest port / hub
   ];
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, 'Carrier shortlist');

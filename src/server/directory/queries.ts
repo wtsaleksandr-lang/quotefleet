@@ -2378,7 +2378,7 @@ export interface HeroCarrierCard {
   ids: string;
   /** Up to ~2 equipment badges + an optional muted "Satisfactory" chip. */
   chips: HeroCarrierChip[];
-  /** Location line label ("Nearest port" | "Based in") or null when unknown. */
+  /** Location line label ("Nearest port" | "Nearest hub" | "Based in") or null when unknown. */
   locLabel: string | null;
   /** Location line value (port city or "City, ST") or null when unknown. */
   locValue: string | null;
@@ -2459,10 +2459,11 @@ function heroChips(r: typeof carrierDirectory.$inferSelect): HeroCarrierChip[] {
   return chips;
 }
 
-/** Location line for a hero card: nearest port when known, else "City, ST". */
+/** Location line for a hero card: nearest port / hub when known, else "City, ST". */
 function heroLocation(r: typeof carrierDirectory.$inferSelect): { locLabel: string | null; locValue: string | null } {
   const g = r.nearestPortCode ? portGroupForMemberCode(r.nearestPortCode) : null;
-  if (g) return { locLabel: 'Nearest port', locValue: g.city || g.label };
+  // An inland rail ramp (Chicago, Minneapolis, Denver, …) is a hub, not a port.
+  if (g) return { locLabel: g.kind === 'inland-hub' ? 'Nearest hub' : 'Nearest port', locValue: g.city || g.label };
   if (r.city && r.state) return { locLabel: 'Based in', locValue: `${titleCaseCity(r.city)}, ${r.state}` };
   return { locLabel: null, locValue: null };
 }

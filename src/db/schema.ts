@@ -1803,7 +1803,8 @@ export const brokerLeads = pgTable(
 //
 // UNLIKE broker_leads (a private outreach prospect list), this table backs
 // PUBLIC directory pages, so it carries a derived `nearest_port_code`
-// (ZIP → nearest major US container port) and a unique `public_slug`.
+// (ZIP → nearest major US container port OR inland rail hub; the column
+// name predates the inland hubs) and a unique `public_slug`.
 // It is platform-level: no tenantId, no reference to tenants / users /
 // leads, so it never touches MRR, trials, or any tenant list.
 // ────────────────────────────────────────────────────────────────────
@@ -1947,7 +1948,9 @@ export const carrierDirectory = pgTable(
     /** Census safety_rating_date — when the published rating was assigned. Most
      *  published ratings are years old, so the rating is never shown without it. */
     safetyRatingDate: timestamp('safety_rating_date', { mode: 'date' }),
-    /** Derived: nearest major container/rail hub UN/LOCODE (ZIP centroid). */
+    /** Derived: nearest major container port OR inland rail hub code (UN/LOCODE,
+     *  USCHI, or INL*) by ZIP centroid. "port" in the name is historical — the
+     *  value may be an inland intermodal hub with no marine berth. */
     nearestPortCode: text('nearest_port_code'),
     /** Unique URL slug for the public carrier page (slug(name)-usdot). */
     publicSlug: text('public_slug').notNull(),

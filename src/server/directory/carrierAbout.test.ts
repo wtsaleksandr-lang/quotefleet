@@ -64,6 +64,12 @@ describe('carrierAbout', () => {
     expect(t).toContain('US container ports');
   });
 
+  it('calls an inland rail ramp an intermodal hub, not a container port', () => {
+    const t = carrierAbout(carrier({ city: 'ST. PAUL', state: 'MN', nearestPortCode: 'INLMSP' }));
+    expect(t).toContain('US intermodal hubs such as Minneapolis/St. Paul Intermodal');
+    expect(t).not.toContain('container ports');
+  });
+
   it('says "motor carrier" (not drayage) when not intermodal, and omits the drayage sentence', () => {
     const t = carrierAbout(carrier({ intermodal: false }));
     expect(t).toContain('FMCSA-registered motor carrier');
