@@ -563,7 +563,7 @@ body { padding-left: var(--space-0-5); padding-right: var(--space-0-5); }
 /* (4) Company / contact card: lighter (normal weight) + ~1px smaller. Covers the
    production #qf-contact card AND the demo brand-trust card. The MC/USDOT labels
    are added in JS (renderContact already labels; renderBrandTrust now does too). */
-.qf-widget .qf-contact { font-size: 11px !important; }
+.qf-widget .qf-contact { font-size: 12px !important; }
 .qf-widget .qf-contact-value { font-weight: 400; }
 .qf-widget .qf-demo-brand-card { font-size: 13px; }
 .qf-widget .qf-demo-brand-card span { font-weight: 400; font-size: 11px; }
