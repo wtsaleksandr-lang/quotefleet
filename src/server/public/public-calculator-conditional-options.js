@@ -94,6 +94,8 @@
       if (mc) out.mc = mc;
       const phone = (p.get('phone') || '').trim();
       if (phone) out.phone = phone;
+      const email = (p.get('email') || '').trim();
+      if (email) out.email = email;
       const city = (p.get('city') || '').trim();
       const state = (p.get('state') || '').trim();
       const address = [city, state].filter(Boolean).join(', ');
