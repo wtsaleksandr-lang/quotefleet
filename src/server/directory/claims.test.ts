@@ -19,7 +19,10 @@ import {
   activateOwnerTrial,
   chooseClaimMethod,
   hashOtp,
+  isFreemailDomain,
+  isNeutralClaimSlug,
   maskEmail,
+  neutralClaimSlug,
   otpMatches,
   reviewClaim,
   startClaim,
@@ -59,6 +62,19 @@ describe('pure helpers', () => {
     expect(chooseClaimMethod({ claimantEmail: 'a@other.com', censusEmail: 'b@acme.com', claimantVerified: true })).toBe('email_otp');
     expect(chooseClaimMethod({ claimantEmail: 'a@acme.com', censusEmail: null, claimantVerified: true })).toBe('manual');
     expect(chooseClaimMethod({ claimantEmail: 'a@acme.com', censusEmail: '  ', claimantVerified: true })).toBe('manual');
+  });
+  it('residential-ISP and country-TLD freemail domains never domain-match', () => {
+    for (const d of ['att.net', 'sbcglobal.net', 'comcast.net', 'verizon.net', 'cox.net', 'ymail.com', 'pm.me', 'gmx.de', 'outlook.fr', 'live.co.uk', 'hotmail.de', 'yahoo.co.jp', 'yahoo.ca', 'protonmail.ch', 'mail.com', 'zoho.com']) {
+      expect(isFreemailDomain(d), d).toBe(true);
+      expect(chooseClaimMethod({ claimantEmail: `owner@${d}`, censusEmail: `dispatch@${d}`, claimantVerified: true }), d).toBe('email_otp');
+    }
+    expect(isFreemailDomain('acme.com')).toBe(false);
+    expect(isFreemailDomain('outlookfreight.com')).toBe(false);
+  });
+  it('neutral claim slugs are recognisable; branded ones are not', () => {
+    expect(neutralClaimSlug('107080', 'AbC123')).toBe('claim-107080-abc123');
+    expect(isNeutralClaimSlug('claim-107080-abc123')).toBe(true);
+    expect(isNeutralClaimSlug('acme-drayage')).toBe(false);
   });
 });
 
@@ -100,6 +116,44 @@ describe('startClaim → email_otp → verifyClaimCode', () => {
     // Trial is untouched: claiming never starts one.
     expect(t.trialEndsAt).toBeNull();
     expect(store.publicEmails).toEqual([{ usdot: '107080', email: 'owner@acme.com', actorUserId: 7 }]);
+  });
+
+  it('a code no provider accepted is never honoured: the claim falls back to manual, no hash kept', async () => {
+    store.emailDeliverable = false;
+    const r = await startClaim(store, { usdot: '107080', tenantId: 42, actor, claimantVerified: false, now });
+    expect(r.kind).toBe('needs_manual');
+    expect(store.sentCodes).toHaveLength(0);
+    expect(store.claims[0]).toMatchObject({ method: 'manual', status: 'pending', otpHash: null, otpExpiresAt: null });
+    // No code exists to verify against.
+    expect((await verifyClaimCode(store, { usdot: '107080', tenantId: 42, actor, code: '123456', now })).kind).toBe('not_found');
+  });
+
+  it('a losing racer (row claimed between start and verify) is REJECTED, never verified or owner', async () => {
+    await startClaim(store, { usdot: '107080', tenantId: 42, actor, claimantVerified: false, now });
+    // The directory row read still looks unclaimed, but the guarded UPDATE
+    // writes 0 rows — exactly what a concurrent winner produces.
+    store.markCarrierClaimed = async () => 0;
+    const v = await verifyClaimCode(store, { usdot: '107080', tenantId: 42, actor, code: store.sentCodes[0].code, now });
+    expect(v.kind).toBe('already_claimed');
+    expect(store.claims[0]).toMatchObject({ status: 'rejected', rejectedReason: 'already_claimed', otpHash: null });
+    expect(store.tenants.get(42)!.isDirectoryOwner).toBe(false);
+    expect(store.publicEmails).toHaveLength(0);
+    expect(store.purged).toHaveLength(0);
+  });
+
+  it('a verified claim brands the neutral slug from the company name and purges the profile', async () => {
+    store.tenants.set(42, { isDirectoryOwner: false, trialEndsAt: null, dotNumber: null, mcNumber: null, slug: 'claim-107080-x1y2z3' });
+    await startClaim(store, { usdot: '107080', tenantId: 42, actor, claimantVerified: false, now });
+    await verifyClaimCode(store, { usdot: '107080', tenantId: 42, actor, code: store.sentCodes[0].code, now });
+    expect(store.tenants.get(42)!.slug).toBe('acme-drayage-inc');
+    expect(store.purged).toEqual(['acme-drayage-inc-107080']);
+  });
+
+  it('never re-slugs a tenant that already has a real slug', async () => {
+    store.tenants.set(42, { isDirectoryOwner: false, trialEndsAt: null, dotNumber: null, mcNumber: null, slug: 'harbor-link' });
+    await startClaim(store, { usdot: '107080', tenantId: 42, actor, claimantVerified: false, now });
+    await verifyClaimCode(store, { usdot: '107080', tenantId: 42, actor, code: store.sentCodes[0].code, now });
+    expect(store.tenants.get(42)!.slug).toBe('harbor-link');
   });
 
   it('never overwrites a DOT/MC the tenant already typed', async () => {
@@ -239,8 +293,9 @@ describe('manual path', () => {
 });
 
 describe('activateOwnerTrial — the "30 days free" upsell', () => {
-  it('a directory owner with NO trial gets exactly CLAIM_OWNER_TRIAL_DAYS', async () => {
+  it('a VERIFIED directory owner with NO trial gets exactly CLAIM_OWNER_TRIAL_DAYS', async () => {
     store.tenants.set(42, { isDirectoryOwner: true, trialEndsAt: null, dotNumber: null, mcNumber: null });
+    store.carriers[0].claimedTenantId = 42;
     const r = await activateOwnerTrial(store, { tenantId: 42, now });
     expect(r.kind).toBe('activated');
     if (r.kind !== 'activated') return;
@@ -249,7 +304,19 @@ describe('activateOwnerTrial — the "30 days free" upsell', () => {
     expect(store.tenants.get(42)!.trialEndsAt?.getTime()).toBe(r.trialEndsAt.getTime());
   });
 
+  it('an UNVERIFIED claimant (started, never verified) cannot start the trial; after verifying they can', async () => {
+    await startClaim(store, { usdot: '107080', tenantId: 42, actor, claimantVerified: false, now });
+    expect((await activateOwnerTrial(store, { tenantId: 42, now })).kind).toBe('not_eligible');
+    // Even a stray owner flag without a directory row naming the tenant is refused.
+    store.tenants.get(42)!.isDirectoryOwner = true;
+    expect((await activateOwnerTrial(store, { tenantId: 42, now })).kind).toBe('not_eligible');
+    store.tenants.get(42)!.isDirectoryOwner = false;
+    await verifyClaimCode(store, { usdot: '107080', tenantId: 42, actor, code: store.sentCodes[0].code, now });
+    expect((await activateOwnerTrial(store, { tenantId: 42, now })).kind).toBe('activated');
+  });
+
   it('refuses a regular (non-owner) tenant, an owner already in/after a trial, and an unknown tenant', async () => {
+    store.carriers[0].claimedTenantId = 42;
     store.tenants.set(42, { isDirectoryOwner: false, trialEndsAt: null, dotNumber: null, mcNumber: null });
     expect((await activateOwnerTrial(store, { tenantId: 42, now })).kind).toBe('not_eligible');
     store.tenants.set(42, { isDirectoryOwner: true, trialEndsAt: new Date(now.getTime() - 1), dotNumber: null, mcNumber: null });

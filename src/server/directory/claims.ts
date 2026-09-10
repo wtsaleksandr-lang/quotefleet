@@ -4,7 +4,7 @@
  * A carrier proves it owns its FMCSA directory profile and gets a "Verified
  * owner" badge + the right to edit the public card. Claiming is free forever:
  * no trial, no card, no plan (owner decision). Only the quote tool is paid, and
- * a profile owner who opts into it gets CLAIM_OWNER_TRIAL_DAYS (30) instead of
+ * a VERIFIED owner who opts into it gets CLAIM_OWNER_TRIAL_DAYS (30) instead of
  * the usual 14 — see `activateOwnerTrial`.
  *
  * Proof of ownership, chosen by `chooseClaimMethod`:
@@ -14,8 +14,17 @@
  *   email_otp    — the record has a census email → a 6-digit code goes to THAT
  *                  address (never to the claimant). Only its SHA-256 is stored;
  *                  15-min TTL; CLAIM_OTP_MAX_ATTEMPTS wrong guesses lock the row.
+ *                  If no real email provider accepts the send, the claim falls
+ *                  back to `manual` — a code that only reached a log file is not
+ *                  a proof of anything.
  *   manual       — no email on the record → pending row; support verifies out
  *                  of band and an admin flips it (`reviewClaim`).
+ *
+ * Nothing is granted before verification: the tenant created at `start` is a
+ * plain account (neutral slug, `isDirectoryOwner: false`, no trial). Only
+ * `finalizeClaim` — which first wins the `claimed_tenant_id IS NULL` race on
+ * the directory row — flips the owner flag, brands the slug and exposes the
+ * claimant's email on the profile.
  *
  * All DB / email access goes through `ClaimStore` (same seam pattern as
  * carrierIngest's CarrierStore) so every transition is unit-tested against an
@@ -33,11 +42,14 @@ import {
   type CarrierClaimRow,
   type NewCarrierClaimRow,
 } from '../../db/schema.js';
-import { sendEmail } from '../../email/send.js';
+import { loadEnv } from '../../config.js';
+import { sendEmail, wasSentByAProvider } from '../../email/send.js';
 import { claimCodeEmail } from '../../email/templates.js';
 import { CLAIM_OWNER_TRIAL_DAYS } from '../plans.js';
+import { deriveAvailableSlug } from '../routes/tenantProvision.js';
 import { upsertCarrierOverride } from './carrierOverrideWrite.js';
 import { normalizeDot } from './carrierIngest.js';
+import { carrierProfileUrls, purgeEdgeUrls } from './edgePurge.js';
 
 export type ClaimMethod = 'email_otp' | 'domain_match' | 'manual';
 export type ClaimStatus = 'pending' | 'verified' | 'rejected' | 'expired';
@@ -48,25 +60,51 @@ export const CLAIM_OTP_TTL_MS = 15 * 60 * 1000;
 export const CLAIM_OTP_MAX_ATTEMPTS = 5;
 
 /**
- * Consumer mailbox providers. A match on one of these domains proves nothing
- * about a company, so `domain_match` is never granted for them.
+ * Consumer mailbox / residential-ISP providers. A match on one of these
+ * domains proves nothing about a company, so `domain_match` is never granted
+ * for them. Exact domains here; provider families with many country TLDs
+ * (outlook.*, live.*, hotmail.*, yahoo.co.*, protonmail.*, gmx.*) are matched
+ * by FREEMAIL_FAMILIES below.
  */
 export const FREEMAIL_DOMAINS: ReadonlySet<string> = new Set([
   'gmail.com',
   'googlemail.com',
   'yahoo.com',
   'ymail.com',
+  'rocketmail.com',
   'outlook.com',
   'hotmail.com',
+  'live.com',
+  'msn.com',
   'aol.com',
   'icloud.com',
   'me.com',
   'mac.com',
   'proton.me',
   'protonmail.com',
-  'live.com',
-  'msn.com',
+  'pm.me',
+  'gmx.com',
+  'gmx.net',
+  'mail.com',
+  'zoho.com',
+  // US residential ISPs — the mailbox a small carrier often runs from, but a
+  // match on them still says nothing about the company.
+  'att.net',
+  'sbcglobal.net',
+  'comcast.net',
+  'verizon.net',
+  'bellsouth.net',
+  'cox.net',
+  'charter.net',
+  'earthlink.net',
+  'frontier.com',
+  'windstream.net',
+  'centurylink.net',
 ]);
+
+/** Provider families with per-country TLDs: `outlook.fr`, `live.co.uk`,
+ *  `hotmail.de`, `yahoo.co.jp`, `protonmail.ch`, `gmx.de`, ... */
+const FREEMAIL_FAMILIES = /^(?:outlook|live|hotmail|protonmail|gmx|yahoo)\.(?:[a-z]{2,}\.)?[a-z]{2,}$/;
 
 /** Lower-cased domain part of an email, or null when there is none. */
 export function emailDomain(email: string | null | undefined): string | null {
@@ -77,7 +115,9 @@ export function emailDomain(email: string | null | undefined): string | null {
 }
 
 export function isFreemailDomain(domain: string | null | undefined): boolean {
-  return !!domain && FREEMAIL_DOMAINS.has(domain.toLowerCase());
+  if (!domain) return false;
+  const d = domain.toLowerCase();
+  return FREEMAIL_DOMAINS.has(d) || FREEMAIL_FAMILIES.test(d);
 }
 
 /** `dispatch@acme.com` → `d***@acme.com`. Reveals only the first character +
@@ -107,6 +147,16 @@ export function otpMatches(code: string, storedHash: string | null | undefined):
   const a = Buffer.from(hashOtp(code), 'hex');
   const b = Buffer.from(storedHash, 'hex');
   return a.length === b.length && timingSafeEqual(a, b);
+}
+
+/** The placeholder slug a claim-created tenant carries until its claim is
+ *  verified — `claim-<usdot>-<random>`. Nobody can squat a company's name by
+ *  merely STARTING a claim; the branded slug is derived in finalizeClaim. */
+export function neutralClaimSlug(usdot: string, random: string): string {
+  return `claim-${usdot}-${random.toLowerCase().replace(/[^a-z0-9]/g, '')}`;
+}
+export function isNeutralClaimSlug(slug: string | null | undefined): boolean {
+  return /^claim-\d+-[a-z0-9]+$/.test(String(slug ?? ''));
 }
 
 /**
@@ -155,20 +205,31 @@ export interface ClaimStore {
   claimById(id: number): Promise<CarrierClaimRow | null>;
   insertClaim(row: NewCarrierClaimRow): Promise<CarrierClaimRow>;
   updateClaim(id: number, patch: Partial<NewCarrierClaimRow>): Promise<void>;
-  /** Mirror a verified claim onto carrier_directory.claimed_*. */
-  markCarrierClaimed(usdot: string, tenantId: number, method: ClaimMethod, at: Date): Promise<void>;
+  /** Mirror a verified claim onto carrier_directory.claimed_* — ONLY if the
+   *  row is still unclaimed. Returns the number of rows written (1 = won,
+   *  0 = someone else got there first). */
+  markCarrierClaimed(usdot: string, tenantId: number, method: ClaimMethod, at: Date): Promise<number>;
   /** Flag the tenant as a directory owner; fill dot/mc ONLY where empty. */
   markTenantOwner(tenantId: number, ids: { dotNumber: string; mcNumber: string | null }): Promise<void>;
+  /** Replace a neutral `claim-<usdot>-…` slug with one derived from the company
+   *  name. A tenant that already has a real slug is left alone. */
+  brandTenantSlug(tenantId: number, companyName: string): Promise<void>;
   /** Set the profile's public email to the verified claimant's address. */
   setPublicEmail(usdot: string, email: string, actor: ClaimActor): Promise<void>;
-  /** Email the ownership code to the CENSUS address. */
-  sendOtpEmail(to: string, opts: { code: string; company: string }): Promise<void>;
+  /** Email the ownership code to the CENSUS address. Resolves true ONLY when a
+   *  real provider accepted the message; false when it would only have been
+   *  logged (no provider configured / undeliverable address). */
+  sendOtpEmail(to: string, opts: { code: string; company: string }): Promise<boolean>;
   /** Has this user ever proven control of their address (OAuth sub or a
    *  consumed magic link)? Gates domain_match. */
   userEmailVerified(userId: number): Promise<boolean>;
   userById(userId: number): Promise<{ id: number; email: string } | null>;
   tenantTrial(tenantId: number): Promise<{ isDirectoryOwner: boolean; trialEndsAt: Date | null } | null>;
+  /** Does a directory row name this tenant as its verified owner? */
+  hasVerifiedClaim(tenantId: number): Promise<boolean>;
   setTrialEndsAt(tenantId: number, trialEndsAt: Date): Promise<void>;
+  /** Best-effort edge purge of the profile after a verified claim. Never throws. */
+  purgeProfileCache(slug: string): Promise<void>;
 }
 
 // ─── Transitions ────────────────────────────────────────────────────────────
@@ -204,67 +265,50 @@ export async function startClaim(
   });
   const usdotInt = Number(dot);
   const existing = await store.pendingClaim(usdotInt, input.tenantId);
+  const note = `claimant:${input.actor.email}`;
+
+  /** Reuse the tenant's open claim row (fresh method/code) or insert one. */
+  const upsertPending = async (patch: Partial<NewCarrierClaimRow>): Promise<CarrierClaimRow> => {
+    if (existing) {
+      await store.updateClaim(existing.id, { ...patch, note });
+      return { ...existing, ...patch, note } as CarrierClaimRow;
+    }
+    return store.insertClaim({
+      usdot: usdotInt,
+      tenantId: input.tenantId,
+      userId: input.actor.userId,
+      method,
+      status: 'pending',
+      note,
+      ...patch,
+    });
+  };
 
   if (method === 'domain_match') {
-    let claim: CarrierClaimRow;
-    if (existing) {
-      await store.updateClaim(existing.id, { method, otpHash: null, otpExpiresAt: null });
-      claim = { ...existing, method };
-    } else {
-      claim = await store.insertClaim({
-        usdot: usdotInt,
-        tenantId: input.tenantId,
-        userId: input.actor.userId,
-        method,
-        status: 'pending',
-        note: `claimant:${input.actor.email}`,
-      });
-    }
-    await finalizeClaim(store, { claim, carrier, actor: input.actor, method, now });
+    const claim = await upsertPending({ method, otpHash: null, otpExpiresAt: null });
+    const won = await finalizeClaim(store, { claim, carrier, actor: input.actor, method, now });
+    if (!won) return { kind: 'already_claimed' };
     return { kind: 'verified', method, claimId: claim.id, slug: carrier.slug };
   }
 
   if (method === 'email_otp') {
     const code = generateOtp();
-    const otpHash = hashOtp(code);
     const otpExpiresAt = new Date(now.getTime() + CLAIM_OTP_TTL_MS);
-    let claimId: number;
-    if (existing) {
-      await store.updateClaim(existing.id, { method, otpHash, otpExpiresAt, attempts: 0, note: `claimant:${input.actor.email}` });
-      claimId = existing.id;
-    } else {
-      const row = await store.insertClaim({
-        usdot: usdotInt,
-        tenantId: input.tenantId,
-        userId: input.actor.userId,
-        method,
-        status: 'pending',
-        otpHash,
-        otpExpiresAt,
-        attempts: 0,
-        note: `claimant:${input.actor.email}`,
-      });
-      claimId = row.id;
-    }
+    const claim = await upsertPending({ method, otpHash: hashOtp(code), otpExpiresAt, attempts: 0 });
     // The census email is non-null here by construction (chooseClaimMethod).
-    await store.sendOtpEmail(carrier.email as string, { code, company: carrier.name });
-    return { kind: 'otp_sent', claimId, maskedEmail: maskEmail(carrier.email as string), expiresAt: otpExpiresAt };
+    const delivered = await store.sendOtpEmail(carrier.email as string, { code, company: carrier.name });
+    if (!delivered) {
+      // A code nobody received proves nothing — and a code that only reached a
+      // log file must never be honoured. Drop the hash and hand the claim to
+      // support instead of reporting a send that did not happen.
+      await store.updateClaim(claim.id, { method: 'manual', otpHash: null, otpExpiresAt: null, attempts: 0 });
+      return { kind: 'needs_manual', claimId: claim.id };
+    }
+    return { kind: 'otp_sent', claimId: claim.id, maskedEmail: maskEmail(carrier.email as string), expiresAt: otpExpiresAt };
   }
 
-  // manual
-  if (existing) {
-    await store.updateClaim(existing.id, { method, otpHash: null, otpExpiresAt: null, note: `claimant:${input.actor.email}` });
-    return { kind: 'needs_manual', claimId: existing.id };
-  }
-  const row = await store.insertClaim({
-    usdot: usdotInt,
-    tenantId: input.tenantId,
-    userId: input.actor.userId,
-    method,
-    status: 'pending',
-    note: `claimant:${input.actor.email}`,
-  });
-  return { kind: 'needs_manual', claimId: row.id };
+  const claim = await upsertPending({ method, otpHash: null, otpExpiresAt: null });
+  return { kind: 'needs_manual', claimId: claim.id };
 }
 
 export type VerifyClaimResult =
@@ -300,7 +344,8 @@ export async function verifyClaimCode(
     const attemptsLeft = Math.max(0, CLAIM_OTP_MAX_ATTEMPTS - attempts);
     return attemptsLeft === 0 ? { kind: 'locked' } : { kind: 'wrong_code', attemptsLeft };
   }
-  await finalizeClaim(store, { claim, carrier, actor: input.actor, method: 'email_otp', now });
+  const won = await finalizeClaim(store, { claim, carrier, actor: input.actor, method: 'email_otp', now });
+  if (!won) return { kind: 'already_claimed' };
   return { kind: 'verified', claimId: claim.id, slug: carrier.slug };
 }
 
@@ -326,25 +371,40 @@ export async function reviewClaim(
   }
   const carrier = await store.carrierByUsdot(String(claim.usdot));
   if (!carrier) return { kind: 'not_found' };
-  if (carrier.claimedTenantId != null && carrier.claimedTenantId !== claim.tenantId) return { kind: 'already_claimed' };
+  if (carrier.claimedTenantId != null) return { kind: 'already_claimed' };
   const user = await store.userById(claim.userId);
   if (!user) return { kind: 'not_found' };
   // An admin approval is the manual method regardless of how the claim began.
-  await finalizeClaim(store, { claim, carrier, actor: { userId: user.id, email: user.email }, method: 'manual', now });
+  const won = await finalizeClaim(store, { claim, carrier, actor: { userId: user.id, email: user.email }, method: 'manual', now });
+  if (!won) return { kind: 'already_claimed' };
   return { kind: 'verified' };
 }
 
 /**
- * The single "it is verified" commit, shared by every method:
- *   1. claim row → verified;
- *   2. carrier_directory.claimed_* mirror (what the profile renders);
- *   3. tenant flagged as directory owner, dot/mc filled where empty;
- *   4. public email on the profile → the claimant's address (carrier_overrides).
+ * The single "it is verified" commit, shared by every method. Returns false
+ * (and rejects the claim) when the directory row was claimed by someone else
+ * in the meantime — the losing racer is never marked verified or owner.
+ *   1. win the `claimed_tenant_id IS NULL` write on carrier_directory;
+ *   2. claim row → verified;
+ *   3. tenant flagged as directory owner, dot/mc filled where empty, neutral
+ *      slug replaced by the branded one;
+ *   4. public email on the profile → the claimant's address (carrier_overrides);
+ *   5. best-effort edge purge of the profile so the badge shows up.
  */
 async function finalizeClaim(
   store: ClaimStore,
   opts: { claim: CarrierClaimRow; carrier: ClaimCarrier; actor: ClaimActor; method: ClaimMethod; now: Date },
-): Promise<void> {
+): Promise<boolean> {
+  const won = await store.markCarrierClaimed(opts.carrier.usdot, opts.claim.tenantId, opts.method, opts.now);
+  if (won < 1) {
+    await store.updateClaim(opts.claim.id, {
+      status: 'rejected',
+      rejectedReason: 'already_claimed',
+      otpHash: null,
+      otpExpiresAt: null,
+    });
+    return false;
+  }
   await store.updateClaim(opts.claim.id, {
     status: 'verified',
     method: opts.method,
@@ -352,9 +412,11 @@ async function finalizeClaim(
     otpHash: null,
     otpExpiresAt: null,
   });
-  await store.markCarrierClaimed(opts.carrier.usdot, opts.claim.tenantId, opts.method, opts.now);
   await store.markTenantOwner(opts.claim.tenantId, { dotNumber: opts.carrier.usdot, mcNumber: opts.carrier.mcNumber });
+  await store.brandTenantSlug(opts.claim.tenantId, opts.carrier.name);
   await store.setPublicEmail(opts.carrier.usdot, opts.actor.email, opts.actor);
+  await store.purgeProfileCache(opts.carrier.slug);
+  return true;
 }
 
 export type ActivateTrialResult =
@@ -362,9 +424,11 @@ export type ActivateTrialResult =
   | { kind: 'activated'; trialEndsAt: Date };
 
 /**
- * The "30 days free" upsell action. ONLY a directory owner with no trial on
- * record may start it; everyone else (regular signups, tenants already in or
- * past a trial) is refused so this can never be used to extend a trial.
+ * The "30 days free" upsell action. ONLY a VERIFIED directory owner (the
+ * owner flag AND a directory row naming this tenant) with no trial on record
+ * may start it; everyone else — an unverified claimant, a regular signup, a
+ * tenant already in or past a trial — is refused, so this can never be used
+ * to obtain or extend a trial without proving ownership.
  */
 export async function activateOwnerTrial(
   store: ClaimStore,
@@ -373,12 +437,21 @@ export async function activateOwnerTrial(
   const now = input.now ?? new Date();
   const t = await store.tenantTrial(input.tenantId);
   if (!t || !t.isDirectoryOwner || t.trialEndsAt != null) return { kind: 'not_eligible' };
+  if (!(await store.hasVerifiedClaim(input.tenantId))) return { kind: 'not_eligible' };
   const trialEndsAt = new Date(now.getTime() + CLAIM_OWNER_TRIAL_DAYS * 24 * 60 * 60 * 1000);
   await store.setTrialEndsAt(input.tenantId, trialEndsAt);
   return { kind: 'activated', trialEndsAt };
 }
 
 // ─── Production store ───────────────────────────────────────────────────────
+
+/** Is a real email provider configured? Mirrors sendEmail's precedence. The
+ *  check is made BEFORE calling sendEmail so the ownership code never reaches
+ *  the stdout dev fallback (which prints the message body). */
+function emailProviderConfigured(): boolean {
+  const env = loadEnv();
+  return !!env.RESEND_API_KEY || !!(env.SMTP_HOST && env.SMTP_USER && env.SMTP_PASS);
+}
 
 export const dbClaimStore: ClaimStore = {
   async carrierByUsdot(usdot) {
@@ -430,10 +503,12 @@ export const dbClaimStore: ClaimStore = {
     await db().update(carrierClaims).set(patch).where(eq(carrierClaims.id, id));
   },
   async markCarrierClaimed(usdot, tenantId, method, at) {
-    await db()
+    const rows = await db()
       .update(carrierDirectory)
       .set({ claimedTenantId: tenantId, claimedAt: at, claimMethod: method })
-      .where(and(eq(carrierDirectory.usdot, usdot), isNull(carrierDirectory.claimedTenantId)));
+      .where(and(eq(carrierDirectory.usdot, usdot), isNull(carrierDirectory.claimedTenantId)))
+      .returning({ usdot: carrierDirectory.usdot });
+    return rows.length;
   },
   async markTenantOwner(tenantId, ids) {
     // COALESCE: never overwrite a DOT/MC the tenant typed themselves.
@@ -447,6 +522,17 @@ export const dbClaimStore: ClaimStore = {
       })
       .where(eq(tenants.id, tenantId));
   },
+  async brandTenantSlug(tenantId, companyName) {
+    const t = (await db().select({ slug: tenants.slug }).from(tenants).where(eq(tenants.id, tenantId)).limit(1))[0];
+    if (!t || !isNeutralClaimSlug(t.slug)) return;
+    try {
+      const slug = await deriveAvailableSlug(companyName);
+      await db().update(tenants).set({ slug, updatedAt: new Date() }).where(eq(tenants.id, tenantId));
+    } catch (err) {
+      // A unique-violation race just means the neutral slug stays — it works.
+      console.warn('[claims] slug branding skipped (non-fatal):', err instanceof Error ? err.message : err);
+    }
+  },
   async setPublicEmail(usdot, email, actor) {
     const r = await upsertCarrierOverride({
       usdot,
@@ -457,9 +543,17 @@ export const dbClaimStore: ClaimStore = {
     if (r.status !== 200) console.warn('[claims] public email override failed:', r.json);
   },
   async sendOtpEmail(to, opts) {
+    if (!emailProviderConfigured()) {
+      console.warn('[claims] no email provider configured — ownership code NOT sent; falling back to manual review');
+      return false;
+    }
     const tpl = claimCodeEmail({ code: opts.code, company: opts.company, ttlMinutes: CLAIM_OTP_TTL_MS / 60_000 });
     const out = await sendEmail({ to, subject: tpl.subject, text: tpl.text, html: tpl.html });
-    if (!out.ok) throw new Error(`ownership code send failed: ${out.error ?? 'unknown'}`);
+    if (!wasSentByAProvider(out)) {
+      console.warn(`[claims] ownership code not accepted by a provider (${out.error ?? out.provider ?? 'logged'}); falling back to manual review`);
+      return false;
+    }
+    return true;
   },
   async userEmailVerified(userId) {
     const u = (
@@ -494,7 +588,24 @@ export const dbClaimStore: ClaimStore = {
       )[0] ?? null
     );
   },
+  async hasVerifiedClaim(tenantId) {
+    const r = (
+      await db()
+        .select({ usdot: carrierDirectory.usdot })
+        .from(carrierDirectory)
+        .where(eq(carrierDirectory.claimedTenantId, tenantId))
+        .limit(1)
+    )[0];
+    return !!r;
+  },
   async setTrialEndsAt(tenantId, trialEndsAt) {
     await db().update(tenants).set({ trialEndsAt, updatedAt: new Date() }).where(eq(tenants.id, tenantId));
+  },
+  async purgeProfileCache(slug) {
+    try {
+      await purgeEdgeUrls(carrierProfileUrls(slug));
+    } catch (err) {
+      console.warn('[claims] edge purge failed (non-fatal):', err instanceof Error ? err.message : err);
+    }
   },
 };

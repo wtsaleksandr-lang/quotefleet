@@ -115,12 +115,14 @@ export async function getTrialState(tenant: Tenant): Promise<TrialState> {
     };
   }
 
-  // Free-forever directory-profile owner who never started the quote-tool
-  // trial: NOT expired — there was never a trial. Checked before the
+  // Free-forever directory-profile account that never started the quote-tool
+  // trial: NOT expired — there was never a trial. Keyed on the claim-created
+  // account (signupSource 'claim') so an ABANDONED, still-unverified claimant
+  // is covered too, not only a verified owner. Checked before the
   // trial_expired fallthrough so no banner/API ever tells them "your trial
   // has ended". Once they activate the 30-day trial, trialEndsAt is set and
   // the ordinary branches above take over.
-  if (tenant.isDirectoryOwner && trialEnd == null) {
+  if ((tenant.signupSource === 'claim' || tenant.isDirectoryOwner) && trialEnd == null) {
     return {
       status: 'directory',
       acceptingLeads: false,

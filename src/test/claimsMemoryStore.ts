@@ -5,15 +5,27 @@
  */
 import type { CarrierClaimRow, NewCarrierClaimRow } from '../db/schema.js';
 import type { ClaimCarrier, ClaimStore } from '../server/directory/claims.js';
+import { isNeutralClaimSlug } from '../server/directory/claims.js';
+
+export interface MemoryTenant {
+  isDirectoryOwner: boolean;
+  trialEndsAt: Date | null;
+  dotNumber: string | null;
+  mcNumber: string | null;
+  slug?: string;
+}
 
 export interface MemoryClaimStore extends ClaimStore {
   carriers: ClaimCarrier[];
   claims: CarrierClaimRow[];
-  tenants: Map<number, { isDirectoryOwner: boolean; trialEndsAt: Date | null; dotNumber: string | null; mcNumber: string | null }>;
+  tenants: Map<number, MemoryTenant>;
   users: Map<number, { id: number; email: string; verified: boolean }>;
   sentCodes: Array<{ to: string; code: string; company: string }>;
   publicEmails: Array<{ usdot: string; email: string; actorUserId: number }>;
   claimedMarks: Array<{ usdot: string; tenantId: number; method: string }>;
+  purged: string[];
+  /** Simulates "a real provider accepted the send" (true) vs logged-only (false). */
+  emailDeliverable: boolean;
 }
 
 export function memoryClaimStore(): MemoryClaimStore {
@@ -26,6 +38,8 @@ export function memoryClaimStore(): MemoryClaimStore {
     sentCodes: [],
     publicEmails: [],
     claimedMarks: [],
+    purged: [],
+    emailDeliverable: true,
 
     async carrierByUsdot(usdot) {
       return store.carriers.find((c) => c.usdot === usdot) ?? null;
@@ -60,10 +74,12 @@ export function memoryClaimStore(): MemoryClaimStore {
       if (c) Object.assign(c, patch);
     },
     async markCarrierClaimed(usdot, tenantId, method, at) {
-      const c = store.carriers.find((x) => x.usdot === usdot);
-      if (c && c.claimedTenantId == null) c.claimedTenantId = tenantId;
-      store.claimedMarks.push({ usdot, tenantId, method });
       void at;
+      const c = store.carriers.find((x) => x.usdot === usdot);
+      if (!c || c.claimedTenantId != null) return 0;
+      c.claimedTenantId = tenantId;
+      store.claimedMarks.push({ usdot, tenantId, method });
+      return 1;
     },
     async markTenantOwner(tenantId, ids) {
       const t = store.tenants.get(tenantId) ?? { isDirectoryOwner: false, trialEndsAt: null, dotNumber: null, mcNumber: null };
@@ -72,11 +88,18 @@ export function memoryClaimStore(): MemoryClaimStore {
       if (!t.mcNumber) t.mcNumber = ids.mcNumber;
       store.tenants.set(tenantId, t);
     },
+    async brandTenantSlug(tenantId, companyName) {
+      const t = store.tenants.get(tenantId);
+      if (!t || !isNeutralClaimSlug(t.slug)) return;
+      t.slug = companyName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+    },
     async setPublicEmail(usdot, email, actor) {
       store.publicEmails.push({ usdot, email, actorUserId: actor.userId });
     },
     async sendOtpEmail(to, opts) {
+      if (!store.emailDeliverable) return false;
       store.sentCodes.push({ to, code: opts.code, company: opts.company });
+      return true;
     },
     async userEmailVerified(userId) {
       return store.users.get(userId)?.verified ?? false;
@@ -89,9 +112,15 @@ export function memoryClaimStore(): MemoryClaimStore {
       const t = store.tenants.get(tenantId);
       return t ? { isDirectoryOwner: t.isDirectoryOwner, trialEndsAt: t.trialEndsAt } : null;
     },
+    async hasVerifiedClaim(tenantId) {
+      return store.carriers.some((c) => c.claimedTenantId === tenantId);
+    },
     async setTrialEndsAt(tenantId, trialEndsAt) {
       const t = store.tenants.get(tenantId);
       if (t) t.trialEndsAt = trialEndsAt;
+    },
+    async purgeProfileCache(slug) {
+      store.purged.push(slug);
     },
   };
   return store;

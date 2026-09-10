@@ -140,6 +140,13 @@ describe('getTrialState', () => {
     expect(r.reason).not.toMatch(/ended|expired/i);
   });
 
+  it('an UNVERIFIED claim-created account (signupSource claim, not owner yet) also reads as `directory`', async () => {
+    const { getTrialState } = await import('./trialGating.js');
+    const r = await getTrialState({ ...baseT, plan: 'free', trialEndsAt: null, isDirectoryOwner: false, signupSource: 'claim' });
+    expect(r.status).toBe('directory');
+    expect(r.reason).not.toMatch(/ended|expired/i);
+  });
+
   it('directory-profile owner who ACTIVATED the 30-day trial is an ordinary trialing tenant', async () => {
     const { getTrialState } = await import('./trialGating.js');
     const r = await getTrialState({ ...baseT, plan: 'free', trialEndsAt: inFuture, isDirectoryOwner: true });

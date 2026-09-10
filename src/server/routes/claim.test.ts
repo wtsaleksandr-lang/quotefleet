@@ -156,9 +156,12 @@ describe('POST /api/claim/:usdot/start — anonymous', () => {
       companyName: 'ACME DRAYAGE INC',
       email: 'owner@acme.com',
       trialEndsAt: null,
-      isDirectoryOwner: true,
+      // NOT an owner until the claim is verified.
+      isDirectoryOwner: false,
       signupSource: 'claim',
     });
+    // Neutral slug — starting a claim can never squat the company's name.
+    expect(h.state.provisioned[0].slug).toMatch(/^claim-107080-[a-z0-9]{8}$/);
     expect(store.sentCodes[0].to).toBe('dispatch@acme.com');
     expect(store.claims[0]).toMatchObject({ tenantId: 42, userId: 7, method: 'email_otp', status: 'pending' });
   });
@@ -275,8 +278,16 @@ describe('POST /api/tenant/trial/activate — the 30-days-free upsell', () => {
     h.state.tenantRow = { id: 42, plan: 'free', status: 'active', trialEndsAt: null };
   });
 
+  it('an UNVERIFIED claimant (code sent, never entered) gets 409; after verifying, 200', async () => {
+    await post('/api/claim/107080/start', {}, SIGNED_IN);
+    expect((await post('/api/tenant/trial/activate', {}, SIGNED_IN)).status).toBe(409);
+    await post('/api/claim/107080/verify', { code: store.sentCodes[0].code }, SIGNED_IN);
+    expect((await post('/api/tenant/trial/activate', {}, SIGNED_IN)).status).toBe(200);
+  });
+
   it('a verified owner with no trial gets a 30-day trial end', async () => {
     store.tenants.set(42, { isDirectoryOwner: true, trialEndsAt: null, dotNumber: null, mcNumber: null });
+    store.carriers[0].claimedTenantId = 42;
     const before = Date.now();
     const r = await post('/api/tenant/trial/activate', {}, SIGNED_IN);
     expect(r.status).toBe(200);

@@ -35,6 +35,7 @@ import { renderClaimFinder, renderClaimPage } from '../directory/claimPage.js';
 import {
   activateOwnerTrial,
   dbClaimStore,
+  neutralClaimSlug,
   reviewClaim,
   startClaim,
   verifyClaimCode,
@@ -42,7 +43,7 @@ import {
 } from '../directory/claims.js';
 import { normalizeDot } from '../directory/carrierIngest.js';
 import { CURRENT_DPA_VERSION, setCookie } from './auth.js';
-import { deriveAvailableSlug, provisionTrialTenant } from './tenantProvision.js';
+import { provisionTrialTenant } from './tenantProvision.js';
 
 const StartSchema = z.object({
   email: z.string().email().optional(),
@@ -167,10 +168,13 @@ export function registerClaimRoutes(app: Express, store: ClaimStore = dbClaimSto
           passwordHash,
           countryFocus: 'US',
           dpaVersion: CURRENT_DPA_VERSION,
-          slug: await deriveAvailableSlug(companyName),
-          // FREE FOREVER: no trial, no card, no plan.
+          // NEUTRAL slug until the claim is verified: starting a claim must
+          // not let anyone squat the company's name (finalizeClaim brands it).
+          slug: neutralClaimSlug(carrier.usdot, nanoid(8)),
+          // FREE FOREVER: no trial, no card, no plan. NOT an owner yet — only a
+          // verified claim flips isDirectoryOwner (and unlocks the 30-day trial).
           trialEndsAt: null,
-          isDirectoryOwner: true,
+          isDirectoryOwner: false,
           signupSource: 'claim',
         });
       } catch (err) {
