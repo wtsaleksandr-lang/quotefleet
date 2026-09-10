@@ -1013,7 +1013,6 @@ export const DIRECTORY_CSS = `
   .cp-gated-blur { font-family: var(--font-mono); font-size: 12px; color: var(--muted); filter: blur(3px); user-select: none; letter-spacing: 0.5px; }
   .cp-gated .btn { width: 100%; justify-content: center; }
   .cp-gated .cp-unlock-btn { margin-bottom: 8px; }
-  .cp-gated .cp-reveal-btn[disabled] { opacity: 0.55; cursor: not-allowed; }
   .cp-gated .cp-reveal-form { margin: 10px 0 0; }
   /* PR C — the revealed enriched-contacts result (swapped in by the inline
      enhancement script). Token-only + theme-aware; cards stack full-width so
@@ -3984,8 +3983,10 @@ export function renderCarrierProfile(opts: {
       ].join('');
   // Additional (enriched) dispatch contacts are a Directory Pro feature, SEPARATE
   // from the public FMCSA phone/email above (which stays free + unchanged).
-  //   • Free / anonymous → a blurred teaser + an "Unlock with Directory Pro"
-  //     upgrade CTA + a disabled "Reveal contacts" affordance.
+  //   • Free / anonymous → a blurred teaser + ONE "Reveal more contacts with
+  //     Directory Pro" upgrade CTA. (A second, permanently-disabled "Reveal
+  //     contacts" button used to sit beside it — removed: a dead control that
+  //     did nothing on click and read as a bug, not a teaser.)
   //   • Directory Pro → a live "Reveal additional contacts" button that POSTs to
   //     the reveal endpoint (built in PR C; the button is wired + ready now).
   // The enriched data + the reveal endpoint itself are PR C — this renders the
@@ -4007,13 +4008,12 @@ export function renderCarrierProfile(opts: {
   const revealAction = `/api/directory/carrier/${encodeURIComponent(c.usdot)}/reveal`;
   const gatedContact = `<div class="cp-gated" data-cp-gated data-reveal-action="${esc(revealAction)}">
         <h3>More dispatch contacts</h3>
-        <p>Direct dispatch and decision-maker contacts beyond the public FMCSA phone and email are part of Directory Pro.</p>
+        <p>Direct dispatch and decision-maker contacts beyond the public FMCSA phone and email above — part of Directory Pro.</p>
         <div class="cp-gated-teaser" aria-hidden="true">
           <span class="cp-gated-blur">Dispatch direct · ••• ••• ••••</span>
           <span class="cp-gated-blur">Ops email · ●●●●●@●●●●●●</span>
         </div>
-        <a class="btn btn-primary cp-unlock-btn" href="/directory/join?intent=subscribe">Unlock with Directory Pro — $19/mo</a>
-        <button type="button" class="btn btn-secondary cp-reveal-btn" disabled aria-disabled="true" title="Available on Directory Pro">Reveal contacts</button>
+        <a class="btn btn-primary cp-unlock-btn" href="/directory/join?intent=subscribe">Reveal more contacts with Directory Pro — $19/mo</a>
       </div>
       <script>${CARRIER_PRO_HYDRATE_SCRIPT}</script>
       <script>${REVEAL_ENHANCE_SCRIPT}</script>`;
