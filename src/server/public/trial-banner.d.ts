@@ -3,7 +3,8 @@
  * suite (a .ts file) can import the pure logic without tripping `pnpm
  * typecheck` (TS7016 — no declaration file). Kept in lockstep with the .js.
  */
-export type TrialBannerStatus = 'trial' | 'trial_expired' | 'paid' | 'unknown' | null | undefined;
+/** 'directory' = free-forever profile owner with no trial → no banner (same as paid/unknown). */
+export type TrialBannerStatus = 'trial' | 'trial_expired' | 'paid' | 'directory' | 'unknown' | null | undefined;
 
 export interface TrialBannerViewOpts {
   trialStatus?: TrialBannerStatus;

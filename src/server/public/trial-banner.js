@@ -42,7 +42,8 @@
   /**
    * Compute the banner view-model.
    *
-   *   opts.trialStatus      — 'trial' | 'trial_expired' | 'paid' | 'unknown' | null
+   *   opts.trialStatus      — 'trial' | 'trial_expired' | 'paid' | 'directory' | 'unknown' | null
+   *                           ('directory' = free-forever profile owner, no trial → no banner)
    *   opts.daysLeft         — whole days left (from the server trial state)
    *   opts.billingConfigured — Stripe configured? (gates the CTA)
    *   opts.paymentPastDue   — paid tenant whose last charge failed (grace window)

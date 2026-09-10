@@ -221,7 +221,10 @@ export function registerClaimRoutes(app: Express, store: ClaimStore = dbClaimSto
     });
     switch (r.kind) {
       case 'not_found':
-        return res.status(404).json({ kind: r.kind, error: 'No code is pending for this profile. Send a new code.' });
+        return res.status(404).json({
+          kind: r.kind,
+          error: 'No code is pending for this profile. Request a new code, or use the support path if your FMCSA record has no email.',
+        });
       case 'already_claimed':
         return res.status(409).json({ kind: r.kind, error: 'This profile already has a verified owner.' });
       case 'expired':
