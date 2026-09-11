@@ -101,8 +101,9 @@ describe('the primary nav has exactly three audience menus + Pricing', () => {
     // The label is pinned anyway, and for a real reason: it was momentarily
     // shortened to "For Carriers" INSIDE the rebuild and restored before merge.
     // Losing "& Brokers" would contradict the menu's own third column (Freight
-    // Brokers / Freight Forwarders / LTL Carriers) and the homepage eyebrow
-    // under it ("FOR CARRIERS, BROKERS & FORWARDERS"). The longer label is
+    // Brokers / Freight Forwarders / LTL Carriers). (It used to contradict the
+    // homepage eyebrow under it too — "FOR CARRIERS, BROKERS & FORWARDERS" —
+    // but that eyebrow is gone; the audience toggle states it now.) The longer label is
     // measured for header overflow at every width 320–1600 (0px at all of them,
     // anonymous AND signed in; the bar still collapses to the burger at exactly
     // one point, 1024px).
