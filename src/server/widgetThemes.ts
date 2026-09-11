@@ -128,6 +128,8 @@ export interface WidgetThemeTokens {
   '--w-footer-text': string;
   /** Field-hint helper text — reads on the tinted --w-surface-2 panels. */
   '--w-hint-text': string;
+  /** Accent-tinted text on the tinted --w-surface-2 panels (highlighted rows). */
+  '--w-panel-accent': string;
   /** Primary text on the result card (--w-input-bg surface). */
   '--w-oncard-text': string;
   /** Muted/secondary text on the result card (line items, meta, disclaimer). */
@@ -136,6 +138,21 @@ export interface WidgetThemeTokens {
   '--w-oncard-accent': string;
   /** Active service-tab label — reads on the sliding indicator's fill. */
   '--w-tab-active-text': string;
+  /**
+   * SELECTED add-on chip fill — the 10%-accent tint over --w-surface, emitted
+   * as ONE opaque colour so the label below can be hardened against the exact
+   * pixels it lands on (a translucent tint composited in CSS is not knowable
+   * server-side). Brand-correct on every preset: it is built from that preset's
+   * own accent, not a hardcoded blue.
+   */
+  '--w-chip-sel-bg': string;
+  /**
+   * SELECTED add-on chip label — guaranteed ≥ AA on --w-chip-sel-bg.
+   * NOT --w-accent-solid: that is a FILL token (the deep accent shade
+   * engineered to carry WHITE text), and painting it as text over the tint is
+   * what made "Hazmat · Class 5" read blue-on-blue.
+   */
+  '--w-chip-sel-text': string;
 }
 
 type ThemeMode = 'dark' | 'light';
@@ -1130,6 +1147,11 @@ function buildTokens(
     p.surface2,
     { level: WCAG.NORMAL },
   );
+  // Accent foreground for a HIGHLIGHTED row on a surface-2 panel (the hovered /
+  // keyboard-active row of the hazmat class list). --w-pill-text is guaranteed
+  // on --w-surface only, and the surface-2 tint is just enough to drop it below
+  // AA on midnight (4.48:1).
+  const panelAccent = ensureReadable(p.accentOnSurface, p.surface2, { level: WCAG.NORMAL });
   // Result-card foregrounds (surface = --w-input-bg).
   const oncardText = ensureReadable(p.inputText, p.inputBg, { level: WCAG.NORMAL });
   const oncardMuted = ensureReadable(
@@ -1142,6 +1164,13 @@ function buildTokens(
   // --w-accent-surface for the light-pill presets). stone/vault paint the
   // indicator with --w-accent-solid instead (scoped CSS) + keep white text.
   const tabActiveText = ensureReadable(p.accent, p.accentSurface, { level: WCAG.NORMAL });
+  // Selected add-on chip (Residential / Hazmat / Temp-control + accessorials).
+  // House rule: selected = outline + soft tint, never a bright fill. The tint is
+  // 10% of the preset accent over the shell surface; resolving it here to a flat
+  // colour lets the engine harden the label against it (and makes the chip carry
+  // the CARRIER's accent instead of the hardcoded cobalt it used to paint).
+  const chipSelBg = mix(p.accent, 0.9, bgRgb(p.surface));
+  const chipSelText = ensureReadable(p.accentOnSurface, chipSelBg, { level: WCAG.NORMAL });
 
   const fc = fontColor && HEX6_RE.test(fontColor) ? fontColor : null;
   const text = fc && passes(fc, p.surface, WCAG.NORMAL) ? fc : p.text;
@@ -1209,10 +1238,13 @@ function buildTokens(
     // Context foregrounds — each guaranteed ≥ AA on its own surface.
     '--w-footer-text': footerText,
     '--w-hint-text': hintText,
+    '--w-panel-accent': panelAccent,
     '--w-oncard-text': oncardText,
     '--w-oncard-muted': oncardMuted,
     '--w-oncard-accent': oncardAccent,
     '--w-tab-active-text': tabActiveText,
+    '--w-chip-sel-bg': chipSelBg,
+    '--w-chip-sel-text': chipSelText,
   };
 }
 

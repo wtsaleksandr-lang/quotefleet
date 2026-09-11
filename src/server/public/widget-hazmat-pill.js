@@ -72,10 +72,14 @@
     if (typeof window.QFPrefersReduce === 'function') return window.QFPrefersReduce();
     return !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
   }
-  function fold(el, open) {
-    if (typeof window.QFAnimateFold === 'function') { window.QFAnimateFold(el, open); return; }
-    el.hidden = !open; // fallback: instant
-  }
+  // NOTE: the class list deliberately does NOT go through window.QFAnimateFold.
+  // animateFold() animates `max-height` and parks `overflow: hidden` + an inline
+  // `max-height: <scrollHeight>px` on the element, restoring them only on a
+  // `transitionend` that never arrived for this popover — measured on main, the
+  // open listbox sat at inline `max-height: 518px; overflow: hidden`, which
+  // overrode BOTH the stylesheet's cap and its `overflow-y: auto`. That is half
+  // of why the lower hazmat classes could not be scrolled to. This popover is a
+  // fixed-size scrollport, not a fold: it fades in (CSS) and sizes itself.
   function pump(dur) {
     if (typeof window.QFPumpResize === 'function') window.QFPumpResize(dur);
     else if (typeof window.QFAutoResize === 'function') window.QFAutoResize();
@@ -177,14 +181,97 @@
       dispatchChange();
     }
 
+    // ── Popover sizing ────────────────────────────────────────────────────
+    // The listbox is absolutely positioned inside the options dialog, whose
+    // body (#qf-options-body) is the scrollport and whose card carries
+    // `overflow: clip`. So the popover has to FIT the scrollport's visible band
+    // — anything past it is clipped by the card and unreachable. We measure
+    // that band, flip above the chip when there is more room there, and cap the
+    // popover's height so it scrolls internally instead of being cut off.
+    var MIN_H = 160;   // never squash below ~3 rows
+    var PREF_H = 360;  // the height we try to make room for
+    var GAP = 8;
+    var reflowRaf = 0;
+
+    function scrollport() {
+      return document.getElementById('qf-options-body');
+    }
+    function band() {
+      var sp = scrollport();
+      var vh = window.innerHeight || document.documentElement.clientHeight || 0;
+      if (!sp) return { top: 0, bottom: vh };
+      var sr = sp.getBoundingClientRect();
+      return { top: Math.max(sr.top, 0), bottom: Math.min(sr.bottom, vh) };
+    }
+    // On a phone the chip sits low in a short sheet, leaving ~230px below it.
+    // Scroll the dialog body just enough to lift the chip toward the top of its
+    // scrollport before measuring — never past the top, never more than needed.
+    function makeRoom() {
+      var sp = scrollport();
+      if (!sp) return;
+      var b = band();
+      var cr = control.getBoundingClientRect();
+      var want = Math.min(PREF_H, listbox.scrollHeight + 2);
+      var below = b.bottom - cr.bottom - GAP;
+      if (below >= want) return;
+      var delta = Math.min(want - below, cr.top - b.top - GAP);
+      if (delta > 0) sp.scrollTop += delta;
+    }
+    function positionList() {
+      if (!isOpen()) return;
+      var b = band();
+      var cr = control.getBoundingClientRect();
+      var below = b.bottom - cr.bottom - GAP;
+      var above = cr.top - b.top - GAP;
+      var need = listbox.scrollHeight + 2;
+      listbox.classList.remove('qf-hz-above');
+      listbox.style.top = '';
+      if (need <= below) {                       // fits below the chip — default
+        listbox.style.maxHeight = Math.floor(below) + 'px';
+        return;
+      }
+      if (need <= above) {                       // fits above it — flip up
+        listbox.classList.add('qf-hz-above');
+        listbox.style.maxHeight = Math.floor(above) + 'px';
+        return;
+      }
+      // Fits neither side: take the WHOLE visible band and scroll inside it,
+      // overlaying the chip the way a native <select> menu does. On a 900px
+      // desktop the dialog body is only ~292px tall, so anchoring strictly
+      // below the chip would leave a 185px menu; this gives it the full ~284px.
+      var h = Math.max(MIN_H, Math.min(Math.floor(b.bottom - b.top - GAP * 2), need));
+      // `top` is relative to .qf-hazmat-control (the containing block).
+      var top = Math.min(Math.round(b.top + GAP - cr.top), Math.round(cr.height + 4));
+      listbox.style.top = top + 'px';
+      listbox.style.maxHeight = h + 'px';
+    }
+    function onReflow() {
+      if (reflowRaf) return;
+      reflowRaf = requestAnimationFrame(function () { reflowRaf = 0; positionList(); });
+    }
+    function bindReflow(on) {
+      var sp = scrollport();
+      var fn = on ? 'addEventListener' : 'removeEventListener';
+      if (sp) sp[fn]('scroll', onReflow, { passive: true });
+      window[fn]('resize', onReflow);
+    }
+
+    var closeTimer = 0;
     function openList() {
       if (isOpen() || !isSelected()) return;
-      listbox.classList.add('open');
+      if (closeTimer) { clearTimeout(closeTimer); closeTimer = 0; }
+      listbox.hidden = false;
+      listbox.style.maxHeight = '';
+      listbox.style.top = '';
       control.classList.add('is-open');
       trigger.setAttribute('aria-expanded', 'true');
-      fold(listbox, true);
+      makeRoom();
+      listbox.classList.add('open'); // marks open BEFORE positionList() reads it
+      positionList();
       var cur = opts.findIndex(function (o) { return o.value === sel.value; });
       setActive(cur >= 0 ? cur : 0);
+      bindReflow(true);
+      pump(200);
       document.addEventListener('mousedown', onDocDown, true);
     }
     function closeList(focusTrigger) {
@@ -194,7 +281,19 @@
       trigger.setAttribute('aria-expanded', 'false');
       trigger.removeAttribute('aria-activedescendant');
       activeIdx = -1;
-      fold(listbox, false);
+      bindReflow(false);
+      var hide = function () {
+        closeTimer = 0;
+        if (isOpen()) return; // reopened during the fade
+        listbox.hidden = true;
+        listbox.classList.remove('qf-hz-above');
+        listbox.style.maxHeight = '';
+        listbox.style.top = '';
+        pump(200);
+      };
+      if (closeTimer) clearTimeout(closeTimer);
+      if (prefersReduce()) hide();
+      else closeTimer = setTimeout(hide, 140);
       document.removeEventListener('mousedown', onDocDown, true);
       if (focusTrigger) trigger.focus();
     }

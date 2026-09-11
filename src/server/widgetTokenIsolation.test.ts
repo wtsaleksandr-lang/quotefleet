@@ -30,6 +30,10 @@ const WIDGET_CSS = [
   'widget-ux-fixes.css',
   'widget-hazmat-pill.css',
   'widget-motion.css',
+  // Ships in the widget document too (injected on the served widget page) and
+  // was the one unguarded sheet — it repainted the hazmat class popover with
+  // the static --w-bg, which came up near-WHITE inside a charcoal dialog.
+  'widget-glass.css',
 ];
 
 const read = (f: string) => readFile(join(PUBLIC_DIR, f), 'utf8');

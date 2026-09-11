@@ -194,7 +194,7 @@
   display: flex;
   flex-direction: column;
   background: var(--w-bg);
-  color: var(--w-fg); /* static-pair: sits on the equally-static --w-bg, not a themed surface */
+  color: var(--w-text, var(--w-fg)); /* §2 below re-points the card to --w-surface, so the static pair no longer holds */
   border: 1px solid var(--w-border);
   border-bottom: 0;
   border-radius: 20px 20px 0 0;
@@ -221,7 +221,7 @@
   appearance: none;
   border: 0;
   background: transparent;
-  color: var(--w-fg); /* static-pair: sits on the equally-static --w-bg, not a themed surface */
+  color: var(--w-text, var(--w-fg)); /* transparent over the card, which §2 re-points to --w-surface */
   font-size: 24px;
   cursor: pointer;
   border-radius: 8px;
@@ -1519,4 +1519,51 @@ body.qf-app-calculator .qf-cta.qf-recalc:hover {
    "Open full route map" is meaningfully larger than the inline card. */
 @media (min-width: 900px) {
   .qf-map-viewport { min-height: 60vh; }
+}
+
+/* ── 17. SELECTED ADD-ON CHIP — one readable, brand-correct rule ────────────
+   Reported: on a dark preset the picked Hazmat chip rendered "Hazmat · Class 5"
+   as blue text on a blue fill. Root cause: every rule that painted a selected
+   add-on used a HARDCODED rgba(37, 99, 235, .10) cobalt tint and labelled it
+   with --w-accent-solid — which is a FILL token (the deep accent shade the
+   engine hardens so WHITE text passes ON it), not a foreground. Painted as text
+   over its own tint it measured 2.09:1 on midnight, 1.93:1 on booking, 2.16:1
+   on cream and 1.09:1 on citron (lime on near-white). Nine of the twelve
+   presets failed AA; Hazmat was simply the chip the owner had selected.
+
+   The pair is now derived per preset by the theme engine (widgetThemes.ts):
+   --w-chip-sel-bg is that preset's accent at 10% over --w-surface, resolved to
+   one opaque colour, and --w-chip-sel-text is ensureReadable() against exactly
+   that colour, so AA is guaranteed by construction — including for a tenant
+   accent override. No preset palette value changed.
+
+   Selected still reads as OUTLINE + soft tint + ✓, never a bright fill (house
+   rule). One selector covers the three shipment-condition chips, the hazmat
+   control and the accessorial chips so they cannot drift apart again.
+
+   Specificity note: the sheets injected after this one carry
+   `body.qf-app-calculator … { color: var(--w-accent-solid) !important }`
+   (public-calculator-no-gradients.css) and `.qf-flags label:has(input:checked)
+   { color: #1d4ed8 !important }` (public-calculator-ux.css). The #-anchored
+   selectors below are (1,3,1)/(1,2,1) with !important, so they win on
+   specificity regardless of injection order. */
+#qf-options-modal .qf-flags label:has(> input[type="checkbox"]:checked),
+#qf-options-modal .qf-accessorials .qf-acc-chip.active,
+#qf-options-modal .qf-hazmat-control.is-selected .qf-hz-trigger {
+  background: var(--w-chip-sel-bg, color-mix(in srgb, var(--w-primary) 10%, var(--w-surface))) !important;
+  background-image: none !important;
+  border-color: var(--w-accent, var(--w-primary)) !important;
+  color: var(--w-chip-sel-text, var(--w-pill-text, var(--w-primary))) !important;
+  box-shadow: none !important;
+  font-weight: 800;
+}
+/* The chip's inner spans (the ✓ prefix, the "· Class 5" suffix, the accessorial
+   label) must inherit that guaranteed foreground, not re-assert an accent. */
+#qf-options-modal .qf-flags label:has(> input[type="checkbox"]:checked) > span,
+#qf-options-modal .qf-accessorials .qf-acc-chip.active .qf-acc-label,
+#qf-options-modal .qf-accessorials .qf-acc-chip.active .qf-acc-label::before,
+#qf-options-modal .qf-hazmat-control.is-selected .qf-hz-name,
+#qf-options-modal .qf-hazmat-control.is-selected .qf-hz-class,
+#qf-options-modal .qf-hazmat-control.is-selected .qf-hz-chev {
+  color: inherit !important;
 }

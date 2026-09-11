@@ -125,31 +125,37 @@
   padding: 0;
   border: 1px solid var(--w-accent, #0D3CFC);
   border-radius: 999px;
-  background: var(--w-bg, #ffffff);
-  color: var(--w-accent-solid, var(--w-accent, #0D3CFC));
+  /* --w-bg/--w-fg are LEGACY STATIC tokens applyTheme() never remaps (see
+     widget-ux-fixes.css §2), so `var(--w-bg)` painted a WHITE disc on every
+     dark preset. Route to the runtime shell surface, --w-bg as the
+     pre-applyTheme fallback — the same repair .qf-modal-card already carries. */
+  background: var(--w-surface, var(--w-bg, #ffffff));
+  color: var(--w-pill-text, var(--w-accent-on-surface, var(--w-accent, #0D3CFC)));
   font-size: 15px;
   cursor: pointer;
   transition: background-color var(--qf-dur-fast) var(--qf-ease);
 }
 .qf-hz-clear:hover {
-  background: rgba(37, 99, 235, 0.14);
+  background: color-mix(in srgb, var(--w-accent, #0D3CFC) 14%, var(--w-surface, var(--w-bg)));
 }
 .qf-hz-clear:focus-visible {
   outline: 2px solid var(--w-accent, #0D3CFC);
   outline-offset: 2px;
 }
 
-/* ── Selected state: unified add-on "selected blue" (outline + tint) ───────── */
-/* Extra right padding keeps the caret clear of the ✕ remove-badge in the corner. */
+/* ── Selected state: unified add-on outline + tint ─────────────────────────── */
+/* Extra right padding keeps the caret clear of the ✕ remove-badge in the corner.
+   The FILL / BORDER / LABEL of the selected state deliberately live in ONE rule
+   shared with Residential, Temp-control and the accessorial chips (see
+   widget-ux-fixes.css, "SELECTED ADD-ON CHIP"). This chip used to set its own
+   hardcoded rgba(37,99,235,.10) tint + --w-accent-solid label, which is a FILL
+   token used as text: 2.09:1 on midnight, 1.09:1 on citron. Geometry only here. */
 .qf-hazmat-control.is-selected .qf-hz-trigger {
   padding-right: 32px;
-  background: rgba(37, 99, 235, 0.10);
-  border-color: var(--w-accent-solid, var(--w-accent, #0D3CFC));
-  color: var(--w-accent-solid, var(--w-accent, #0D3CFC));
 }
 .qf-hazmat-control.is-selected .qf-hz-name,
 .qf-hazmat-control.is-selected .qf-hz-class {
-  color: var(--w-accent-solid, var(--w-accent, #0D3CFC));
+  color: inherit;
 }
 .qf-hazmat-control.is-selected .qf-hz-chev {
   display: inline-block;
@@ -162,35 +168,51 @@
   transform: rotate(180deg);
 }
 
-/* Un-clip the anchored popover: the options live in a modal whose body
-   (.qf-modal-body / #qf-options-body, widget-ux-fixes.css) is a scroll container
-   (overflow-y:auto), which crops the absolutely-positioned listbox so the lower
-   class rows get cut off. Only while the listbox is open, let that body render
-   overflow so the full popover escapes the clip. Scoped to the open state, so
-   normal modal scrolling is untouched and no other option content leaks. The
-   listbox stays position:absolute (out of flow), so this adds no layout height
-   and leaves zero residual gap on close. */
-#qf-options-body:has(.qf-hazmat-control.is-open) {
-  overflow: visible;
-}
+/* ── Class listbox — anchored popover, height-fitted to its scrollport ──────
+   SCROLL TRAP (fixed): this popover previously tried to grow to its full ~520px
+   content height and un-clip its way out of the dialog with
+   `#qf-options-body:has(.is-open) { overflow: visible }`. That does NOT work:
+   .qf-modal-card carries `overflow: clip` (widget-ux-fixes.css §1 — `clip`, not
+   `hidden`, precisely so the head/foot keep position:sticky), so un-clipping the
+   body only moved the clip one level up to the card, while ALSO switching the
+   body out of being a scroll container. Measured on main at 1440x900: list
+   bottom 905px vs card bottom 680px — Classes 7-9 were 225px outside the dialog
+   with nothing left that could scroll to them, and clicking Class 9 timed out.
 
-/* ── Class listbox — anchored popover that unfolds in place ────────────────── */
+   The popover now sizes itself to the space actually available inside the modal
+   body's scrollport (widget-hazmat-pill.js positionList(), which writes
+   --qf-hz-max and may flip it above the trigger), and scrolls internally. The
+   body keeps `overflow-y: auto`, so nothing about the modal's own scrolling —
+   or the sticky head/foot — changes. */
 .qf-hz-list {
   position: absolute;
   top: calc(100% + 4px);
   left: 0;
   right: 0;
   z-index: 60;
-  background: var(--w-bg, #ffffff);
+  /* --w-bg is a LEGACY STATIC token (see .qf-hz-clear above): it painted this
+     popover WHITE on midnight/tesla/booking/cream. Runtime shell surface. */
+  background: var(--w-surface, var(--w-bg, #ffffff));
   border: 1px solid var(--w-border);
   border-radius: 12px;
   box-shadow: 0 12px 30px rgba(15, 23, 42, 0.18);
-  /* Tall enough to hold all 9 classes with NO internal scrollbar on desktop
-     (content ≈ 518px; ≈ 550px when descriptions wrap on narrow screens). Capped
-     to the viewport (min with a vh unit) so on short viewports it never runs off
-     screen — it scrolls internally instead of being clipped. */
-  max-height: min(72vh, 560px);
+  /* JS measures the real room inside the dialog and writes --qf-hz-max; the
+     literal is only the pre-measure / no-JS fallback. */
+  max-height: var(--qf-hz-max, min(72vh, 560px));
   overflow-y: auto;
+  /* A wheel/touch scroll that reaches the end of the class list must NOT chain
+     into the modal body behind it. */
+  overscroll-behavior: contain;
+  opacity: 0;
+  transition: opacity var(--qf-dur-fast, 0.12s) var(--qf-ease, ease);
+}
+.qf-hz-list.open {
+  opacity: 1;
+}
+/* Not enough room below the chip → the popover flips above it. */
+.qf-hz-list.qf-hz-above {
+  top: auto;
+  bottom: calc(100% + 4px);
 }
 .qf-hz-list[hidden] {
   display: none;
@@ -209,23 +231,43 @@
 .qf-hz-opt:last-child {
   border-bottom: 0;
 }
+/* Hover / keyboard-active row. --w-input-bg-hover is the INPUT surface (cream
+   on midnight, #D4CFC9) — on this shell-surface popover it produced a light bar
+   under shell-coloured text. --w-surface-2 is the shell's own tinted-panel
+   surface and ships with a matched foreground (--w-surface-2-text). */
 .qf-hz-opt:hover,
 .qf-hz-opt.active {
-  background: var(--w-input-bg-hover, #F2F4F7);
+  background: var(--w-surface-2, var(--w-input-bg-hover, #F2F4F7));
 }
 .qf-hz-opt-badge {
   font-size: 12.5px;
   font-weight: 800;
-  color: var(--w-input-text, var(--w-fg));
+  /* The popover paints --w-surface, so its text is the SHELL text token, not
+     the input-surface one (--w-input-text is #FFFFFF on booking/tesla, i.e.
+     white-on-white here). */
+  color: var(--w-text, var(--w-fg));
 }
 .qf-hz-opt-desc {
   font-size: 11.5px;
   line-height: 1.4;
   color: var(--w-muted);
 }
-.qf-hz-opt.active .qf-hz-opt-badge,
-.qf-hz-opt[aria-selected="true"] .qf-hz-opt-badge {
-  color: var(--w-accent-solid, var(--w-accent, #0D3CFC));
+.qf-hz-opt:hover .qf-hz-opt-badge,
+.qf-hz-opt.active .qf-hz-opt-badge {
+  color: var(--w-surface-2-text, var(--w-text, var(--w-fg)));
+}
+.qf-hz-opt:hover .qf-hz-opt-desc,
+.qf-hz-opt.active .qf-hz-opt-desc {
+  color: color-mix(in srgb, var(--w-surface-2-text, var(--w-text)) 72%, var(--w-surface-2, var(--w-surface)));
+}
+.qf-hz-opt[aria-selected="true"] .qf-hz-opt-badge,
+.qf-hz-opt.active[aria-selected="true"] .qf-hz-opt-badge {
+  /* The picked class is usually ALSO the keyboard-active row, so it sits on the
+     --w-surface-2 highlight: --w-panel-accent is the engine's accent hardened
+     against that panel (--w-pill-text, which is guaranteed on --w-surface only,
+     measured 4.48:1 there on midnight). --w-accent-solid is a FILL token and
+     was the original blue-on-blue failure. */
+  color: var(--w-panel-accent, var(--w-pill-text, var(--w-accent-on-surface, var(--w-accent, #0D3CFC))));
 }
 .qf-hz-opt[aria-selected="true"] .qf-hz-opt-badge::before {
   content: '\2713\00a0';
@@ -237,6 +279,7 @@
   .qf-hz-trigger,
   .qf-hz-chev,
   .qf-hz-clear,
+  .qf-hz-list,
   .qf-hz-opt {
     transition: none;
   }
