@@ -1003,6 +1003,18 @@ export const DIRECTORY_CSS = `
      Left-aligned hero (dir-hero), title-in-field inputs (.join-field), one
      card per step; everything on the 8px ramp and design tokens only. */
   .claim-shell { max-width: 720px; }
+  /* The site header is STICKY (nav-unify.css .site-header), so a step scrolled
+     to block start lands underneath it: the step heading shows but the
+     1-2-3 stepper — the thing that tells you where you are — is covered. The
+     codebase has no header-height token, so this defines one rather than
+     scattering a magic number. MEASURED, not estimated: the collapsed header
+     is 65px at 375px (12+12 inner padding + content + 1px border) and ~68px
+     above the 1023px collapse point, so one value covers both — 80px, the next
+     step up the 8px ramp, which clears the header with a little air instead of
+     landing flush against it. Applies to the stepper too: it is the element
+     showStep() actually scrolls to. */
+  .claim-shell { --claim-sticky-offset: 80px; }
+  .claim-stepper, .claim-step { scroll-margin-top: var(--claim-sticky-offset); }
   .claim-eyebrow { font-size: 12px; font-family: var(--font-mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--accent); margin: 0 0 8px; }
   .claim-stepper { display: flex; gap: 8px; list-style: none; padding: 0; margin: 0 0 16px; counter-reset: claim-step; }
   .claim-stepper li { flex: 1 1 0; min-width: 0; display: flex; align-items: center; gap: 8px; font-size: 12px; line-height: 1.4; color: var(--muted); padding: 8px 12px; border: 1px solid var(--border); border-radius: var(--radius-chip); background: var(--surface); }
