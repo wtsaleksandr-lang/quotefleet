@@ -1984,16 +1984,39 @@ export const DIRECTORY_CSS = `
      backdrop-filter, zero keyframes, radii 6/8/12, the three token shadows,
      motion .2s/.3s, spacing on {0,4,8,12,16,24,32,48,60,80,120}.
 
-     ON THE GRADIENT. The hero was authorised ONE scoped gradient exception. It
-     is not taken, and the reason is structural rather than taste: the only
-     deep-blue surface token that survives the dark theme is '--accent-fill'
-     ('--accent-strong' flips to a pale lavender under data-theme="dark", so a
-     stop on it would put white text on a near-white band). A second stop would
-     therefore have to be a raw hex — which is exactly what
-     directoryCssTokens.test.ts exists to keep out of the one stylesheet served
-     'immutable' to ~330k indexed pages. A flat '--accent-fill' fill reads
-     identically at the size the hero is actually seen, so the exception buys
-     nothing and costs the guard.
+     ON THE GRADIENT — SUPERSEDED, AND HOW.  The first pass declined the
+     authorised gradient exception for a real reason: the only deep-blue surface
+     token that survives the dark theme is '--accent-fill' ('--accent-strong'
+     flips to a pale lavender under data-theme="dark", so a stop on it would put
+     white text on a near-white band), so a second stop had to be a raw hex —
+     exactly what directoryCssTokens.test.ts keeps out of the one stylesheet
+     served 'immutable' to ~330k indexed pages.
+
+     That reasoning still holds for a CSS gradient. It does not hold for an
+     IMAGE. A flat saturated blue at this size reads as a heavy slab, and the
+     depth that fixes it now comes from a decorative raster over the flat
+     '--accent-fill' base — the CSS says url(), the fallback stays a token, and
+     every guard above is satisfied: no hex, no linear-gradient, no new radius,
+     no new shadow. Same technique and the SAME generator as the homepage hero
+     (scripts/make-hero-wash.mjs, variant 'dir-hero-wash'), so there is one way
+     of doing this in the codebase rather than two.
+
+     ONE VARIANT, NOT TWO. '--accent-fill' is #3356EE and '--accent-ink' is
+     #FFFFFF in BOTH themes — this surface is theme-invariant by design — so the
+     same image is correct in light and dark theme and there is no dark twin to
+     build.
+
+     WHITE TEXT, SO THE STOPS ARE PICKED BY CONTRAST. The diagonal runs deep
+     navy at the top-left to a brighter, more saturated blue at the bottom-right;
+     the brightest single pixel in the file is #2E5CFF, which is 5.13:1 against
+     white, and the darkest is 11.79:1. AA everywhere by construction, and the
+     facet/dither amplitudes are capped to keep it that way.
+
+     THE RADIUS STAYS 12px. The reference's corners read larger, but the radius
+     ramp {0,6,8,12,9999} is a guard, not a preference. What actually makes the
+     corners read is the INSET: flush at 98% the card had no frame and all four
+     corners died against the page edge. It now carries a real gap on all four
+     sides, so the page ground frames it and the 12px corners are visible.
      ══════════════════════════════════════════════════════════════════════════ */
 
   /* One named token for the monogram tint. The hue is set per carrier inline
@@ -2002,10 +2025,19 @@ export const DIRECTORY_CSS = `
   .cc-logo, .cp-monogram { --dir-logo-h: 226; --dir-logo-tint: hsl(var(--dir-logo-h) 58% 42%); }
 
   /* ── 1 · The /directory search hero ─────────────────────────────────────── */
-  .dsh { display: block; padding: 0; margin: 0; }
-  /* Same card geometry as the homepage hero (.qf-hhero__card): 12px radius,
-     a page rail down both sides, flush under the sticky header. */
-  .dsh-card { background: var(--accent-fill); border-radius: var(--radius-lg); max-width: 98%; margin: 0 auto; padding: 48px 24px; }
+  /* The gap above and below the card is padding on the SECTION, not margin on
+     the card: a margin here would collapse through .dsh and the top gap would
+     land outside the section instead of inside it. */
+  .dsh { display: block; padding: 24px 0; margin: 0; }
+  /* An INSET card, not a slab. 24px of page ground on all four sides, so the
+     card is framed and its corners are visible, and 60/48 of internal padding
+     so the content breathes instead of filling the box.
+     The blue is the diagonal raster over the flat --accent-fill base (see the
+     block header): a 404 or a WebP-less client lands on the flat fill this card
+     shipped with, never on white. 'cover' at 50% 50% because the field is a
+     corner-to-corner diagonal — centred, every crop from a 343px portrait one
+     up to a 2512px ultrawide one keeps the dark→bright direction intact. */
+  .dsh-card { background-color: var(--accent-fill); background-image: url("/brand/dir-hero-wash.webp"); background-repeat: no-repeat; background-position: 50% 50%; background-size: cover; border-radius: var(--radius-lg); max-width: calc(100% - 48px); margin: 0 auto; padding: 60px 48px; }
   .dsh-inner { width: 100%; max-width: 780px; margin: 0 auto; display: flex; flex-direction: column; align-items: center; text-align: center; }
   .dsh-eyebrow { margin: 0 0 12px; font-family: var(--font-mono); font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--accent-ink); }
   .dsh-title { margin: 0 0 12px; font-size: 40px; line-height: 1.1; color: var(--accent-ink); }
@@ -2045,7 +2077,11 @@ export const DIRECTORY_CSS = `
     .dsh-chips { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   }
   @media (max-width: 640px) {
-    .dsh-card { max-width: 100%; border-radius: 0; padding: 32px 16px; }
+    /* The inset shrinks on a phone but does NOT go away — losing the frame is
+       what made this read as a slab in the first place, and it reads that way
+       at 375px too. 16px of ground on all four sides, corners kept. */
+    .dsh { padding: 16px 0; }
+    .dsh-card { max-width: calc(100% - 32px); padding: 32px 24px; }
     .dsh-title { font-size: 26px; }
     .dsh-sub { font-size: 15px; }
     .dsh-row { flex-direction: column; background: transparent; overflow: visible; gap: 8px; }

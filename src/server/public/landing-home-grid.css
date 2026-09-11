@@ -31,10 +31,25 @@
   padding: 0;
 }
 
-/* The card itself: flat tint (NO gradient, no raster), 12px radius, a ~14px
-   page rail down both sides, flush under the sticky header. */
+/* The card itself: a soft blue WASH, 12px radius, a ~14px page rail down both
+   sides, flush under the sticky header.
+
+   The wash is `--surface-hero-image`, a generated decorative raster (style.css
+   EOF explains how it is made and why it is a raster and not a CSS gradient —
+   the design law forbids gradients, and the reference achieves this look the
+   same way). It is layered OVER the flat `--surface-hero` colour, so a failed
+   or unsupported image leaves the card on the tint it had before, never white.
+
+   `cover` + `50% 100%` is the geometry that survives every width: the field's
+   deepening runs along the bottom edge, so anchoring to centre-bottom keeps
+   the focal area pinned to the base of the card from a 367px-wide portrait
+   crop at 375px right out to a 2509px-wide ultrawide one. */
 .qf-hhero__card {
-  background: var(--surface-hero);
+  background-color: var(--surface-hero);
+  background-image: var(--surface-hero-image);
+  background-repeat: no-repeat;
+  background-position: 50% 100%;
+  background-size: cover;
   border-radius: var(--radius);
   max-width: 98%;
   margin: 0 auto;
