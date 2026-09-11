@@ -53,7 +53,7 @@ The homepage should show this flow visually:
 
 Preferred visuals:
 
-- hosted URL example such as `acmetrucking.yourquote.net`
+- hosted URL example such as `acmetrucking.yourquote.online` — always a domain from `HOST_DOMAINS`, never `yourquote.net` (a parked for-sale domain owned by someone else)
 - email signature snippet
 - branded PDF quote card
 - AI chat bubbles

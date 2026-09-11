@@ -15,7 +15,14 @@ describe('public static page smoke checks', () => {
     expect(html).toContain('See your own freight quote calculator &mdash; live in seconds.');
     expect(html).toContain('Stop losing loads to slow, manual quoting.');
     expect(html).toContain('For carriers, brokers &amp; forwarders');
-    expect(html).toContain('acmetrucking.yourquote.net');
+    // The illustrated hosted URL must be a domain WE OWN. `yourquote.net` is a
+    // GoDaddy/Afternic for-sale parking page belonging to someone else (307 →
+    // forsale.godaddy.com, NS = ns1.afternic.com, verified 2026-09-11) and is
+    // not in HOST_DOMAINS. `yourquote.online` is: Cloudflare NS in our account,
+    // serving the real QuoteFleet app.
+    expect(html).toContain('acmetrucking.yourquote.online');
+    expect(html, 'the homepage must not illustrate the product with a domain we do not own')
+      .not.toContain('yourquote.net');
     expect(html).toContain('email signature');
     // CRO hero: outcome-first subhead, short toggle labels, FMCSA trust line,
     // and the redundant "See a live demo" link removed from the hero.
