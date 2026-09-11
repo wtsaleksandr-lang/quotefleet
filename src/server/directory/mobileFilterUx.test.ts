@@ -219,6 +219,9 @@ describe('X-QF-Partial render — only the swappable block', () => {
     // Desktop never jumps when the toolbar is already on screen (the rail would
     // move out from under the cursor); phones always land on the toolbar.
     expect(full).toContain('function scrollAfterSwap(){if(isMobile()||!toolbarInView())scrollToToolbar();}');
+    // Scroll anchoring is off on these pages: the script sets the position
+    // itself, and anchoring re-adjusted it a frame later (undoing the scroll).
+    expect(full).toContain("document.documentElement.style.overflowAnchor='none'");
     expect(full).toContain('rebind(state);\n        scrollAfterSwap();');
   });
 });

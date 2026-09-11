@@ -2794,6 +2794,11 @@ const DIRECTORY_NAV_SCRIPT = `(function(){
   window.addEventListener('popstate',function(e){if(e.state&&e.state.qf)go(location.href,{pop:true});});
   if(mq.addEventListener)mq.addEventListener('change',function(){setRail(railWanted(),false);});else if(mq.addListener)mq.addListener(function(){setRail(railWanted(),false);});
   // ── First load ───────────────────────────────────────────────────────────
+  // This script owns the scroll position after every swap. Chrome's scroll
+  // anchoring would otherwise re-adjust scrollY a frame later to keep some
+  // pre-swap node in place (measured: it undid scrollToToolbar entirely when
+  // the anchor sat near the page bottom, and drifted 14px when it sat above).
+  try{document.documentElement.style.overflowAnchor='none';}catch(e){}
   initAcc([]); initFolds();
   setRail(railWanted(),false);
   try{history.replaceState({qf:1},'',location.href);}catch(e){}
