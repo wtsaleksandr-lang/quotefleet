@@ -123,11 +123,19 @@ const QUALITY = 0.9;
 /* Streak alpha ceiling, 0-255. Pure WHITE pixels at a varying alpha, so the
    texture can only ever LIGHTEN the ground: in light theme that means it
    cannot cost dark-ink contrast at all, and in dark theme the ceiling below is
-   what bounds the loss. 14/255 ≈ 5.5%, i.e. a +13-level lift at the brightest
-   pixel of the brightest streak; measured on the rendered dark card that takes
-   the worst-case ground from luminance 0.0187 to 0.0246, against a 0.0384
-   ceiling for `--muted`. */
-const STREAK_ALPHA = 14;
+   what bounds the loss. 18/255 ≈ 7%, i.e. a +17-level lift at the brightest
+   pixel of the brightest streak. Measured on the rendered dark card that puts
+   the worst-case ground behind the lead at luminance 0.0245 against the 0.0384
+   ceiling `--muted` needs — 5.36:1, AA with room.
+
+   IT IS SET BY THE LIGHT THEME, NOT THE DARK ONE. A white streak on a light
+   blue ground has very little headroom to work with: at 18/255 it is a whisper
+   at 100% and a clear brushed texture only under magnification, while the same
+   tile on the dark card reads plainly. Raising it further buys almost nothing
+   in light (the ground is already near white) and turns the dark card loud,
+   which is the failure mode the owner named — "surface, not damage". This is
+   the top of the usable band, not a conservative pick inside it. */
+const STREAK_ALPHA = 18;
 const STREAK_LEVELS = 16;  // 16 alphas × ONE colour = 16 RGBA values → palette-coded
 
 const VARIANTS = [

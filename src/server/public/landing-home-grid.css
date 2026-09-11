@@ -497,11 +497,26 @@ html body.qf-wft .qf-toolbtn--secondary:hover {
   outline-offset: 2px;
 }
 
-/* The hero's "Start free" is the legacy `.btn.btn-secondary` skin, which lands
-   on this page with no hover of its own. Scoped to the hero so the rest of the
-   site's buttons are untouched, it gets the same answer as the outline
-   variant above — border to the accent, ground to the accent tint, arrow
-   slides — so every button in the hero behaves identically. */
+/* THE HERO'S "Start free" — the legacy `.btn.btn-secondary` skin. It does have
+   a hover, from landing-hero-fixes-v2.css:
+
+     html body.qf-wft .qf-aud-panel[data-aud-panel="carriers"] .hero-cta
+       .btn-secondary:hover { background: var(--surface-2) !important;
+                              border-color: var(--accent) !important;
+                              color: var(--accent) !important }
+
+   — and it is WRONG in dark. `--accent` resolves to the fill blue #3356EE on
+   this page (see the --accent-legible note at the foot of style.css), so the
+   label went to 2.50:1 against its own hover ground: an AA failure that only
+   exists while the pointer is on the button, which is how it survived. That
+   rule is (0,6,2)+!important, so the chain below repeats its ancestry and adds
+   `.qf-hhero__action` and `.btn` to reach (0,8,2) rather than leaving a
+   half-applied rule in the sheet.
+
+   Same answer as the outline variant above, for the same reason: the BORDER
+   and the ground react, the ink does not. `--ink` on the tinted ground
+   measures 15.9:1 light / 15.2:1 dark, where an accent label would be 4.01:1
+   on the light wash — under AA for 16px, so the label stays ink in both. */
 html body.qf-wft .qf-hhero .hero-cta .btn {
   transition: var(--motion);
 }
@@ -509,19 +524,22 @@ html body.qf-wft .qf-hhero .hero-cta .btn .arr {
   display: inline-block;
   transition: var(--motion-state);
 }
-html body.qf-wft .qf-hhero .hero-cta .btn:hover {
+html body.qf-wft .qf-hhero .qf-aud-panel .qf-hhero__action .hero-cta .btn:hover {
   border-color: var(--accent-legible) !important;
-  color: var(--accent-legible) !important;
+  color: var(--ink) !important;
   background: var(--cta-sec-bg-hover) !important;
   box-shadow: none !important;
   transform: none !important;
 }
-html body.qf-wft .qf-hhero .hero-cta .btn:hover .arr {
+html body.qf-wft .qf-hhero .qf-aud-panel .qf-hhero__action .hero-cta .btn:hover .arr {
   transform: translateX(4px);
+  color: inherit !important;
 }
-/* It had no focus style of its own either — it fell through to the UA's 1px
-   auto ring, which is a near-black hairline on a near-white card. Same ring as
-   every other button here, so focus reads the same wherever you tab to. */
+/* It had no focus style of its own, though — it fell through to the UA's 1px
+   auto ring, a near-black hairline on a near-white card. Same ring as every
+   other button here, so focus reads the same wherever you tab to, and it is
+   still clearly a different state from hover: hover repaints the border and
+   the ground, focus draws outside the box and touches neither. */
 html body.qf-wft .qf-hhero .hero-cta .btn:focus-visible {
   outline: 2px solid var(--accent-legible) !important;
   outline-offset: 2px !important;

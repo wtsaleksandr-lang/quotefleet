@@ -1983,7 +1983,7 @@ html[data-theme="dark"],
    `cover` downscales the wash, and downscaling averages per-pixel texture out
    of existence. Tiled 1:1 at its natural 256×256 it renders identically at
    every card width. Every pixel in it is WHITE and only the alpha varies, so
-   one 13.8 KB asset serves both themes, and the layer can only ever LIGHTEN
+   one 13.9 KB asset serves both themes, and the layer can only ever LIGHTEN
    the ground — which is why deepening the wash cost the light theme's dark ink
    nothing, and why the dark theme's light ink is the only contrast the texture
    has to be bounded against. See scripts/make-hero-wash.mjs for the
@@ -1997,7 +1997,7 @@ html[data-theme="dark"],
    bottom — dark `--muted` #90A1B9 needs the ground under luminance 0.0386 —
    so it runs 0.0111 → 0.0304 after the deepening (was 0.018 → 0.035), a
    1.28:1 step off the #0C111D page ground. Rendered worst case with the white
-   streaks composited on top: H1 14.17:1, lead 5.64:1.
+   streaks composited on top: H1 14.17:1, lead 5.36:1.
 
    Appended at EOF for baseline-protocol.md rule 1 (the guards key file:line).
    ───────────────────────────────────────────────────────────────────────── */
