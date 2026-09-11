@@ -1148,10 +1148,11 @@ export const DRIVERS_BUCKETS: ReadonlyArray<{ id: DriversBucketId; label: string
 /**
  * DOMICILE-COUNTRY FACET — the registry, NOT a claim of coverage.
  *
- * `carrier_directory.country` is set by the ingest from the carrier's FMCSA
- * physical state/province (carrierIngest.carrierCountry): a US state/territory →
- * 'US', a Canadian province → 'CA' (gated behind the ingest's `includeCanada`,
- * which runIngest defaults ON), anything else → the row is DROPPED.
+ * `carrier_directory.country` is set by the ingest from FMCSA's own census
+ * `phy_country`, falling back to the physical state/province code
+ * (carrierIngest.carrierCountry): 'US', 'CA' (gated behind the ingest's
+ * `includeCanada`, which runIngest defaults ON), 'MX' (ungated), anything else
+ * → the row is dropped, and counted as `unplaceable` in the run summary.
  *
  * This list is therefore the set of countries the schema can REPRESENT, and is
  * deliberately NOT the set the UI renders. Every surface that draws a country
@@ -1160,9 +1161,10 @@ export const DRIVERS_BUCKETS: ReadonlyArray<{ id: DriversBucketId; label: string
  * flag can never advertise a filter that returns nothing. See
  * `countriesWithData()` and `directorySearchHero` in pages.ts.
  *
- * MX is listed because FMCSA genuinely licenses ~13k Mexico-domiciled active
- * property carriers under US cross-border authority, and the column can hold
- * 'MX' the moment an ingest admits them. It renders only if/when it has rows.
+ * MX is listed because FMCSA genuinely licenses ~14.7k Mexico-domiciled active
+ * property carriers under US cross-border authority. The ingest now admits them
+ * (it dropped them outright when this registry was written), so the flag
+ * renders as soon as a re-ingest has run. It still renders only if it has rows.
  */
 export const COUNTRY_OPTIONS: ReadonlyArray<{ id: string; code: string; label: string; name: string }> = [
   { id: 'US', code: 'US', label: 'US', name: 'United States' },

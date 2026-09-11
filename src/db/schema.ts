@@ -1835,10 +1835,13 @@ export const carrierDirectory = pgTable(
     /** Two-letter physical state/province (upper-cased); the primary browse facet. */
     state: text('state'),
     /**
-     * Domicile country: 'US' (default) or 'CA'. Defaults 'US' so every existing
-     * + newly-ingested US row is unchanged; Canadian carriers (gated behind the
-     * ingest's includeCanada flag) are tagged 'CA'. Keeps the North-America
-     * directory country-partitioned without disturbing the live US-only browse.
+     * Domicile country: 'US' (default), 'CA' or 'MX'. Defaults 'US' so every
+     * existing + newly-ingested US row is unchanged; Canadian carriers (gated
+     * behind the ingest's includeCanada flag, which defaults ON) are tagged
+     * 'CA', and Mexican ones 'MX' unconditionally. Set from FMCSA's own census
+     * `phy_country` where available, else from the state/province code — see
+     * carrierIngest.carrierCountry(). Keeps the North-America directory
+     * country-partitioned and drives the /directory country control.
      */
     country: text('country').notNull().default('US'),
     zip: text('zip'),

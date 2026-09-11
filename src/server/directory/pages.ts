@@ -56,7 +56,8 @@ import {
   hubGatewayLabel,
   type ContainerPort,
 } from './containerPorts.js';
-import { CA_PROVINCE_CODES } from './caProvinces.js';
+import { CA_PROVINCE_CODES, provinceByCode } from './caProvinces.js';
+import { MX_STATE_CODES, mxStateByCode } from './mxStates.js';
 import { hubRobotsDirective } from './indexQualityFloor.js';
 import { curatedSquareLogoForUsdot } from './carrierLogos.js';
 import {
@@ -2682,16 +2683,55 @@ export function carrierName(c: { dbaName?: string | null; legalName: string }): 
  * omitted when its underlying data is missing, so a sparse record still yields
  * a clean, factual sentence. Plain text (the caller escapes it once).
  */
+/**
+ * Which country a carrier is domiciled in, for every piece of country-aware
+ * copy and structured data on a listing row or profile.
+ *
+ * Reads the STORED `country` first — that is the ingest's own answer, derived
+ * from FMCSA's census `phy_country` where available (see
+ * carrierIngest.carrierCountry). Falling back to the state code, as this file
+ * used to do exclusively, is not merely less direct — it is WRONG for Mexico:
+ * `NL` is Nuevo León in FMCSA's Mexican set and Newfoundland and Labrador in
+ * the Canadian one, so a Monterrey carrier read off the code alone renders as
+ * Canadian. The code path survives only for rows/fixtures with no stored
+ * country, and checks MX before CA for that same overlap.
+ */
+export type CarrierDomicile = 'US' | 'CA' | 'MX';
+
+export function carrierDomicile(c: {
+  country?: string | null;
+  state?: string | null;
+}): CarrierDomicile {
+  const stored = (c.country ?? '').toUpperCase();
+  if (stored === 'US' || stored === 'CA' || stored === 'MX') return stored;
+  const st = (c.state ?? '').toUpperCase();
+  if (MX_STATE_CODES.has(st)) return 'MX';
+  if (CA_PROVINCE_CODES.has(st)) return 'CA';
+  return 'US';
+}
+
+/** Country name for a domicile, for the "Based in …" fallback when FMCSA gave
+ *  us no city/state at all. */
+export function domicileCountryName(d: CarrierDomicile): string {
+  return d === 'CA' ? 'Canada' : d === 'MX' ? 'Mexico' : 'United States';
+}
+
 export function carrierAbout(c: VisibleCarrier): string {
   const name = carrierName(c);
-  const isCa = !!(c.state && CA_PROVINCE_CODES.has(c.state));
+  const domicile = carrierDomicile(c);
+  const isCa = domicile === 'CA';
+  const isMx = domicile === 'MX';
   const typeWord = c.intermodal ? 'drayage and intermodal carrier' : 'motor carrier';
   // "active" only when FMCSA authority is on file; "an FMCSA" reads correctly.
   const lead = c.authorityType ? 'an active FMCSA-registered' : 'an FMCSA-registered';
   let s1 = `${name} is ${lead} ${typeWord}`;
 
   const cityDisp = c.city ? titleCaseCity(c.city) : '';
-  const stName = (isCa ? null : stateByCode(c.state))?.name ?? c.state ?? '';
+  // Name the region from the RIGHT list. stateByCode synthesizes `name = code`
+  // for anything it doesn't know, so feeding it 'NL' or 'TA' would have produced
+  // a plausible-looking US-shaped label for a Mexican state.
+  const stName =
+    (isCa ? null : isMx ? mxStateByCode(c.state) : stateByCode(c.state))?.name ?? c.state ?? '';
   if (cityDisp && c.state) s1 += ` based in ${cityDisp}, ${c.state}`;
   else if (stName) s1 += ` based in ${stName}`;
   else if (cityDisp) s1 += ` based in ${cityDisp}`;
@@ -2714,12 +2754,16 @@ export function carrierAbout(c: VisibleCarrier): string {
   if (c.intermodal) {
     const p = portByCode(c.nearestPortCode);
     // An inland rail ramp is not a "container port" — name the hub for what it is.
+    // A Mexican carrier running US authority is a cross-border operator; it does
+    // not serve "US ports" from Monterrey, and it has no stored hub at all (see
+    // deriveNearestPortCode), so the phrasing names the lane, not a gateway.
+    const crossBorder = isCa || isMx;
     const ports =
       p?.kind === 'inland-hub'
-        ? isCa
+        ? crossBorder
           ? 'North American intermodal hubs'
           : 'US intermodal hubs'
-        : isCa
+        : crossBorder
           ? 'North American container ports'
           : 'US container ports';
     s3 = ` It runs container drayage and intermodal moves, serving shippers at ${ports}${p ? ` such as ${p.name}` : ''}.`;
@@ -2920,8 +2964,10 @@ function jsonLdCarrier(c: VisibleCarrier): string {
     '@type': 'PostalAddress',
     // The STORED domicile country, not an assumption. This was hardcoded 'US',
     // which published a wrong country in structured data for every
-    // Canada-domiciled carrier the ingest deliberately keeps.
-    addressCountry: c.country === 'CA' ? 'CA' : 'US',
+    // Canada-domiciled carrier the ingest deliberately keeps — and the
+    // two-branch `=== 'CA' ? 'CA' : 'US'` that replaced it would have done the
+    // same thing to every Mexican one. Read the whole value.
+    addressCountry: carrierDomicile(c),
     ...(c.city ? { addressLocality: c.city } : {}),
     ...(c.state ? { addressRegion: c.state } : {}),
     ...(c.zip ? { postalCode: c.zip } : {}),
@@ -4891,7 +4937,21 @@ export function renderCarrierProfile(opts: {
   const related = opts.related ?? [];
   const sr = safetyLabel(c.safetyRating);
   const cityState = [c.city, c.state].filter(Boolean).join(', ');
-  const st = stateByCode(c.state);
+  const domicile = carrierDomicile(c);
+  // ONLY a US state has a browsable /directory/:stateSlug page — stateBySlug
+  // resolves the 50 states + DC + PR/VI/GU and nothing else. stateByCode, by
+  // design, SYNTHESIZES an entry for any unknown two-letter code, so a Canadian
+  // 'ON' or a Mexican 'TA' used to produce a confident `/directory/on` /
+  // `/directory/ta` breadcrumb link — and an equally confident BreadcrumbList
+  // `item` URL in structured data — straight to a 404. Non-US domiciles get
+  // their region as a plain, unlinked crumb instead.
+  const st = domicile === 'US' ? stateByCode(c.state) : null;
+  const regionCrumbName =
+    (domicile === 'MX'
+      ? mxStateByCode(c.state)?.name
+      : domicile === 'CA'
+        ? provinceByCode(c.state)?.name
+        : null) ?? null;
   const port = portByCode(c.nearestPortCode);
   const citySlug = c.city ? citySlugify(c.city) : '';
   const cityName = c.city ? titleCaseCity(c.city) : '';
@@ -4902,10 +4962,11 @@ export function renderCarrierProfile(opts: {
   // Breadcrumb: Directory / State / City / Carrier.
   const crumbs: Crumb[] = [{ name: 'Directory', path: '/directory' }];
   if (st) crumbs.push({ name: st.name, path: `/directory/${st.slug}` });
+  else if (regionCrumbName) crumbs.push({ name: regionCrumbName });
   if (st && citySlug && cityName) crumbs.push({ name: cityName, path: `/directory/${st.slug}/${citySlug}` });
   crumbs.push({ name: carrierName(c) });
 
-  const isCa = !!(c.state && CA_PROVINCE_CODES.has(c.state));
+  const isCa = domicile === 'CA';
   const isActive = !!c.authorityType;
   // Free-forever profile claim (routes/claim.ts). A CLAIMED profile shows the
   // "Verified owner" badge and drops every claim CTA — the id itself is never
@@ -5213,7 +5274,11 @@ export function renderCarrierProfile(opts: {
 
   // Location line — NEW: append ZIP (stored, never shown before) after City, State.
   const cityStateZip = [cityState, c.zip].filter(Boolean).join(' ');
-  const locBased = cityStateZip ? esc(cityStateZip) : isCa ? 'Canada' : 'the United States';
+  const locBased = cityStateZip
+    ? esc(cityStateZip)
+    : domicile === 'US'
+      ? 'the United States'
+      : domicileCountryName(domicile);
   // ── Also operating in — CLAIM-DRIVEN other operating cities/terminals. FMCSA
   // gives one physical HQ; a claimed carrier declares the extra metros it serves
   // via carrier_overrides.operating_locations (already normalized in the merge).
@@ -5278,7 +5343,7 @@ export function renderCarrierProfile(opts: {
     isClaimed ? `Not listed` : `<a href="${claimHref}">Add ${what}</a>`;
   const hiddenNote = 'Hidden at the carrier’s request';
   const contactStrip = `<div class="cp-cstrip">
-        ${contactBox('Location', PIN_ICON, cityStateZip ? esc(cityStateZip) : isCa ? 'Canada' : 'United States')}
+        ${contactBox('Location', PIN_ICON, cityStateZip ? esc(cityStateZip) : domicileCountryName(domicile))}
         ${contactBox('Website', '<span class="cp-cbox-glyph">↗</span>', addCta('website'), true)}
         ${
           c.contactHidden || !c.phone
@@ -5410,7 +5475,13 @@ export function renderCarrierProfile(opts: {
         <section class="cp-card">
           <h2 class="cp-h">Location &amp; service area</h2>
           <p class="cp-loc">Based in ${locBased}.</p>
-          <p class="cp-loc">Serving shippers, brokers and forwarders ${isCa ? 'across Canadian trade lanes' : 'at US ports and rail ramps'}.</p>
+          <p class="cp-loc">Serving shippers, brokers and forwarders ${
+            domicile === 'CA'
+              ? 'across Canadian trade lanes'
+              : domicile === 'MX'
+                ? 'on US–Mexico cross-border lanes'
+                : 'at US ports and rail ramps'
+          }.</p>
           ${port ? `<p class="cp-loc"><span class="lk">${port.kind === 'inland-hub' ? 'Nearest hub' : 'Nearest port'}</span> ${esc(port.name)}${port.city || port.state ? ` · ${esc([port.city, port.state].filter(Boolean).join(', '))}` : ''}</p>` : ''}
           ${alsoOperatingBlock}
         </section>

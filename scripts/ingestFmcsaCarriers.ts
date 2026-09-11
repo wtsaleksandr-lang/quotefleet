@@ -11,10 +11,25 @@
  *   --limit N       cap total carriers ingested (0 = no cap → full run).
  *   --offset N      start at L&I page offset N (resume a partial run).
  *   --page N        L&I page size (default 1000).
- *   --state XX      restrict to one physical state (repeatable) — bounded loads.
- *   --include-canada  also ingest Canada-domiciled carriers (tagged country='CA');
- *                     DEFAULT OFF → US-only. Env INGEST_INCLUDE_CANADA=1 also enables it.
+ *   --state XX      restrict to one L&I `bus_state_code` (repeatable) — bounded
+ *                   loads. NOTE this filters the L&I file's OWN code spelling,
+ *                   which for Mexico differs from the census spelling that ends
+ *                   up in `carrier_directory.state`: `--state TM` (L&I
+ *                   Tamaulipas) writes rows with state='TA' (census Tamaulipas),
+ *                   and `--state BA` writes 'BN'. See src/server/directory/
+ *                   mxStates.ts for the full measured mapping.
+ *   --include-canada  also ingest Canada-domiciled carriers (tagged country='CA').
+ *                     DEFAULT ON — runIngest treats an absent flag as enabled;
+ *                     set INGEST_INCLUDE_CANADA=0 to force the legacy US-only run.
+ *                     (This line used to say "DEFAULT OFF"; that stopped being
+ *                     true when runIngest flipped its own default and the CLI
+ *                     started passing `undefined` rather than `false`.)
  *   --dry-run       parse + filter + summarize, but do NOT write to the DB.
+ *
+ * MEXICO has no flag: it ingests unconditionally, like the US. FMCSA licenses
+ * ~14.7k active property carriers domiciled in Mexico under the same authority,
+ * and they were dropped outright until carrierCountry() learned the Mexican
+ * state codes.
  *
  * DO NOT run a full national load casually — there are ~370k active property
  * carriers. Use --limit or --state for bounded pilot loads.
@@ -68,6 +83,11 @@ async function main(): Promise<void> {
   console.log('\n[ingest] DONE in ' + secs + 's');
   console.log(`  carriers ingested : ${s.ingested}`);
   console.log(`  intermodal (dray) : ${s.intermodal} (${pct}%)`);
+  console.log(`  per-country       : ${s.countryCounts.map(([c, n]) => `${c}=${n}`).join('  ') || '(none)'}`);
+  console.log(
+    `  unplaceable       : ${s.unplaceable}` +
+      (s.unplaceable ? ` (${s.unplaceableCodes.slice(0, 8).map(([c, n]) => `${c}=${n}`).join(' ')})` : ''),
+  );
   console.log(`  per-state         : ${s.stateCounts.slice(0, 15).map(([st, c]) => `${st}=${c}`).join('  ') || '(none)'}`);
   console.log(`  per-port          : ${s.portCounts.map(([p, c]) => `${p}=${c}`).join('  ') || '(none)'}`);
 }

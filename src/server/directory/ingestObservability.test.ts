@@ -230,6 +230,9 @@ describe('the job_runs detail line is greppable and queryable', () => {
     intermodal: 0,
     stateCounts: [],
     portCounts: [],
+    countryCounts: [],
+    unplaceable: 0,
+    unplaceableCodes: [],
   };
 
   it('renders the 2026-09-06 no-op in a shape a SQL LIKE can find', () => {

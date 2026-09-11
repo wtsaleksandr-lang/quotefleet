@@ -27,6 +27,9 @@ const emptySummary: IngestSummary = {
   intermodal: 0,
   stateCounts: [],
   portCounts: [],
+  countryCounts: [],
+  unplaceable: 0,
+  unplaceableCodes: [],
 };
 
 /** Fully-mocked deps; individual tests override what they exercise. isDisabled
