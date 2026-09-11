@@ -242,11 +242,20 @@ html body.qf-wft .qf-hhero .hero-cta {
   list-style: none;
 }
 
+/* `min-width: 0` IS LOad-BEARING, not tidiness. A grid track sized `1fr` still
+   floors at its item's min-content width, and once the action bar stopped
+   wrapping, a card's min-content became the SUM of its two nowrap buttons. At
+   320px that is wider than the column, so the track grew past the viewport and
+   the whole document scrolled sideways — 19px of it, caught by
+   heavy-haul-quote.spec's ZERO HEADER OVERFLOW sweep. With the floor released
+   the track obeys the container, and the ≤374px rule further down makes sure
+   there is nothing left to clip at the widths where it would have mattered. */
 .qf-hcard {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
   gap: 24px;
+  min-width: 0;
   min-height: 224px;
   padding: 24px;
   background: var(--surface);
@@ -333,6 +342,7 @@ html body.qf-wft .qf-toolgrid-head__all:hover { color: var(--accent) !important;
   flex-direction: column;
   align-items: flex-start;
   gap: 24px;
+  min-width: 0;
   min-height: 224px;
   padding: 24px;
   background: var(--surface-2);
@@ -583,6 +593,15 @@ html[data-theme="light"] body.qf-wft a.qf-toolgrid-head__all:not(.btn):not(.nav-
   html body.qf-wft .qf-hhero__head h1 { font-size: 44px; letter-spacing: -1.76px; }
   .qf-toolbtn { font-size: 14px; padding: 8px 8px 8px 12px; }
   .qf-toolbtn__arr { font-size: 14px; }
+  /* Cards tighten with the type. 24 -> 16 on the padding is +16px of content
+     per card and 24 -> 16 on the grid gap is another +5px per 3-up column —
+     together that is the difference between an action row that fits with
+     4px of slack and one that fits with 25px of it. Both values are on the
+     house ramp; this is buying headroom, not inventing a new scale. */
+  .qf-hcard,
+  .qf-toolcard { padding: 16px; gap: 16px; }
+  .qf-hhero__cards,
+  .qf-toolgrid { gap: 16px; }
 }
 
 @media (max-width: 860px) {
@@ -613,4 +632,40 @@ html[data-theme="light"] body.qf-wft a.qf-toolgrid-head__all:not(.btn):not(.nav-
      two buttons end up the same width on every card, which is the cleanest
      reading of "aligned" once the cards are stacked. */
   .qf-toolbtn { flex: 1 1 0; }
+}
+
+/* BELOW 375 THE ROW STOPS BEING HONEST. A card is ~238px of content at 320px,
+   and two labelled CTAs plus their chrome need 268px at the widest pair
+   ("Search carriers" + "By capability"). Something has to give, and the choices
+   are: clip a CTA label, shrink the type below 14px, or stack. Stacking is the
+   only one that keeps every label readable — so at these widths EVERY card in
+   both grids stacks its two buttons full-width.
+
+   That is not a retreat from the rule this wave exists to enforce, it IS the
+   rule: no card may differ from its siblings. Above 375 they all sit on one
+   row; below it they all stack. What is forbidden is one card doing something
+   its neighbours do not, and neither branch does that.
+
+   375 itself stays on one row, with 25px of slack at the widest pair. */
+@media (max-width: 374px) {
+  .qf-toolcard__actions { flex-wrap: wrap; }
+  .qf-toolbtn { flex: 1 1 100%; }
+}
+
+/* AND THE HERO'S 3-UP IS CRAMPED BETWEEN 701 AND 920, for the same reason at a
+   different width. Below 701 the cards are one per row and have the whole card
+   to work with; above 920 a third of the container is enough. In between the
+   three columns are 180-230px of content, and the widest pair — "Find
+   carriers" + "Compliance" — overran its own button by up to 12px. Measured
+   per button, scrollWidth against clientWidth, every 20px across 700-1120: the
+   band is 705 to ~840, and 920 is where it is with real margin rather than
+   where it stops by a pixel.
+
+   So all three stack there, which is what they did before this wave and is
+   still uniform across the row. The tool bento is NOT in this rule: its 2-up
+   columns clear the same pair by 18px at 705 and by 108px at 925, measured the
+   same way, so it stays on one row throughout. */
+@media (min-width: 701px) and (max-width: 920px) {
+  .qf-hhero__cards .qf-toolcard__actions { flex-wrap: wrap; }
+  .qf-hhero__cards .qf-toolbtn { flex: 1 1 100%; }
 }
