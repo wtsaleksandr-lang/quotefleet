@@ -1,0 +1,177 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   HOMEPAGE — THE PARTNER LOGO MARQUEE
+   ---------------------------------------------------------------------------
+   A left-aligned two-tone heading (the carrier count in ink, the descriptor in
+   the muted tone) above a horizontal strip of soft off-white tiles that scrolls
+   continuously.
+
+   THIS SHEET IS LOADED CONDITIONALLY.  src/server/home/homeSections.ts injects
+   the <link> into the homepage's <head> only when HOME_PARTNER_LOGOS is
+   non-empty. While the marquee is empty this file is never requested, so an
+   empty marquee costs the page nothing — no markup, no stylesheet, no script.
+
+   ── THE KEYFRAME, WHICH IS A DELIBERATE, SCOPED EXCEPTION ────────────────
+   The design law on this page is zero keyframes, and every other component
+   here honours it. A marquee cannot: continuous motion IS the component, and
+   there is no transition-based way to express "forever". So this sheet carries
+   exactly ONE named animation, `qf-logo-marquee-scroll`, and nothing else in
+   the bundle may use it. It is contained by four rules:
+
+     1. It only ever applies to `.qf-marquee__track`.
+     2. It is PAUSED by default and runs only while the strip is on screen —
+        `.qf-marquee.is-inview`, set by landing-logo-marquee.js. An animation
+        ticking in a background tab is a battery cost with nobody watching.
+     3. It cannot run when there is nothing to scroll: the section is not
+        rendered at all when the logo array is empty.
+     4. `prefers-reduced-motion: reduce` turns it off entirely and the strip
+        becomes a manually scrollable row (see the block at the foot).
+
+   ── HOW THE LOOP IS SEAMLESS ─────────────────────────────────────────────
+   The track holds TWO identical rows laid end to end and slides the pair left
+   by exactly half its own width. At the end of the cycle row B occupies the
+   pixels row A started in, so the reset is invisible; no measurement, no JS,
+   no bounce. `linear` timing is what keeps the speed constant — an eased
+   marquee visibly stutters at the loop point. 60s is slow on purpose.
+
+   DESIGN LAW OTHERWISE UNCHANGED.  Tokens only; zero gradients; zero
+   backdrop-filter; radii 6/8/12; spacing on {0,4,8,12,16,24,32,48,60,80,120};
+   tiles do not lift on hover.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+html body.qf-wft.landing-v2 .qf-marquee-section {
+  padding: 0 0 80px !important;
+}
+
+/* Left-aligned, per the house rule that page and card headers are never
+   centred. Two-tone: count in ink, descriptor muted. */
+html body.qf-wft h2.qf-marquee-head {
+  margin: 0 0 32px 0;
+  padding: 0;
+  font-family: var(--font-sans);
+  font-size: 32px;
+  font-weight: 500;
+  line-height: 1.25;
+  letter-spacing: -1.28px;
+  color: var(--ink);
+  text-align: left;
+}
+html body.qf-wft .qf-marquee-head .qf-marquee-head__n { color: var(--ink); }
+html body.qf-wft .qf-marquee-head .qf-marquee-head__soft { color: var(--muted-soft); }
+
+/* The viewport. `overflow: clip` rather than `hidden` — `hidden` makes this an
+   ancestor scroll container, which breaks `position: sticky` on the page's
+   header in embedded contexts. */
+.qf-marquee {
+  overflow: clip;
+  width: 100%;
+}
+
+.qf-marquee__track {
+  display: flex;
+  width: max-content;
+  animation: qf-logo-marquee-scroll 60s linear infinite;
+  /* Paused until the strip is actually on screen (see rule 2 in the header). A
+     visitor with JS off never gets `.is-inview`, so they get a STATIC strip
+     rather than a broken one — the tiles are all still there to read. */
+  animation-play-state: paused;
+  will-change: transform;
+}
+.qf-marquee.is-inview .qf-marquee__track {
+  animation-play-state: running;
+}
+
+@keyframes qf-logo-marquee-scroll {
+  from { transform: translate3d(0, 0, 0); }
+  to   { transform: translate3d(-50%, 0, 0); }
+}
+
+.qf-marquee__row {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: stretch;
+  gap: 24px;
+  /* The gap between the two rows has to match the gap INSIDE a row, or the
+     seam shows as a wide or narrow join once per cycle. */
+  margin: 0 24px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* A tile: soft off-white card, 12px radius, reserved 1px border so nothing
+   shifts. No shadow and no hover lift — the strip is a backdrop, not a menu. */
+.qf-logo-tile {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 180px;
+  height: 96px;
+  padding: 16px 24px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.qf-logo-tile__link {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  text-decoration: none;
+}
+
+.qf-logo-tile__img {
+  display: block;
+  max-width: 100%;
+  max-height: 100%;
+  width: auto;
+  height: auto;
+  object-fit: contain;
+}
+
+/* The no-artwork fallback: the company's own initials, exactly as a carrier
+   profile renders them when it has no logo (directory/pages.ts). */
+.qf-logo-tile__mono {
+  font-family: var(--font-sans);
+  font-size: 24px;
+  font-weight: 600;
+  line-height: 1.5;
+  letter-spacing: 1px;
+  color: var(--muted);
+}
+
+/* ── Breakpoints ─────────────────────────────────────────────────────────── */
+
+@media (max-width: 1100px) {
+  html body.qf-wft h2.qf-marquee-head { font-size: 28px; letter-spacing: -1.12px; }
+}
+
+@media (max-width: 860px) {
+  html body.qf-wft h2.qf-marquee-head { font-size: 24px; letter-spacing: -0.96px; margin-bottom: 24px; }
+  .qf-logo-tile { width: 148px; height: 80px; padding: 16px; }
+}
+
+@media (max-width: 560px) {
+  html body.qf-wft.landing-v2 .qf-marquee-section { padding: 0 0 48px !important; }
+  html body.qf-wft h2.qf-marquee-head { font-size: 22px; letter-spacing: -0.66px; }
+  .qf-logo-tile { width: 132px; height: 72px; }
+  .qf-marquee__row { gap: 16px; margin-right: 16px; }
+}
+
+/* ── REDUCED MOTION ──────────────────────────────────────────────────────── */
+/* No animation at all, and the duplicate row is removed so a screen full of
+   repeated tiles does not read as a list of twice as many partners. What is
+   left is an honest, manually scrollable strip: the real tiles, in one row,
+   draggable/swipeable if they overflow. */
+@media (prefers-reduced-motion: reduce) {
+  .qf-marquee {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  .qf-marquee__track {
+    animation: none;
+    will-change: auto;
+  }
+  .qf-marquee__row[aria-hidden="true"] { display: none; }
+}

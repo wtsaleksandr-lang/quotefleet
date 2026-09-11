@@ -75,6 +75,7 @@ import { captureException } from './errorMonitoring.js';
 import { hostInfoMiddleware } from './hostInfo.js';
 import { applyAuthChrome, applyFullSiteHeader, verifySiteChromeSlots } from './siteChrome.js';
 import { applyFmcsaFreshness } from './directory/fmcsaFreshness.js';
+import { applyHomeSections, verifyHomeSectionSlots } from './home/homeSections.js';
 import { registerPartnersRoutes } from './routes/partners.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -504,6 +505,10 @@ export function createApp(): express.Express {
     ...fullHeaderPages.map(([, file]) => ({ file, variant: 'full' as const })),
     ...authChromePages.map(([, file]) => ({ file, variant: 'auth' as const })),
   ]);
+  // Same discipline for the homepage's two below-the-grid slots: a landing.html
+  // that lost one of them would otherwise render a page silently missing a
+  // whole section. Fails createApp() instead.
+  verifyHomeSectionSlots(publicDir);
   // The standalone /marketplace page has been retired in favour of the richer,
   // faceted /directory (same carriers, filters, RFQ + export). See
   // registerMarketplaceRedirects — only the PAGE is retired; the marketplace
@@ -558,7 +563,15 @@ export function createApp(): express.Express {
     // DB dependency and no added latency; when the vintage is unknown the page's
     // own fallback copy stands, and that fallback is itself truthful. This exists
     // because the page used to hard-code "Synced daily" against a weekly cron.
+    //
+    // applyHomeSections fills the two below-the-bento-grid slots: the hidden
+    // legacy band (empty while HOME_LEGACY_SECTIONS_ENABLED is false — see
+    // home/homeSections.ts for the one-line restore) and the logo marquee
+    // (empty while HOME_PARTNER_LOGOS is). Like the freshness injector it is
+    // synchronous and reads a process-local cache, so the homepage still has
+    // no request-path DB dependency.
     return void readFile(resolve(publicDir, 'landing.html'), 'utf8')
+      .then((raw) => applyHomeSections(raw))
       .then((html) => res.type('html').send(applyFmcsaFreshness(applyFullSiteHeader(html, 'landing.html'))))
       .catch(next);
   });

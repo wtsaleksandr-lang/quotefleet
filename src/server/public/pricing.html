@@ -304,7 +304,12 @@
       Need multi-company, API, or white-glove setup? <a href="mailto:hello@quotefleet.net">Talk to us</a>.
     </p>
 
-    <section class="qf-faq">
+    <!-- `id="faq"` is the shared footer's FAQ destination (siteChrome.ts). It
+         moved here on 2026-09-11 when the homepage's FAQ block came off the
+         live page: this is now the site's one visible FAQ, and it already
+         carried its own FAQPage graph, so the link and the structured data
+         point at the same answers. -->
+    <section class="qf-faq" id="faq">
       <h2>Questions, answered</h2>
 
       <details class="qf-faq-item">

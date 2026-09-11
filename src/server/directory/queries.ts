@@ -960,6 +960,28 @@ export async function getPersistedCarrierDataAsOf(): Promise<Date | null> {
   }
 }
 
+/**
+ * The DIRECTORY-WIDE CARRIER TOTAL for marketing surfaces, read from the
+ * persisted singleton only. Same contract as getPersistedCarrierDataAsOf above,
+ * and for the same reason: the homepage must never be able to trigger the live
+ * ~330k-row scan, so this stops at the PK lookup and answers `null` when the
+ * singleton has not been populated yet. A `null` is not an error — the caller
+ * omits the claim rather than printing a number it cannot source. Never throws.
+ *
+ * `0` is a legitimate answer (an empty directory) and is returned as `0`, not
+ * folded into `null`; the caller decides what an empty directory means for it.
+ */
+export async function getPersistedCarrierTotal(): Promise<number | null> {
+  try {
+    const persisted = await loadPersistedAggregates();
+    const total = persisted?.summary?.total;
+    return typeof total === 'number' && Number.isFinite(total) && total >= 0 ? total : null;
+  } catch (err) {
+    console.warn('[directory] getPersistedCarrierTotal failed (non-fatal):', err);
+    return null;
+  }
+}
+
 // ─── Faceted filter model ─────────────────────────────────────────────────
 //
 // Every facet is a real GET query param (shareable + crawlable). Facets are

@@ -1,0 +1,155 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   HOMEPAGE — THE PARTNER / EMBED BANNER
+   ---------------------------------------------------------------------------
+   One full-width card inside the 1328/24/1280 container, sitting directly under
+   the freight-tool bento grid. Centred stack: a small rounded-square icon tile,
+   a two-tone headline (the ask in ink, the qualifier in the muted tone), and a
+   single dark CTA with a trailing chevron.
+
+   WHY A NEW FILE.  Both CI guards key their baselines by `file:line`
+   (docs/design-refactor/baseline-protocol.md r1), so new component CSS goes in
+   a new file rather than mid-way through an existing sheet where it would
+   renumber every entry below it. It also keeps this band clear of the seven
+   sheets that re-declare `.hero`/`.section` with !important.
+
+   THE WASH IS NOT A GRADIENT.  The design law forbids CSS gradients, so this
+   card uses the SAME technique as the hero card (landing-home-grid.css §1): a
+   flat `--surface-hero` base with the two generated rasters over it —
+   `--surface-hero-grain` tiled at its natural 192px size, `--surface-hero-image`
+   cropped with `cover`. Both are decorative, so a failed image leaves the card
+   on the flat tint rather than white. See the Wave 5 block at the foot of
+   style.css for how the rasters are made (scripts/make-hero-wash.mjs).
+
+   DESIGN LAW.  Tokens only; zero gradients, zero backdrop-filter, zero
+   keyframes here; radii 6/8/12; spacing on {0,4,8,12,16,24,32,48,60,80,120};
+   motion `var(--motion)` on the control only. The card does not lift on hover —
+   only the button reacts.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+html body.qf-wft.landing-v2 .qf-partner-section {
+  padding: 0 0 80px !important;
+}
+
+/* The card. Anchored `50% 100%` like the hero card so the wash's deep base
+   stays pinned to the foot of the card at every crop width, and carrying the
+   same 1px `--border-strong` rim — at 375 the card is nearly the full viewport
+   and `cover` shows only the pale centre column, so the rim is what makes the
+   12px radius read as an edge. */
+.qf-partner-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 24px;
+  width: 100%;
+  padding: 80px 24px;
+  background-color: var(--surface-hero);
+  background-image: var(--surface-hero-grain), var(--surface-hero-image);
+  background-repeat: repeat, no-repeat;
+  background-position: 0 0, 50% 100%;
+  background-size: auto, cover;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  text-align: center;
+}
+
+/* Icon tile — a rounded SQUARE, not a circle, so it echoes the card's own
+   corner. Sits on `--surface` rather than the wash so the glyph keeps its
+   contrast wherever the crop happens to land. */
+.qf-partner-ico {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  color: var(--ink);
+}
+.qf-partner-ico svg {
+  display: block;
+  width: 24px;
+  height: 24px;
+}
+
+/* Two-tone headline. Same idiom as `.qf-toolgrid-head__soft` on the bento grid
+   above: the sentence leads in ink, the qualifier drops to the muted tone.
+   `--muted` (not `--muted-soft`) because this text is long enough to be read
+   rather than scanned and has to clear 4.5:1 on the wash. */
+html body.qf-wft .qf-partner-title {
+  max-width: 780px;
+  margin: 0;
+  padding: 0;
+  font-family: var(--font-sans);
+  font-size: 32px;
+  font-weight: 500;
+  line-height: 1.25;
+  letter-spacing: -1.28px;
+  color: var(--ink);
+  text-align: center;
+}
+html body.qf-wft .qf-partner-title .qf-partner-title__soft { color: var(--muted); }
+
+/* The one CTA. Dark primary, 8px radius, trailing chevron — the same
+   `--cta-*` tokens the bento grid's primary tool buttons use, so the page has
+   exactly one primary-button look. */
+.qf-partner-cta {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 12px 24px;
+  background: var(--cta-bg);
+  border: 1px solid var(--cta-bg);
+  border-radius: var(--radius-btn);
+  font-family: var(--font-sans);
+  font-size: 16px;
+  font-weight: 500;
+  line-height: 1.5;
+  color: var(--cta-text);
+  text-decoration: none;
+  transition: var(--motion);
+}
+.qf-partner-cta__chev {
+  flex: 0 0 auto;
+  width: 16px;
+  height: 16px;
+}
+html body.qf-wft .qf-partner-cta { color: var(--cta-text) !important; }
+html body.qf-wft .qf-partner-cta:hover {
+  background: var(--cta-bg-hover);
+  border-color: var(--cta-bg-hover);
+}
+.qf-partner-cta:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* LIGHT THEME — landing-wefixtrades-cleanup.css repaints every non-.btn link on
+   this page in the accent, with !important at (0,3,2). That lands on this CTA,
+   so it is answered here at (0,4,2), exactly as landing-home-grid.css §6 does
+   for the tool buttons. */
+html[data-theme="light"] body.qf-wft a.qf-partner-cta:not(.btn):not(.nav-link):not(.signin):not(.demo-link) {
+  color: var(--cta-text) !important;
+}
+
+/* ── Breakpoints ─────────────────────────────────────────────────────────── */
+
+@media (max-width: 1100px) {
+  html body.qf-wft .qf-partner-title { font-size: 28px; letter-spacing: -1.12px; }
+}
+
+@media (max-width: 860px) {
+  .qf-partner-card { padding: 48px 24px; gap: 24px; }
+  html body.qf-wft .qf-partner-title { font-size: 24px; letter-spacing: -0.96px; }
+}
+
+@media (max-width: 560px) {
+  html body.qf-wft.landing-v2 .qf-partner-section { padding: 0 0 48px !important; }
+  .qf-partner-card { padding: 32px 16px; }
+  html body.qf-wft .qf-partner-title { font-size: 22px; letter-spacing: -0.66px; }
+  /* The button goes full-bleed inside the card's padding rather than wrapping
+     its label onto a second line at 375. */
+  .qf-partner-cta { width: 100%; }
+}
