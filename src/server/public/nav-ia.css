@@ -127,19 +127,19 @@ html body.qf-wft .nav-dd--wide { position: static; }
 html body.qf-wft .nav-dd--wide > .nav-dd-panel { top: calc(100% + 8px); }
 
 /* READABILITY OVER MATERIAL. landing-glass.css paints the dropdown with
-   `--glass-ultra-bg` (0.58–0.60 alpha). On an interior page that sits over a
-   calm wash and reads fine; on the HOMEPAGE the panel opens directly over the
-   hero headline and the device mockups, and the menu's own link text competed
-   with the artwork showing through. The glass system's own hard rule is that
-   glass never sits behind body text, so the nav panel keeps the frosted blur but
-   takes the most opaque SOLID token (`--glass-card-solid`, 0.98) the glass
-   system already defines. At 0.94 the H1 still ghosted through the panel behind
-   the link column; 0.98 keeps the frosted edge and shadow with no ghost.
-   Both themes, tokens only. */
+   `--glass-ultra-bg`, and this rule used to answer it with --glass-card-solid:
+   the glass system's most opaque SOLID token, but still 0.98 alpha — 2% of
+   whatever the panel covers reaching the link text. It never actually rendered,
+   only because the chrome / WAVE 4 blocks further down this file are later at
+   equal specificity. A translucent fill aimed at this element with !important
+   and kept one cascade shuffle away from winning is not a material choice, it
+   is a latent regression, so it now names the same opaque chrome token the rest
+   of the flyout uses. Line count held so the guard baselines do not renumber.
+   Both themes, tokens only. Elevation and the edge: see WAVE 4 at EOF. */
 html body.qf-wft .nav-dd-panel,
 html[data-theme="light"] body.qf-wft .nav-dd-panel,
 html:not([data-theme="light"]) body.qf-wft .nav-dd-panel {
-  background: var(--glass-card-solid) !important;
+  background: var(--chrome-panel-bg) !important;
 }
 
 /* ── 3 — Audience toggle rides the hero column ──────────────────────────── */
@@ -551,3 +551,60 @@ html body.qf-wft .premium-footer .premium-footer-inner[data-cols="5"] {
     column-gap: 16px !important;
   }
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   WAVE 4 — FLYOUT ELEVATION (homepage copy).
+
+   The reasoning, the measurements and the interaction contract are written out
+   once at the foot of nav-unify.css; this is the same rule restated at the
+   `html body.qf-wft` specificity the homepage needs, because landing.html does
+   not load nav-unify.css and its own bundle (landing-footer-polish.css paints
+   this panel `rgb(20,24,30)`, landing-glass.css paints it at 0.98 alpha) would
+   otherwise out-cascade it. In one line: the fill was already opaque and the
+   pixel diff proves it — what the flyout lacked was an EDGE, so it takes the
+   largest of the three shadow tokens and a 1px --border-strong hairline (the
+   measurements behind that choice are in nav-unify.css), and the drawer gets
+   the z-index it never had.
+
+   --qf-shadow-lift is named directly, not via --shadow-lg, because the dark
+   theme re-points --shadow-lg at --qf-shadow-md; the lavender tint is the halo
+   that reads as elevation on a dark ground, where 4% black reads as nothing.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+html body.qf-wft .nav-dd-panel,
+html[data-theme="light"] body.qf-wft .nav-dd-panel,
+html:not([data-theme="light"]) body.qf-wft .nav-dd-panel,
+html body.qf-wft .site-mobile-menu:not([hidden]),
+html[data-theme="light"] body.qf-wft .site-mobile-menu:not([hidden]),
+html:not([data-theme="light"]) body.qf-wft .site-mobile-menu:not([hidden]) {
+  background-color: var(--chrome-panel-bg) !important;
+  background-image: none !important;
+  opacity: 1 !important;
+  border: 1px solid var(--border-strong) !important;
+  box-shadow: var(--qf-shadow-lift) !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  z-index: 80 !important;
+}
+
+/* Open motion — `.2s ease`, as a keyframe because the panel is revealed by
+   toggling `hidden` and `display` is not animatable. Opacity reaches 1 at 40%
+   of the 200ms so the settle is fully opaque: a see-through open would be the
+   reported bug in miniature. */
+@keyframes qf-flyout-in {
+  from { opacity: 0; transform: translateY(-4px); }
+  40%  { opacity: 1; }
+  to   { opacity: 1; transform: translateY(0); }
+}
+html body.qf-wft .nav-dd-panel:not([hidden]),
+html body.qf-wft .site-mobile-menu:not([hidden]) {
+  animation: qf-flyout-in .2s ease !important;
+}
+@media (prefers-reduced-motion: reduce) {
+  html body.qf-wft .nav-dd-panel:not([hidden]),
+  html body.qf-wft .site-mobile-menu:not([hidden]) { animation: none !important; }
+}
+
+/* The chat launcher stands down while the drawer is open — same stacking fix,
+   same reasoning as the block of that name at the foot of nav-unify.css. */
+html body:has(#site-burger[aria-expanded="true"]) .qf-mc-fab { display: none !important; }
