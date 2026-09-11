@@ -54,6 +54,7 @@ import {
   type ContainerPort,
 } from './containerPorts.js';
 import { CA_PROVINCE_CODES } from './caProvinces.js';
+import { hubRobotsDirective } from './indexQualityFloor.js';
 import {
   NATIONAL_DRIVER_OOS_RATE,
   NATIONAL_VEHICLE_OOS_RATE,
@@ -3660,6 +3661,13 @@ interface FacetedCfg {
    *  everything a facet change can alter — instead of the whole document. The
    *  root carries the new <title> + total as data-* for the client to apply. */
   partial?: boolean;
+  /** `<meta name="robots">` value, or undefined for the default (indexable).
+   *  Set by the generated hubs from the index quality floor — see
+   *  indexQualityFloor.ts. Undefined omits the tag, so a healthy hub's HTML is
+   *  unchanged. Never reached on the `partial` path: an in-page facet swap
+   *  replaces `.dir-layout` only and never rewrites <head>, which is exactly why
+   *  the floor is evaluated per REQUEST rather than per rendered fragment. */
+  robots?: string;
 }
 
 /** A carrier card with a top-right selection checkbox (sibling of the card link
@@ -3821,6 +3829,7 @@ function renderFacetedResults(cfg: FacetedCfg): string {
     jsonLd: cfg.jsonLd,
     relPrev,
     relNext,
+    robots: cfg.robots,
   });
 }
 
@@ -4543,6 +4552,18 @@ export function renderCityPage(opts: {
   const otherCities = cities.filter((c) => c.slug !== city.slug).slice(0, 23);
   return renderFacetedResults({
     partial: opts.partial,
+    // INDEX QUALITY FLOOR (indexQualityFloor.ts). `list.total` is the total
+    // matching THIS view, not the rows on this page, so:
+    //   • unfiltered hub → the city's real carrier count, i.e. the exact number
+    //     the sitemap filters on, so page and sitemap can never disagree about
+    //     the URLs the sitemap actually contains;
+    //   • every /page/N of that series → the same total, so the whole paginated
+    //     series agrees with itself instead of flipping at the last page;
+    //   • a facet that narrows a real city to a handful of rows → correctly
+    //     thin, and noindexed. That is the case the `cityDisplayName` guard in
+    //     routes/directory.ts warns about (a facet narrowing a city to zero
+    //     rows still rendering an indexable page); it is now closed.
+    robots: hubRobotsDirective(list.total),
     scope,
     list,
     counts,
@@ -4643,6 +4664,12 @@ export function renderPortPage(opts: {
       .join('\n')}`;
   return renderFacetedResults({
     partial: opts.partial,
+    // Same index quality floor as the city hubs. Measured 2026-09-11 across all
+    // 60 live port/intermodal hubs: 56 are healthy (min 157, median 4,059, max
+    // 28,194 carriers) and FOUR list zero — CAPRR, INLSAS, INLREG, INLEDM, the
+    // Canadian inland ramps, which have no carriers mapped to them at all. Those
+    // four were being submitted to Google as empty result pages.
+    robots: hubRobotsDirective(list.total),
     scope,
     list,
     counts,

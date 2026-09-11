@@ -24,8 +24,16 @@
  * DOCUMENT KEYS (one row each in sitemap_cache):
  *   'index'        → <sitemapindex> referencing every child below.
  *   'pages'        → <urlset> of marketing + /directory + /compliance + all state
- *                    hubs + all port hubs (a small fixed set, no carrier scan).
- *   'cities'       → <urlset> of every REAL city hub (/directory/{state}/{city}).
+ *                    hubs + every port hub that clears the index quality floor.
+ *   'cities'       → <urlset> of every city hub (/directory/{state}/{city}) that
+ *                    clears the INDEX QUALITY FLOOR (indexQualityFloor.ts).
+ *
+ * THE QUALITY FLOOR IS A DISCOVERY RULE, NOT AN ACCESS RULE. A hub below the
+ * floor still returns 200, still renders, and is still linked from its state's
+ * A–Z city index — it just carries `noindex, follow` and is not advertised here.
+ * Submitting a URL while telling Google not to index it is a contradictory
+ * signal, so the renderer and this document read the SAME predicate off the SAME
+ * live carrier counts; neither owns a list.
  *   'carriers-<n>' → <urlset> of ≤SITEMAP_MAX_URLS carrier profiles (~7 for 334k).
  *   'guides'       → <urlset> of every PUBLISHED /guides article. Its own child
  *                    (not folded into 'pages') because it is the one DB-backed
@@ -38,7 +46,8 @@ import { HUB_COVERED_STATES, OSOW_HUB_PATH } from '../osow/hubData.js';
 import { db } from '../../db/client.js';
 import { carrierDirectory, sitemapCache } from '../../db/schema.js';
 import { US_STATES } from './usStates.js';
-import { PORT_GROUPS } from './containerPorts.js';
+import { PORT_GROUPS, portGroupByCode, portGroupForMemberCode } from './containerPorts.js';
+import { isIndexableHub } from './indexQualityFloor.js';
 import { GLOSSARY_TERMS } from './glossary.js';
 import { SERVICES } from './servicePages.js';
 import { DRAYAGE_RATE_SLUGS } from './drayageRatePages.js';
@@ -337,7 +346,14 @@ const MARKETING_ROUTES: Array<{ path: string; changefreq: string; priority: stri
  * profiles and answers a real head-term query. State and port hubs are 0.7 for
  * exactly that reason.
  */
-export function staticPageEntries(): Array<{ path: string; changefreq: string; priority: string }> {
+export function staticPageEntries(
+  /** Paths to withhold — the hubs in this list that fall below the index quality
+   *  floor (indexQualityFloor.ts) and therefore render `noindex, follow`.
+   *  Supplied by the off-path rebuild, which is the only caller that has the live
+   *  counts; defaults to empty so the pure builders stay synchronous and every
+   *  existing caller keeps its current output. */
+  excludePaths: ReadonlySet<string> = new Set(),
+): Array<{ path: string; changefreq: string; priority: string }> {
   const out: Array<{ path: string; changefreq: string; priority: string }> = [...MARKETING_ROUTES];
   // One page per state in the seasonal-restriction registry, generated FROM the
   // registry rather than listed by hand: adding a state to `sources.ts` adds its
@@ -391,15 +407,16 @@ export function staticPageEntries(): Array<{ path: string; changefreq: string; p
   for (const slug of DRAYAGE_RATE_SLUGS) {
     out.push({ path: `/drayage-rates/${slug}`, changefreq: 'monthly', priority: '0.7' });
   }
-  return out;
+  return excludePaths.size ? out.filter((e) => !excludePaths.has(e.path)) : out;
 }
 
 /** Build the 'pages' child <urlset>: marketing + directory landing + every state
- *  hub + every port hub. NO carrier scan. lastmod is the recompute time. */
-export function buildPagesXml(now = new Date()): string {
+ *  hub + every port hub that clears the index quality floor. NO carrier scan.
+ *  lastmod is the recompute time. */
+export function buildPagesXml(now = new Date(), excludePaths: ReadonlySet<string> = new Set()): string {
   const lastmod = fmtLastmod(now, now);
   return buildUrlset(
-    staticPageEntries().map((r) => ({
+    staticPageEntries(excludePaths).map((r) => ({
       loc: `${SITE}${xmlEscape(r.path)}`,
       lastmod,
       changefreq: r.changefreq,
@@ -410,8 +427,8 @@ export function buildPagesXml(now = new Date()): string {
 
 /** Total <url> count of the 'pages' document — read from the same list the
  *  builder uses, so the two can never drift (persisted as url_count). */
-export function pagesUrlCount(): number {
-  return staticPageEntries().length;
+export function pagesUrlCount(excludePaths: ReadonlySet<string> = new Set()): number {
+  return staticPageEntries(excludePaths).length;
 }
 
 /** Build the <sitemapindex> from the set of child document keys that exist. */
@@ -448,12 +465,19 @@ async function boundedScan<T>(budgetMs: number, fn: (tx: Parameters<Parameters<R
  * the ORDER BY makes this a plain sequential scan — strictly cheaper than the
  * ordered scan it replaces.
  *
- * The SCORE is computed server-side so the wire payload stays three small
+ * The SCORE is computed server-side so the wire payload stays a few small
  * columns instead of the ~13 the scorer reads. A full scan is unavoidable here
  * by definition: the sitemap must enumerate every carrier. It is bounded by
  * `SET LOCAL statement_timeout` and runs only from the off-path rebuild.
+ *
+ * PORT TOTALS RIDE ALONG on this scan rather than costing a second one. The port
+ * hubs need a per-hub carrier count to apply the index quality floor, and that
+ * is one `nearest_port_code` per row — six more characters on a payload that
+ * already carries four columns — tallied in JS here. A separate `group by
+ * nearest_port_code` query would be a whole extra bounded transaction on a path
+ * whose entire design rule is "as few round-trips off the hot path as possible".
  */
-async function fetchAllCarrierRows(): Promise<CarrierSitemapRow[]> {
+async function fetchAllCarrierRows(): Promise<{ carriers: CarrierSitemapRow[]; portTotals: Map<string, number> }> {
   return boundedScan(OFFPATH_SCAN_BUDGET_MS, async (tx) => {
     const rows = await tx
       .select({
@@ -461,31 +485,59 @@ async function fetchAllCarrierRows(): Promise<CarrierSitemapRow[]> {
         updatedAt: carrierDirectory.updatedAt,
         score: sql<number>`${sql.raw(richnessScoreSql())}`.as('score'),
         powerUnits: carrierDirectory.powerUnits,
+        nearestPortCode: carrierDirectory.nearestPortCode,
       })
       .from(carrierDirectory);
-    return rows.map((r) => ({
-      slug: r.slug,
-      updatedAt: r.updatedAt,
-      score: Number(r.score) || 0,
-      powerUnits: r.powerUnits,
-    }));
+    const portTotals = new Map<string, number>();
+    const carriers = rows.map((r) => {
+      // Tally by GROUP code: /directory/port/USLAX serves the whole LA/Long Beach
+      // group (a member code 301s to it), so a group clears the floor on its
+      // members' COMBINED carriers, which is exactly what its page will render.
+      const group = portGroupForMemberCode(r.nearestPortCode) ?? portGroupByCode(r.nearestPortCode);
+      if (group) portTotals.set(group.code, (portTotals.get(group.code) ?? 0) + 1);
+      return {
+        slug: r.slug,
+        updatedAt: r.updatedAt,
+        score: Number(r.score) || 0,
+        powerUnits: r.powerUnits,
+      };
+    });
+    return { carriers, portTotals };
   });
 }
 
-/** Every REAL city hub — one (state, city) group per distinct city, resolved to a
- *  (stateSlug, citySlug) and deduped (case/spacing variants collapse to one slug).
- *  Only US states are emitted (matches the browse grid). OFF-PATH only. */
+/**
+ * Every city hub that CLEARS THE INDEX QUALITY FLOOR — one (state, city) group
+ * per distinct city, resolved to a (stateSlug, citySlug) and deduped (case/
+ * spacing variants collapse to one slug). Only US states are emitted (matches the
+ * browse grid). OFF-PATH only.
+ *
+ * THE FLOOR (indexQualityFloor.ts): a hub listing fewer than
+ * HUB_INDEX_MIN_CARRIERS carriers renders `noindex, follow`, so advertising it
+ * here would submit a URL we are simultaneously telling Google not to index —
+ * a contradictory signal, and 54% of this document by measured volume. Such hubs
+ * stay fully reachable (the state city-index pages still link every one of them,
+ * which is what keeps the carrier profiles beneath them crawlable); they simply
+ * stop being *advertised*.
+ *
+ * THE COUNT IS SUMMED AFTER SLUG DEDUP, NOT FILTERED IN SQL. "ST. PAUL" and
+ * "ST PAUL" are two `group by city` rows but ONE hub, and the page at that hub
+ * matches on the slugified form (queries.ts `cityCondition`) so it renders BOTH
+ * variants' carriers. Filtering per raw-spelling row would drop a hub whose
+ * variants each fall under the floor but which together clear it — i.e. it would
+ * noindex a page that renders plenty of carriers. Summing first is what keeps
+ * this query's answer identical to what the renderer will compute.
+ */
 async function fetchAllCityHubs(): Promise<Array<{ stateSlug: string; citySlug: string }>> {
   const stateSlugByCode = new Map(US_STATES.map((s) => [s.code, s.slug]));
   const rows = await boundedScan(OFFPATH_SCAN_BUDGET_MS, async (tx) =>
     tx
-      .select({ state: carrierDirectory.state, city: carrierDirectory.city })
+      .select({ state: carrierDirectory.state, city: carrierDirectory.city, n: sql<number>`count(*)::int` })
       .from(carrierDirectory)
       .where(sql`${carrierDirectory.city} is not null and ${carrierDirectory.city} <> '' and ${carrierDirectory.state} is not null`)
       .groupBy(carrierDirectory.state, carrierDirectory.city),
   );
-  const seen = new Set<string>();
-  const hubs: Array<{ stateSlug: string; citySlug: string }> = [];
+  const totals = new Map<string, { stateSlug: string; citySlug: string; total: number }>();
   for (const r of rows) {
     const code = (r.state ?? '').toUpperCase();
     const stateSlug = stateSlugByCode.get(code);
@@ -493,13 +545,35 @@ async function fetchAllCityHubs(): Promise<Array<{ stateSlug: string; citySlug: 
     const citySlug = citySlugify(r.city ?? '');
     if (!citySlug) continue;
     const dedup = `${stateSlug}/${citySlug}`;
-    if (seen.has(dedup)) continue;
-    seen.add(dedup);
-    hubs.push({ stateSlug, citySlug });
+    const cur = totals.get(dedup);
+    if (cur) cur.total += r.n ?? 0;
+    else totals.set(dedup, { stateSlug, citySlug, total: r.n ?? 0 });
   }
+  const hubs = [...totals.values()]
+    .filter((h) => isIndexableHub(h.total))
+    .map((h) => ({ stateSlug: h.stateSlug, citySlug: h.citySlug }));
   // Stable output order so the materialized doc is deterministic across recomputes.
   hubs.sort((a, b) => (a.stateSlug === b.stateSlug ? a.citySlug.localeCompare(b.citySlug) : a.stateSlug.localeCompare(b.stateSlug)));
   return hubs;
+}
+
+/**
+ * The `/directory/port/{code}` paths that fall BELOW the index quality floor and
+ * must therefore be withheld from the 'pages' document — derived from the port
+ * tallies the carrier scan already produced, so this costs no query at all.
+ *
+ * EVERY group is considered, not just the ones the tally mentions: a hub with no
+ * carriers mapped to it never appears in `portTotals`, and an EMPTY hub is
+ * precisely what this is looking for. Iterating PORT_GROUPS (rather than the
+ * tally's keys) is what makes a zero-carrier hub visible instead of silently
+ * absent. Pure and exported for the unit test.
+ */
+export function thinPortPathsFrom(portTotals: ReadonlyMap<string, number>): Set<string> {
+  const thin = new Set<string>();
+  for (const g of PORT_GROUPS) {
+    if (!isIndexableHub(portTotals.get(g.code) ?? 0)) thin.add(`/directory/port/${g.code}`);
+  }
+  return thin;
 }
 
 // ─── Materialize (off the request path) ────────────────────────────────────
@@ -572,8 +646,14 @@ interface SitemapRecomputeResult {
 
 async function recomputeAndPersistSitemapInner(): Promise<SitemapRecomputeResult> {
   const now = new Date();
-  const carriers = sortCarriersByRichness(await fetchAllCarrierRows());
+  const scan = await fetchAllCarrierRows();
+  const carriers = sortCarriersByRichness(scan.carriers);
   const cityHubs = await fetchAllCityHubs();
+  // Port hubs below the index quality floor render `noindex, follow`, so they are
+  // withheld from 'pages' for the same reason thin city hubs are withheld from
+  // 'cities': never advertise a URL you are telling Google not to index. Derived
+  // from the scan above — no extra round-trip.
+  const thinPortPaths = thinPortPathsFrom(scan.portTotals);
   // Published guides only — the store helper applies the status filter, so this
   // caller cannot accidentally advertise a draft.
   const { listPublishedGuides } = await import('../seo/store.js');
@@ -586,7 +666,7 @@ async function recomputeAndPersistSitemapInner(): Promise<SitemapRecomputeResult
   const docs: SitemapDoc[] = [];
 
   // 'pages' + 'cities' children.
-  docs.push({ key: 'pages', xml: buildPagesXml(now), urlCount: pagesUrlCount() });
+  docs.push({ key: 'pages', xml: buildPagesXml(now, thinPortPaths), urlCount: pagesUrlCount(thinPortPaths) });
   docs.push({ key: 'cities', xml: buildCitiesXml(cityHubs, now), urlCount: cityHubs.length });
   docs.push({ key: 'guides', xml: buildGuidesXml(guides, now), urlCount: guides.length });
 
@@ -622,7 +702,9 @@ async function recomputeAndPersistSitemapInner(): Promise<SitemapRecomputeResult
     carriers: carriers.length,
     cities: cityHubs.length,
     families: {
-      pagePaths: staticPageEntries().map((e) => e.path),
+      // Same exclusion as the document itself: IndexNow must never announce a
+      // URL the sitemap withheld, or the two discovery channels contradict.
+      pagePaths: staticPageEntries(thinPortPaths).map((e) => e.path),
       cityHubs,
       guides,
     },
