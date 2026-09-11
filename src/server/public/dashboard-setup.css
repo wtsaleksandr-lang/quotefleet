@@ -76,10 +76,9 @@
   color: var(--ink-soft);
   text-align: left;
   cursor: pointer;
-  transition: transform .16s ease, border-color .16s ease, background .16s ease;
+  transition: all .2s ease;
 }
 .qf-setup-step:hover {
-  transform: translateY(-2px);
   border-color: rgba(13, 60, 252, .36);
   background: rgba(13, 60, 252, .055);
 }
@@ -210,7 +209,7 @@ html[data-theme="light"] .qf-setup-empty,
 html[data-theme="light"] .qf-onboarding-panel {
   border-color: rgba(184, 207, 245, 0.72);
   background: #ffffff;
-  box-shadow: 0 16px 42px rgba(37, 34, 99, 0.06);
+  box-shadow: var(--qf-shadow-md);
 }
 html[data-theme="light"] .qf-onboarding-question { border-color: rgba(184,207,245,.74); background: rgba(255,255,255,.84); }
 /* Phase P2: onboarding progress clarity, current-step cue, primary action,

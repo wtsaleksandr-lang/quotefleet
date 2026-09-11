@@ -34,7 +34,7 @@
   padding: 10px 16px; font-size: 14px; font-weight: 600;
   color: #fff; background: var(--accent-fill);
   border: 1px solid var(--accent-fill); border-radius: var(--radius);
-  cursor: pointer; transition: filter .14s ease, transform .1s ease;
+  cursor: pointer; transition: all .2s ease;
 }
 .qf-addons-add-btn:hover { filter: brightness(1.08); }
 .qf-addons-add-btn:active { transform: translateY(1px); }
@@ -65,7 +65,7 @@
 .qf-addon-card {
   padding: 14px 16px; background: var(--surface);
   border: 1px solid var(--border); border-radius: var(--radius);
-  transition: border-color .14s ease;
+  transition: all .2s ease;
 }
 .qf-addon-card:hover { border-color: var(--border-strong); }
 
@@ -95,7 +95,7 @@
   display: inline-flex; align-items: center; justify-content: center;
   color: var(--muted); background: transparent;
   border: 1px solid var(--border); border-radius: 8px; cursor: pointer;
-  transition: color .14s ease, border-color .14s ease, background .14s ease;
+  transition: all .2s ease;
 }
 .qf-addon-del:hover { color: var(--error); border-color: var(--error); background: rgba(209, 67, 67, 0.08); }
 .qf-addon-del:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }

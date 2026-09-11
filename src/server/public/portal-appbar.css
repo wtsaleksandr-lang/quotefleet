@@ -112,7 +112,7 @@ html[data-theme="light"] .sidebar .brand-block a.sub {
   text-overflow: ellipsis;
   overflow-wrap: normal;
   word-break: normal;
-  transition: color 0.15s ease, background 0.15s ease;
+  transition: all .2s ease;
 }
 .sidebar .brand-block a.sub:hover,
 .sidebar .brand-block a.sub:focus-visible {

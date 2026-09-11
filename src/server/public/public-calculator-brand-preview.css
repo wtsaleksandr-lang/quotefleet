@@ -71,7 +71,7 @@ body.qf-demo-brand-preview .qf-demo-logo-slot {
   font-weight: 850;
   line-height: 1.05;
   text-align: center;
-  box-shadow: 0 8px 18px -16px rgba(15,23,42,.48);
+  box-shadow: var(--qf-shadow-md);
   cursor: pointer;
 }
 
@@ -79,7 +79,7 @@ body.qf-demo-brand-preview .qf-demo-logo-slot:hover,
 body.qf-demo-brand-preview .qf-demo-logo-slot:focus-visible {
   border-color: var(--w-primary);
   outline: none;
-  box-shadow: 0 0 0 4px color-mix(in srgb, var(--w-primary) 14%, transparent), 0 8px 18px -16px rgba(15,23,42,.48);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--w-primary) 14%, transparent), var(--qf-shadow-md);
 }
 
 body.qf-demo-brand-preview .qf-demo-logo-slot em {

@@ -113,7 +113,7 @@ tr.qf-zone-hidden-by-filter { display: none; }
 html[data-theme="light"] .qf-zone-health {
   border-color: rgba(184, 207, 245, 0.72);
   background: #ffffff;
-  box-shadow: 0 16px 42px rgba(37, 34, 99, 0.06);
+  box-shadow: var(--qf-shadow-md);
 }
 
 html[data-theme="light"] .qf-zone-health-head {

@@ -25,17 +25,17 @@
 
 :root {
   /* Ultra-thin (nav bar, Solutions dropdown — chrome that content slides under) */
-  --glass-ultra-bg: rgba(255, 255, 255, 0.60);
+  --glass-ultra-bg: rgb(255, 255, 255);
   --glass-ultra-brd: rgba(255, 255, 255, 0.50);
   /* Thin (finder / search shells, toggle track — chrome around inputs) */
-  --glass-thin-bg: rgba(255, 255, 255, 0.50);
+  --glass-thin-bg: rgb(255, 255, 255);
   --glass-thin-brd: rgba(255, 255, 255, 0.35);
   /* Regular (content cards that hold body paragraphs — kept ≥0.55 for AA text) */
-  --glass-card-bg: rgba(255, 255, 255, 0.72);
+  --glass-card-bg: rgb(255, 255, 255);
   --glass-card-brd: rgba(15, 37, 64, 0.10);
   /* Shared depth + geometry */
-  --glass-shadow: 0 8px 32px rgba(10, 37, 64, 0.10);
-  --glass-shadow-hover: 0 14px 40px rgba(10, 37, 64, 0.16);
+  --glass-shadow: var(--qf-shadow-md);
+  --glass-shadow-hover: var(--qf-shadow-md);
   --glass-radius: 18px;
   /* Opaque fallbacks (no backdrop-filter support) — legible, not translucent */
   --glass-ultra-solid: rgba(255, 255, 255, 0.94);
@@ -45,14 +45,14 @@
 
 html[data-theme="dark"],
 html:not([data-theme="light"]) {
-  --glass-ultra-bg: rgba(18, 22, 26, 0.58);
+  --glass-ultra-bg: rgb(18, 22, 26);
   --glass-ultra-brd: rgba(255, 255, 255, 0.10);
-  --glass-thin-bg: rgba(22, 27, 33, 0.52);
+  --glass-thin-bg: rgb(22, 27, 33);
   --glass-thin-brd: rgba(255, 255, 255, 0.08);
-  --glass-card-bg: rgba(22, 27, 33, 0.66);
+  --glass-card-bg: rgb(22, 27, 33);
   --glass-card-brd: rgba(255, 255, 255, 0.10);
-  --glass-shadow: 0 8px 32px rgba(0, 0, 0, 0.35);
-  --glass-shadow-hover: 0 16px 44px rgba(0, 0, 0, 0.46);
+  --glass-shadow: var(--qf-shadow-md);
+  --glass-shadow-hover: var(--qf-shadow-md);
   --glass-ultra-solid: rgba(18, 22, 26, 0.94);
   --glass-thin-solid: rgba(22, 27, 33, 0.96);
   --glass-card-solid: rgba(24, 29, 35, 0.98);
@@ -171,7 +171,7 @@ html body.qf-wft .qf-aud-toggle {
 html body.qf-wft .qf-aud-seg.is-active {
   color: var(--ink) !important;
   background: var(--glass-thin-bg) !important;
-  box-shadow: inset 0 0 0 1px var(--accent), 0 2px 8px rgba(10, 37, 64, 0.12) !important;
+  box-shadow: inset 0 0 0 1px var(--accent), var(--qf-shadow-sm) !important;
 }
 html body.qf-wft .qf-aud-seg.is-active:hover { color: var(--ink) !important; }
 html body.qf-wft .qf-aud-toggle,
@@ -203,7 +203,7 @@ html[data-theme="light"] body.qf-wft .final-cta-card {
   background: var(--glass-card-bg) !important;
   border: 1px solid var(--glass-card-brd) !important;
   box-shadow: var(--glass-shadow) !important;
-  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease !important;
+  transition: all .2s ease !important;
 }
 html body.qf-wft .qf-dir-card,
 html body.qf-wft .qf-included-card,
@@ -228,7 +228,6 @@ html[data-theme="light"] body.qf-wft .qf-trust-card:hover,
 html[data-theme="light"] body.qf-wft .qf-wins-card:hover,
 html[data-theme="light"] body.qf-wft .use-card:hover,
 html[data-theme="light"] body.qf-wft .qf-ba-card:hover {
-  transform: translateY(-3px) !important;
   box-shadow: var(--glass-shadow-hover) !important;
   border-color: var(--accent) !important;
 }
@@ -236,12 +235,11 @@ html[data-theme="light"] body.qf-wft .qf-ba-card:hover {
 /* Smaller chrome (finder / search / directory preview cards) lift a touch less. */
 html body.qf-wft .qf-finder:hover,
 html body.qf-wft .qf-dir-search:hover {
-  transform: translateY(-2px) !important;
   box-shadow: var(--glass-shadow-hover) !important;
 }
 html body.qf-wft .qf-finder,
 html body.qf-wft .qf-dir-search {
-  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease !important;
+  transition: all .2s ease !important;
 }
 
 /* Directory-preview featured card keeps its brand-blue rail on top of the glass,

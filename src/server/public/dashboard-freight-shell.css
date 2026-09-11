@@ -16,8 +16,8 @@ html[data-theme="light"] {
   --accent-ink: #ffffff;
   --accent-2: #38bdf8;
   --accent-2-soft: rgba(56, 189, 248, 0.12);
-  --shadow-md: 0 16px 42px rgba(37, 34, 99, 0.08), 0 2px 8px rgba(15, 23, 42, 0.04);
-  --shadow-lg: 0 28px 80px rgba(37, 34, 99, 0.12);
+  --shadow-md: var(--qf-shadow-md);
+  --shadow-lg: var(--qf-shadow-md);
 }
 
 html[data-theme="light"] body {
@@ -35,7 +35,7 @@ html[data-theme="light"] .sidebar {
   border: 1px solid rgba(184, 207, 245, 0.72);
   border-radius: 24px;
   background: rgb(255, 255, 255);
-  box-shadow: 0 24px 70px rgba(37, 34, 99, 0.09);
+  box-shadow: var(--qf-shadow-md);
 }
 
 html[data-theme="light"] .sidebar .brand-block {
@@ -69,7 +69,7 @@ html[data-theme="light"] .sidebar .brand-block .name::before {
   font-size: 12px;
   font-weight: 950;
   letter-spacing: -0.04em;
-  box-shadow: 0 10px 22px color-mix(in srgb, var(--accent-fill) 20%, transparent);
+  box-shadow: var(--qf-shadow-md);
 }
 
 html[data-theme="light"] .sidebar .brand-block .sub {
@@ -142,7 +142,7 @@ html[data-theme="light"] .price-card,
 html[data-theme="light"] .feature-card {
   border-color: rgba(184, 207, 245, 0.68);
   background: rgba(255, 255, 255, 0.94);
-  box-shadow: 0 18px 46px rgba(37, 34, 99, 0.06);
+  box-shadow: var(--qf-shadow-md);
   border-radius: 20px;
 }
 
@@ -150,7 +150,7 @@ html[data-theme="light"] .btn-primary {
   background: #3b22f4;
   border-color: #3b22f4;
   color: #fff;
-  box-shadow: 0 12px 26px rgba(59, 34, 244, 0.18);
+  box-shadow: var(--qf-shadow-lift);
 }
 
 html[data-theme="light"] .btn-primary:hover {

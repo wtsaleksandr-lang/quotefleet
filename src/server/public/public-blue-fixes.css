@@ -50,7 +50,7 @@ body.qf-wft .qf-mc-head .dot,
 body.qf-public-wft .qf-mc-head .dot,
 body.qf-auth-wft .qf-mc-head .dot {
   background: #0d3cfc !important;
-  box-shadow: 0 0 8px rgba(13,60,252,.65) !important;
+  box-shadow: var(--qf-shadow-lift) !important;
 }
 
 body.qf-wft .qf-mc-send,

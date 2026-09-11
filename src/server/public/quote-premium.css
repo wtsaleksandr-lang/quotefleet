@@ -19,7 +19,7 @@ body {
 .qdoc {
   border-color: rgba(16,35,48,.12);
   border-radius: 18px;
-  box-shadow: 0 28px 80px -46px rgba(11,17,23,.35), 0 1px 0 rgba(255,255,255,.9) inset;
+  box-shadow: var(--qf-shadow-md), 0 1px 0 rgba(255,255,255,.9) inset;
 }
 .qdoc {
   padding: 18px;
@@ -46,7 +46,7 @@ body {
 .qdoc-callback button {
   padding: 8px 11px;
   border-radius: 999px;
-  transition: transform .15s ease, border-color .15s ease, background .15s ease;
+  transition: all .2s ease;
 }
 .qdoc-actions button:hover,
 .qdoc-actions a:hover,
@@ -79,7 +79,7 @@ body {
 }
 .qdoc-summary-box {
   border-radius: 14px;
-  box-shadow: 0 12px 34px -26px rgba(11,17,23,.3);
+  box-shadow: var(--qf-shadow-md);
 }
 .qdoc-summary-box div:last-child {
   background: rgba(37,99,235,.10);
@@ -104,7 +104,7 @@ body {
 .qdoc-panel {
   border-radius: 15px;
   border-color: var(--qdoc-line);
-  box-shadow: 0 12px 34px -28px rgba(11,17,23,.25);
+  box-shadow: var(--qf-shadow-md);
 }
 .qdoc-panel h2 {
   background: #f8fafc;
@@ -121,7 +121,7 @@ body {
 .qdoc-total-box {
   background: var(--qdoc-primary);
   border-radius: 14px;
-  box-shadow: 0 16px 38px -26px rgba(37,99,235,.7);
+  box-shadow: var(--qf-shadow-lift);
   /* The blue gradient is dark, so every label on it must be white.
      quote-polish.css darkens these for a light box; restore white here
      (the box this file paints is always the deep-blue accent). */

@@ -162,7 +162,7 @@ body.qf-wft .visual-flow {
   border-radius: 24px !important;
   background: #151a1c !important;
   padding: 18px !important;
-  box-shadow: 0 28px 70px -55px rgba(0,0,0,.85), inset 0 1px 0 rgba(255,255,255,.04) !important;
+  box-shadow: var(--qf-shadow-md), inset 0 1px 0 rgba(255,255,255,.04) !important;
 }
 
 body.qf-wft .flow-card {
@@ -365,7 +365,6 @@ body.qf-wft .simple-step {
 
 body.qf-wft .simple-step:hover {
   border-color: rgba(255,255,255,.24) !important;
-  transform: translateY(-2px);
 }
 
 body.qf-wft .simple-step strong,
@@ -407,7 +406,7 @@ body.qf-wft .final-cta-card {
   background: #151a1c !important;
   border: 1px solid rgba(255,255,255,.14) !important;
   border-radius: 24px !important;
-  box-shadow: 0 28px 70px -55px rgba(0,0,0,.85), inset 0 1px 0 rgba(255,255,255,.04) !important;
+  box-shadow: var(--qf-shadow-md), inset 0 1px 0 rgba(255,255,255,.04) !important;
   padding: clamp(34px, 5vw, 58px) !important;
 }
 
@@ -976,7 +975,7 @@ body.qf-wft .qf-included-media {
   overflow: hidden !important;
   border: 1px solid rgba(255,255,255,.13) !important;
   background: #0f1416 !important;
-  box-shadow: 0 8px 24px rgba(0,0,0,.28) !important;
+  box-shadow: var(--qf-shadow-md) !important;
 }
 body.qf-wft .qf-included-media img {
   display: block !important;
@@ -1273,7 +1272,7 @@ html[data-theme="light"] body.qf-wft .site-header,
 html[data-theme="light"] body.qf-wft.landing-v2 .site-header {
   background: #ffffff !important;
   border-bottom: 1px solid var(--border) !important;
-  box-shadow: 0 1px 0 var(--border) !important;
+  box-shadow: var(--qf-shadow-sm) !important;
 }
 html[data-theme="light"] body.qf-wft .site-header-inner,
 html[data-theme="light"] body.qf-wft.landing-v2 .site-header-inner {
@@ -1297,7 +1296,7 @@ html[data-theme="light"] body.qf-wft .site-actions .signin {
 html[data-theme="light"] body.qf-wft .nav-dd-panel {
   background: var(--surface) !important;
   border-color: var(--border) !important;
-  box-shadow: 0 18px 42px rgba(10, 37, 64, 0.14) !important;
+  box-shadow: var(--qf-shadow-md) !important;
 }
 html[data-theme="light"] body.qf-wft .nav-dd-panel a:hover,
 html[data-theme="light"] body.qf-wft .nav-dd-panel a:focus-visible {
@@ -1316,7 +1315,7 @@ html[data-theme="light"] body.qf-wft .nav-dd-head {
 html[data-theme="light"] body.qf-wft .site-mobile-menu:not([hidden]) {
   background: var(--surface) !important;
   border-color: var(--border) !important;
-  box-shadow: 0 18px 42px rgba(10, 37, 64, 0.14) !important;
+  box-shadow: var(--qf-shadow-md) !important;
 }
 /* The :not() chain matches (and out-specifies) the generic light-mode
    `a:not(.btn)…` accent rule above, which otherwise paints these links brand
@@ -1387,7 +1386,7 @@ html[data-theme="light"] body.qf-wft .qf-badge-ico svg {
 html[data-theme="light"] body.qf-wft .qf-badge-pop {
   background: var(--surface) !important;
   border-color: var(--border) !important;
-  box-shadow: 0 24px 60px -30px rgba(10, 37, 64, 0.35) !important;
+  box-shadow: var(--qf-shadow-md) !important;
 }
 html[data-theme="light"] body.qf-wft .qf-badge-pop p {
   color: var(--ink-soft) !important;
@@ -1406,5 +1405,5 @@ html[data-theme="light"] body.qf-wft .qf-showcase-pills .qf-chip {
   background: var(--surface) !important;
   border: 1px solid var(--border) !important;
   color: var(--ink) !important;
-  box-shadow: 0 1px 2px rgba(10, 37, 64, 0.06) !important;
+  box-shadow: var(--qf-shadow-sm) !important;
 }

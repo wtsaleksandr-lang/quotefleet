@@ -22,20 +22,20 @@
   --glass-ultrathin-bg: rgba(18, 22, 30, 0.62);
   --glass-bg: rgba(22, 27, 36, 0.55);
   --glass-border: rgba(255, 255, 255, 0.10);
-  --glass-shadow: 0 8px 32px rgba(0, 0, 0, 0.36);
+  --glass-shadow: var(--qf-shadow-md);
   --glass-blur: 12px;
   /* KPI tiles/cards carry big numbers + charts → keep the tint ≥0.5 so the
      value stays crisp (readability HARD rule). */
   --glass-tile-bg: rgba(22, 27, 36, 0.58);
-  --glass-lift-shadow: 0 12px 40px rgba(0, 0, 0, 0.42);
+  --glass-lift-shadow: var(--qf-shadow-md);
 }
 html[data-theme="light"] {
   --glass-ultrathin-bg: rgba(255, 255, 255, 0.62);
   --glass-bg: rgba(255, 255, 255, 0.45);
   --glass-border: rgba(255, 255, 255, 0.28);
-  --glass-shadow: 0 8px 32px rgba(15, 23, 42, 0.10);
+  --glass-shadow: var(--qf-shadow-md);
   --glass-tile-bg: rgba(255, 255, 255, 0.55);
-  --glass-lift-shadow: 0 12px 40px rgba(15, 23, 42, 0.16);
+  --glass-lift-shadow: var(--qf-shadow-md);
 }
 
 /* ── Reusable glass primitives (canonical) ─────────────────────────────── */
@@ -116,11 +116,10 @@ html[data-theme="light"] .qf-kpi-card {
 }
 .qf-kpi-tile,
 .qf-kpi-card {
-  transition: transform 0.18s ease, box-shadow 0.18s ease;
+  transition: all .2s ease;
 }
 .qf-kpi-tile:hover,
 .qf-kpi-card:hover {
-  transform: translateY(-2px);
   box-shadow: var(--glass-lift-shadow);
 }
 
@@ -142,7 +141,7 @@ html[data-theme="light"] .card.qf-glass {
 .qf-nav-advanced > .nav-item {
   opacity: 0;
   transform: translateY(-4px);
-  transition: opacity 0.18s ease, transform 0.18s ease;
+  transition: all .2s ease;
 }
 .qf-nav-advanced[open] > .nav-item {
   opacity: 1;

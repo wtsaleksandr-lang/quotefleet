@@ -5,7 +5,7 @@
 .sidebar {
   background: rgba(18, 26, 34, 0.98);
   border-right: 1px solid rgba(143, 159, 178, 0.18);
-  box-shadow: 18px 0 48px -36px rgba(0, 0, 0, 0.95);
+  box-shadow: var(--qf-shadow-md);
 }
 html[data-theme="light"] .sidebar {
   background: #FFFFFF;

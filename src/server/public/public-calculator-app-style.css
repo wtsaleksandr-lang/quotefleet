@@ -11,7 +11,7 @@
   --qf-app-radius-card: 8px;
   --qf-app-radius-control: 6px;
   --qf-app-radius-button: 4px;
-  --qf-app-shadow: 0 18px 42px -34px rgba(15, 23, 42, .55);
+  --qf-app-shadow: var(--qf-shadow-md);
 }
 
 body.qf-app-calculator {
@@ -56,7 +56,7 @@ body.qf-app-calculator .qf-header img {
   border-radius: var(--qf-app-radius-control);
   object-fit: cover;
   background: var(--qf-app-card);
-  box-shadow: 0 8px 18px -14px rgba(15,23,42,.45);
+  box-shadow: var(--qf-shadow-md);
 }
 
 body.qf-app-calculator .qf-header .brand-name {
@@ -100,7 +100,7 @@ body.qf-app-calculator .qf-tabs button {
 body.qf-app-calculator .qf-tabs button.active {
   background: var(--qf-app-card) !important;
   color: var(--w-primary) !important;
-  box-shadow: 0 10px 22px -18px rgba(15,23,42,.65) !important;
+  box-shadow: var(--qf-shadow-md) !important;
 }
 
 body.qf-app-calculator .qf-section-title {
@@ -217,7 +217,7 @@ body.qf-app-calculator .qf-cta {
   border-radius: var(--qf-app-radius-button) !important;
   background: var(--w-primary) !important;
   color: #fff !important;
-  box-shadow: 0 16px 30px -22px color-mix(in srgb, var(--w-primary) 62%, #111827) !important;
+  box-shadow: var(--qf-shadow-md) !important;
   position: relative;
   overflow: hidden;
 }
@@ -266,7 +266,7 @@ body.qf-app-calculator .qf-result .qf-customer-note {
 body.qf-app-calculator .qf-suggestions {
   border-radius: var(--qf-app-radius-control) !important;
   border-color: var(--qf-app-border) !important;
-  box-shadow: 0 18px 34px -22px rgba(15,23,42,.42) !important;
+  box-shadow: var(--qf-shadow-md) !important;
 }
 
 body.qf-app-calculator .qf-error,

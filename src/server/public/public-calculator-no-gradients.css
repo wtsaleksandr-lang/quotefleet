@@ -200,14 +200,13 @@ body.qf-app-calculator[data-qf-cta-hover="lift"] .qf-cta:not(.qf-secondary):hove
   background: var(--w-accent-hover, #0B32D4) !important;
   border-color: var(--w-accent-hover, #0B32D4) !important;
   transform: translateY(-2px) !important;
-  box-shadow: 0 12px 26px -8px rgba(0,0,0,.5) !important;
+  box-shadow: var(--qf-shadow-md) !important;
 }
 body.qf-app-calculator[data-qf-cta-hover="glow"] .qf-cta:not(.qf-secondary):hover {
   background: var(--w-accent-hover, #0B32D4) !important;
   border-color: var(--w-accent, #0D3CFC) !important;
   transform: none !important;
-  box-shadow: 0 0 0 4px color-mix(in srgb, var(--w-accent, #0D3CFC) 34%, transparent),
-              0 8px 22px -6px color-mix(in srgb, var(--w-accent, #0D3CFC) 55%, transparent) !important;
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--w-accent, #0D3CFC) 34%, transparent), var(--qf-shadow-md) !important;
 }
 body.qf-app-calculator[data-qf-cta-hover="fill"] .qf-cta:not(.qf-secondary):hover {
   background: var(--w-accent-hover, #0B32D4) !important;
@@ -242,8 +241,7 @@ body.qf-app-calculator[data-qf-cta-hover="ring"] .qf-cta:not(.qf-secondary):hove
   background: var(--w-accent-hover, #0B32D4) !important;
   border-color: var(--w-accent-surface, #FFFFFF) !important;
   transform: none !important;
-  box-shadow: 0 0 0 3px var(--w-accent-surface, #FFFFFF),
-              0 0 0 5px color-mix(in srgb, var(--w-accent, #0D3CFC) 45%, transparent) !important;
+  box-shadow: 0 0 0 3px var(--w-accent-surface, #FFFFFF), 0 0 0 5px color-mix(in srgb, var(--w-accent, #0D3CFC) 45%, transparent) !important;
 }
 @media (prefers-reduced-motion: reduce) {
   body.qf-app-calculator[data-qf-cta-hover="lift"] .qf-cta:not(.qf-secondary):hover,
@@ -485,7 +483,7 @@ body[data-qf-preset="mono"] .qf-map-expand {
   background: rgb(255, 255, 255) !important;
   background-image: none !important;
   border: 1px solid rgba(255, 255, 255, 0.65) !important;
-  box-shadow: 0 2px 12px -2px rgba(15, 23, 42, 0.26);
+  box-shadow: var(--qf-shadow-md);
   /* Rounded-RECTANGLE corners matching the theme's CTA / "INSTANT FREIGHT
      ESTIMATE" badge character (~8px) — deliberately NOT a fully-round pill. */
   border-radius: 8px !important;
@@ -676,13 +674,13 @@ body[data-qf-preset="cupertino"] .qf-tabs button {
   font-weight: 590 !important;
   box-shadow: none !important;
   border: 0 !important;
-  transition: background .18s ease, box-shadow .18s ease;
+  transition: all .2s ease;
 }
 body[data-qf-preset="cupertino"] .qf-tabs button.active {
   background: rgba(255, 255, 255, 0.96) !important;
   background-image: none !important;
   color: #1C1C1E !important;
-  box-shadow: 0 3px 8px -2px rgba(60, 60, 67, 0.22), 0 0 0 0.5px rgba(60, 60, 67, 0.06) !important;
+  box-shadow: var(--qf-shadow-sm), 0 0 0 0.5px rgba(60, 60, 67, 0.06) !important;
   border: 0 !important;
 }
 /* iOS grouped-list inputs — softly filled rounded fields with a hairline, not a
@@ -727,7 +725,7 @@ body[data-qf-preset="material"] .qf-tabs button {
   color: #5F6368;
   background: transparent;
   box-shadow: none;
-  transition: background .15s, color .15s;
+  transition: all .2s ease;
 }
 body[data-qf-preset="material"] .qf-tabs button:hover:not(.active) {
   background: rgba(26, 115, 232, .06);
@@ -787,7 +785,7 @@ body[data-qf-preset="material"] .qf-cta:not(.qf-secondary) {
   border-radius: 999px;
   font-weight: 500;
   letter-spacing: .01em;
-  box-shadow: 0 1px 2px rgba(60, 64, 67, .30), 0 1px 3px 1px rgba(60, 64, 67, .15);
+  box-shadow: var(--qf-shadow-sm);
 }
 /* Google-green emphasis for the positive / ETA / transit strings. */
 body[data-qf-preset="material"] .qf-eta,

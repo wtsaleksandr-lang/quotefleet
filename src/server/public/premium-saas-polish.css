@@ -96,7 +96,7 @@
 .app-main button:not(.nav-item):not(.qf-mobile-nav-toggle),
 .app-main .btn-primary,
 .app-main .btn-danger {
-  transition: transform .15s ease, border-color .15s ease, box-shadow .15s ease, opacity .15s ease;
+  transition: all .2s ease;
 }
 .app-main button:not(.nav-item):not(.qf-mobile-nav-toggle):hover {
   transform: translateY(-1px);
@@ -108,7 +108,7 @@
   transform: none !important;
 }
 .app-main .table tbody tr {
-  transition: background .15s ease, box-shadow .15s ease;
+  transition: all .2s ease;
 }
 .qf-page-skeleton {
   display: grid;
@@ -271,7 +271,7 @@
 
 /* ── AI import: staged microcopy (cross-fade the processing subtitle) ── */
 .qf-ingest-processing-sub {
-  transition: opacity .2s ease, transform .2s ease;
+  transition: all .2s ease;
 }
 .qf-ingest-processing-sub.is-swapping {
   opacity: 0;
@@ -328,7 +328,7 @@
   height: 100%;
   border-radius: 999px;
   background: color-mix(in srgb, var(--accent);
-  transition: width .85s cubic-bezier(.22, .61, .36, 1);
+  transition: all .3s ease;
 }
 .qf-ingest-progress-fill::after {
   content: "";

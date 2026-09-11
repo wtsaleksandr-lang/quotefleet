@@ -66,10 +66,10 @@
     border-radius: 16px;
     background: var(--surface);
     border: 1px solid var(--border);
-    box-shadow: 0 12px 28px rgba(0, 0, 0, 0.32);
+    box-shadow: var(--qf-shadow-md);
   }
   html[data-theme="light"] body.qf-wft .site-mobile-menu:not([hidden]) {
-    box-shadow: 0 12px 28px rgba(10, 37, 64, 0.14);
+    box-shadow: var(--qf-shadow-md);
   }
   html body.qf-wft .site-mobile-menu a {
     display: block;

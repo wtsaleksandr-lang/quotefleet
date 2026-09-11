@@ -181,7 +181,7 @@ body.qf-wft::before {
   border: 1px solid var(--qf-wft-line);
   border-radius: var(--qf-wft-radius-lg);
   background: rgba(17,24,23,.84);
-  box-shadow: 0 28px 70px -55px rgba(0,0,0,.85), inset 0 1px 0 rgba(255,255,255,.04);
+  box-shadow: var(--qf-shadow-md), inset 0 1px 0 rgba(255,255,255,.04);
 }
 
 .wft-hero-copy {
@@ -251,7 +251,7 @@ body.qf-wft::before {
   font: 900 12px/1 var(--qf-wft-mono);
   letter-spacing: .04em;
   text-transform: uppercase;
-  transition: transform .16s ease, filter .16s ease, border-color .16s ease;
+  transition: all .2s ease;
 }
 
 .wft-cta-primary {
@@ -400,7 +400,7 @@ body.qf-wft::before {
   border: 1px solid var(--qf-wft-line);
   border-radius: var(--qf-wft-radius);
   padding: 16px;
-  transition: transform .16s ease, border-color .16s ease, background .16s ease;
+  transition: all .2s ease;
 }
 
 .wft-product-card:hover {

@@ -151,7 +151,7 @@
   border: 1px solid rgba(110,139,255,.2);
   border-radius: 22px;
   background: rgba(27,33,35,.96);
-  box-shadow: 0 20px 60px rgba(0,0,0,.24);
+  box-shadow: var(--qf-shadow-md);
   padding: 18px;
 }
 .flow-rates { grid-area: rates; animation-delay: .05s; }
@@ -626,7 +626,7 @@ body.qf-wft .footer-brand .qf-footer-brand {
   color: var(--muted);
   text-decoration: none;
   white-space: nowrap;
-  transition: color 0.16s ease;
+  transition: all .2s ease;
 }
 .site-actions .site-oog:hover,
 .site-actions .site-oog:focus-visible {

@@ -55,12 +55,11 @@
   border: 1px solid rgba(255,255,255,.12);
   border-radius: 8px;
   background: #22282A;
-  box-shadow: 0 28px 70px -55px rgba(0,0,0,.85), inset 0 1px 0 rgba(255,255,255,.04);
+  box-shadow: var(--qf-shadow-md), inset 0 1px 0 rgba(255,255,255,.04);
   padding: var(--space-2);
-  transition: transform .16s ease, border-color .16s ease, background .16s ease;
+  transition: all .2s ease;
 }
 .qf-vertical-wft .feature-card:hover {
-  transform: translateY(-2px);
   border-color: rgba(255,255,255,.24);
   background: #22282A;
 }
@@ -87,7 +86,7 @@
   border-radius: 8px;
   background: #22282A;
   padding: var(--space-4) var(--space-3);
-  box-shadow: 0 28px 70px -55px rgba(0,0,0,.85), inset 0 1px 0 rgba(255,255,255,.04);
+  box-shadow: var(--qf-shadow-md), inset 0 1px 0 rgba(255,255,255,.04);
 }
 @media (max-width: 900px) {
   .qf-vertical-wft .features { grid-template-columns: repeat(2, minmax(0, 1fr)); }

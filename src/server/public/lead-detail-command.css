@@ -5,7 +5,7 @@
   border: 1px solid rgba(184, 207, 245, 0.72);
   border-radius: 24px;
   background: #ffffff;
-  box-shadow: 0 20px 54px rgba(37, 34, 99, 0.08);
+  box-shadow: var(--qf-shadow-md);
 }
 
 .qf-lead-command-head {
@@ -108,13 +108,13 @@
 
 .qf-lead-command-pulse {
   outline: 3px solid rgba(59, 34, 244, 0.24);
-  box-shadow: 0 0 0 8px rgba(59, 34, 244, 0.08), 0 18px 46px rgba(37, 34, 99, 0.08) !important;
+  box-shadow: 0 0 0 8px rgba(59, 34, 244, 0.08), var(--qf-shadow-md) !important;
 }
 
 html[data-theme="light"] .qf-lead-crm-bar {
   border-color: rgba(184, 207, 245, 0.72);
   background: #ffffff;
-  box-shadow: 0 16px 42px rgba(37, 34, 99, 0.06);
+  box-shadow: var(--qf-shadow-md);
 }
 
 html[data-theme="light"] .qf-lead-crm-pill,

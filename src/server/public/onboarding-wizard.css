@@ -51,7 +51,7 @@ html.qf-ob-open body {
   --cta-bg-hover:  #0B34D6;
   --cta-text:      #FFFFFF;
   --error:      #B91C1C;
-  --shadow-lg:  0 24px 60px -16px rgba(15, 23, 42, 0.18);
+  --shadow-lg:  var(--qf-shadow-md);
 
   /* ── Glass material tokens (canonical DESIGN-SYSTEM values, scoped here so the
      wizard subtree is self-contained). Every value is rgba()/hex-in-a-custom-
@@ -77,7 +77,7 @@ html.qf-ob-open body {
   --ob-input-bg:    rgba(255, 255, 255, 0.90);
   --ob-glow:        rgba(13, 60, 252, 0.35);
   --ob-shell-shadow: 0 24px 60px -16px rgba(15, 23, 42, 0.28);
-  --ob-float-shadow: 0 16px 40px -12px rgba(15, 23, 42, 0.28);
+  --ob-float-shadow: var(--qf-shadow-md);
   position: fixed;
   inset: 0;
   z-index: 2000;
@@ -95,7 +95,7 @@ html.qf-ob-open body {
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
   /* Portal open/close handoff — the overlay fades, the shell scale-fades (below). */
-  transition: opacity 0.3s ease;
+  transition: all .3s ease;
 }
 
 /* Entrance + close handoff (item 10/portal). JS toggles .is-entering on mount
@@ -145,7 +145,7 @@ html.qf-ob-open body {
     --ob-input-bg:    rgba(15, 20, 30, 0.92);
     --ob-glow:        rgba(46, 91, 255, 0.45);
     --ob-shell-shadow: 0 24px 60px -16px rgba(0, 0, 0, 0.55);
-    --ob-float-shadow: 0 16px 44px -12px rgba(0, 0, 0, 0.6);
+    --ob-float-shadow: var(--qf-shadow-md);
   }
 }
 
@@ -176,7 +176,7 @@ html.qf-ob-open body {
   border-radius: 24px;
   box-shadow: var(--ob-shell-shadow), inset 0 1px 0 var(--ob-hairline);
   padding: var(--space-4);
-  transition: transform 0.32s cubic-bezier(0.2, 0.8, 0.2, 1), opacity 0.3s ease;
+  transition: all .3s ease;
 }
 /* Entrance rises + scales in; close hands off with a scale-fade. */
 .qf-ob-overlay.is-entering .qf-ob-shell { transform: scale(0.97) translateY(8px); opacity: 0; }
@@ -228,7 +228,7 @@ html.qf-ob-open body {
   font-size: 13px;
   font-weight: 600;
   cursor: pointer;
-  transition: color 0.15s ease, background 0.15s ease;
+  transition: all .2s ease;
 }
 .qf-ob-skip:hover {
   color: var(--ink);
@@ -257,8 +257,8 @@ html.qf-ob-open body {
   width: 0;
   border-radius: var(--radius-pill);
   background: var(--accent);
-  box-shadow: 0 0 8px var(--ob-glow);
-  transition: width 0.45s cubic-bezier(0.2, 0.8, 0.2, 1);
+  box-shadow: var(--qf-shadow-sm);
+  transition: all .3s ease;
 }
 .qf-ob-seg.is-on .qf-ob-seg-fill { width: 100%; }
 .qf-ob-seg { background: var(--surface-3); }
@@ -319,14 +319,12 @@ html.qf-ob-open body {
   border-radius: 16px;
   padding: var(--space-2);
   min-height: 44px;
-  transition: transform 0.18s cubic-bezier(0.2, 0.8, 0.2, 1),
-    border-color 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
+  transition: all .2s ease;
   color: var(--ink);
 }
 .qf-ob-card:hover {
   border-color: var(--border-strong);
   background: var(--ob-card-hover);
-  transform: translateY(-2px);
   box-shadow: var(--ob-float-shadow);
 }
 /* Selected = accent OUTLINE + tint, NEVER a bright solid fill (preserved). */
@@ -338,7 +336,7 @@ html.qf-ob-open body {
 }
 .qf-ob-card { background: var(--ob-card-solid); }
 @media (prefers-reduced-motion: reduce) {
-  .qf-ob-card { transition: border-color 0.15s ease, background 0.15s ease; }
+  .qf-ob-card { transition: all .2s ease; }
   .qf-ob-card:hover { transform: none; }
 }@media (prefers-reduced-motion: reduce) {
   .qf-ob-check.is-pop { animation: none; }
@@ -349,7 +347,7 @@ html.qf-ob-open body {
    while animating so heights don't jump. Forward = enter from right / leave to
    left; Back = the mirror. */
 .qf-ob-step {
-  transition: transform 0.28s cubic-bezier(0.2, 0.8, 0.2, 1), opacity 0.28s ease;
+  transition: all .3s ease;
 }
 .qf-ob-body.qf-ob-anim { position: relative; overflow: hidden; }
 .qf-ob-body.qf-ob-anim .qf-ob-step { position: absolute; top: 0; left: 0; right: 0; }
@@ -358,7 +356,7 @@ html.qf-ob-open body {
 .qf-ob-step.is-leave-to-left    { transform: translateX(-24px); opacity: 0; }
 .qf-ob-step.is-leave-to-right   { transform: translateX(24px); opacity: 0; }
 @media (prefers-reduced-motion: reduce) {
-  .qf-ob-step { transition: opacity 0.2s ease; }
+  .qf-ob-step { transition: all .2s ease; }
   .qf-ob-step.is-enter-from-right,
   .qf-ob-step.is-enter-from-left,
   .qf-ob-step.is-leave-to-left,
@@ -371,12 +369,12 @@ html.qf-ob-open body {
   display: grid;
   grid-template-rows: 0fr;
   opacity: 0;
-  transition: grid-template-rows 0.32s cubic-bezier(0.2, 0.8, 0.2, 1), opacity 0.28s ease;
+  transition: all .3s ease;
 }
 .qf-ob-reveal.is-open { grid-template-rows: 1fr; opacity: 1; }
 .qf-ob-reveal-inner { overflow: hidden; min-height: 0; }
 @media (prefers-reduced-motion: reduce) {
-  .qf-ob-reveal { transition: opacity 0.2s ease; grid-template-rows: 1fr; }
+  .qf-ob-reveal { transition: all .2s ease; grid-template-rows: 1fr; }
 }
 .qf-ob-card-title {
   display: flex;
@@ -480,7 +478,7 @@ html.qf-ob-open body {
   padding: var(--space-1-5);
   min-height: 44px;
   font-size: 15px;
-  transition: border-color 0.15s ease;
+  transition: all .2s ease;
 }
 .qf-ob-input:focus {
   outline: none;
@@ -546,13 +544,12 @@ html.qf-ob-open body {
   font-size: 13px;
   font-weight: 600;
   cursor: pointer;
-  transition: transform 0.14s cubic-bezier(0.2, 0.8, 0.2, 1),
-    border-color 0.12s ease, background 0.12s ease;
+  transition: all .2s ease;
 }
-.qf-ob-region:hover { border-color: var(--accent); transform: translateY(-1px); }
+.qf-ob-region:hover { border-color: var(--accent);}
 .qf-ob-region { background: var(--ob-thin-solid); }
 @media (prefers-reduced-motion: reduce) {
-  .qf-ob-region { transition: border-color 0.12s ease, background 0.12s ease; }
+  .qf-ob-region { transition: all .2s ease; }
   .qf-ob-region:hover { transform: none; }
 }
 /* Selected = outline + tint, never a bright solid fill. */
@@ -587,8 +584,7 @@ html.qf-ob-open body {
   min-height: 44px;
   font-size: 15px;
   font-weight: 600;
-  transition: background 0.15s ease, border-color 0.15s ease, opacity 0.15s ease,
-    transform 0.15s cubic-bezier(0.2, 0.8, 0.2, 1), box-shadow 0.15s ease;
+  transition: all .2s ease;
 }
 /* Back, bottom-left: ghost/outlined with a leading left-arrow. */
 .qf-ob-btn-back {
@@ -603,7 +599,7 @@ html.qf-ob-open body {
   border: 1px solid var(--cta-bg);
   background: var(--cta-bg);
   color: var(--cta-text);
-  box-shadow: 0 8px 20px var(--ob-glow);
+  box-shadow: var(--qf-shadow-md);
 }
 .qf-ob-btn-next:hover {
   background: var(--cta-bg-hover);
@@ -673,7 +669,7 @@ html.qf-ob-open body {
   min-height: 44px;
   font-size: 13px;
   font-weight: 700;
-  transition: background 0.15s ease, border-color 0.15s ease;
+  transition: all .2s ease;
 }
 .qf-ob-fastpath-btn:hover {
   background: var(--cta-bg-hover);
@@ -756,7 +752,7 @@ html.qf-ob-open body {
   min-height: 44px;
   font-size: 14px;
   font-weight: 600;
-  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+  transition: all .2s ease;
 }
 .qf-ob-copy-btn:hover {
   border-color: var(--accent);
@@ -831,7 +827,7 @@ html.qf-ob-open body {
   font: inherit;
   padding: var(--space-1-5) var(--space-2);
   cursor: pointer;
-  transition: background 0.12s ease;
+  transition: all .2s ease;
 }
 .qf-ob-finder-item:last-child { border-bottom: 0; }
 .qf-ob-finder-item:hover,
@@ -848,7 +844,7 @@ html.qf-ob-open body {
   border-radius: var(--radius-btn);
   background: var(--ob-input-bg);
   padding: var(--space-1) var(--space-1-5);
-  transition: border-color 0.15s ease;
+  transition: all .2s ease;
 }
 .qf-ob-ifield:focus-within { border-color: var(--accent); }
 .qf-ob-ifield-title {

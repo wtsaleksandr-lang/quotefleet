@@ -35,7 +35,7 @@ body.qf-wft .site-header-inner {
   border-radius: 14px !important;
   background: rgb(24, 29, 31) !important;
   border: 1px solid rgba(255, 255, 255, 0.10) !important;
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.18) !important;
+  box-shadow: var(--qf-shadow-md) !important;
 }
 
 /* Bare minimal logo mark — no cream box, no busy truck icon */
@@ -91,7 +91,7 @@ body.qf-wft .site-actions .signin {
   background: transparent !important;
   border-radius: 8px !important;
   padding: 8px 12px !important;
-  transition: color 0.15s ease !important;
+  transition: all .2s ease !important;
 }
 
 body.qf-wft .site-nav a:hover,
@@ -124,7 +124,7 @@ body.qf-wft .site-actions .btn-secondary {
   font-weight: 600 !important;
   letter-spacing: 0 !important;
   box-shadow: none !important;
-  transition: background 0.16s ease, transform 0.16s ease, box-shadow 0.16s ease !important;
+  transition: all .2s ease !important;
 }
 
 body.qf-wft .site-actions .btn-secondary .arr {
@@ -135,7 +135,7 @@ body.qf-wft .site-actions .btn-secondary:hover {
   background: rgba(255, 255, 255, 0.06) !important;
   border-color: rgba(255, 255, 255, 0.5) !important;
   transform: translateY(-1px) !important;
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.18) !important;
+  box-shadow: var(--qf-shadow-md) !important;
 }
 
 /* ── Hero eyebrow — clean top-left kicker (drop the heavy bordered pill) ── */
@@ -398,7 +398,7 @@ body.qf-wft .site-mobile-menu {
     border-radius: 14px;
     background: rgb(24, 29, 31);
     border: 1px solid rgba(255, 255, 255, 0.10);
-    box-shadow: 0 12px 28px rgba(0, 0, 0, 0.32);
+    box-shadow: var(--qf-shadow-md);
   }
   body.qf-wft .site-mobile-menu a {
     font-family: "JetBrains Mono", ui-monospace, monospace;
@@ -410,7 +410,7 @@ body.qf-wft .site-mobile-menu {
     text-decoration: none;
     padding: 12px 14px;
     border-radius: 10px;
-    transition: color 0.15s ease, background 0.15s ease;
+    transition: all .2s ease;
   }
   body.qf-wft .site-mobile-menu a:hover,
   body.qf-wft .site-mobile-menu a:focus-visible {
@@ -644,7 +644,7 @@ body.qf-wft.landing-v2 .hiw-card .hiw-body p {
    and guard-safe. ── */
 body.qf-wft .site-logo .qf-brand-mark {
   transform-origin: center;
-  transition: transform 0.18s ease;
+  transition: all .2s ease;
   will-change: transform;
 }
 body.qf-wft .site-brand:hover .qf-brand-mark,
