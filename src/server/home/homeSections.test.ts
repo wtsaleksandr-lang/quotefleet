@@ -14,10 +14,19 @@
  *      The section is populated from a data array that is deliberately empty,
  *      and "empty" has to mean invisible, not "an empty strip with a heading".
  *
- *   3. THE ONE NUMBER ON THE PAGE COMES FROM THE DATABASE. The carrier count is
- *      the kind of figure that gets typed into HTML once and is wrong forever
- *      after. Pin that it moves with its input and that no literal count is
- *      sitting in the source.
+ *   3. THE HEADING CLAIMS NOTHING ABOUT THE COMPANIES UNDER IT. The tiles are
+ *      other people's marks, shown because those carriers are LISTED IN an
+ *      FMCSA-derived directory. "Built for drivers, brokers and importers" is a
+ *      statement about QuoteFleet; "trusted by", a customer count, or any
+ *      number at all next to a wall of logos is a statement about them that
+ *      none of them has made. Pin the copy, and pin the absence of a count —
+ *      including the one this section used to carry honestly.
+ *
+ *   4. THE STRIP LOOPS SEAMLESSLY AND AT A FIXED PACE. Both are properties of
+ *      the stylesheet that a well-meaning edit can silently break: a computed
+ *      pixel advance reintroduces the once-per-cycle jump, and a constant
+ *      duration makes the scroll speed a function of how many carriers are in
+ *      the registry.
  */
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
@@ -53,7 +62,7 @@ const MODULE_SRC = read('src/server/home/homeSections.ts');
 /** The homepage as served, minus the injected site chrome (which this module
  *  does not touch): landing.html with both below-the-grid slots filled. */
 const served = (opts?: Parameters<typeof applyHomeSections>[1]) =>
-  applyHomeSections(LANDING_SRC, { carrierTotal: null, ...opts });
+  applyHomeSections(LANDING_SRC, { ...opts });
 
 /** Markers unique to the sections that were taken off the page. */
 const HIDDEN_MARKERS = [
@@ -78,7 +87,7 @@ describe('homepage: the hidden below-the-grid band', () => {
 
   it('throws rather than quietly dropping a section when a slot goes missing', () => {
     const withoutSlot = LANDING_SRC.replace(LEGACY_SECTIONS_SLOT, '');
-    expect(() => applyHomeSections(withoutSlot, { carrierTotal: null })).toThrow(
+    expect(() => applyHomeSections(withoutSlot)).toThrow(
       /home legacy sections/,
     );
   });
@@ -225,7 +234,7 @@ describe('homepage: the logo marquee', () => {
   it('still ships NOTHING — no section, stylesheet or script — when the list is empty', () => {
     // The empty-means-absent contract is what lets the registry be emptied
     // (a takedown request, say) without leaving a headed, tile-less strip.
-    expect(renderLogoMarquee([], 331482)).toBe('');
+    expect(renderLogoMarquee([])).toBe('');
     const html = served({ logos: [] });
     expect(html).not.toContain('qf-marquee');
     expect(html).not.toContain(MARQUEE_STYLESHEET);
@@ -233,7 +242,7 @@ describe('homepage: the logo marquee', () => {
   });
 
   it('appears — with its stylesheet and script — as soon as the array has entries', () => {
-    const html = served({ logos: LOGOS, carrierTotal: 331482 });
+    const html = served({ logos: LOGOS });
     expect(html).toContain('class="section qf-marquee-section"');
     expect(html).toContain(`<link rel="stylesheet" href="${MARQUEE_STYLESHEET}">`);
     expect(html).toContain(MARQUEE_SCRIPT);
@@ -241,7 +250,7 @@ describe('homepage: the logo marquee', () => {
   });
 
   it('builds a seamless two-row strip and names every company on exactly one of them', () => {
-    const out = renderLogoMarquee(LOGOS, 1000);
+    const out = renderLogoMarquee(LOGOS);
     const rows = out.match(/<ul class="qf-marquee__row"[^>]*>/g) ?? [];
     expect(rows).toHaveLength(2);
     // The duplicate exists for the loop, not for the reader.
@@ -249,8 +258,37 @@ describe('homepage: the logo marquee', () => {
     expect(out).toContain('>Example Freight Co<');
   });
 
+  it('publishes the rendered tile count, and it matches the tiles it rendered', () => {
+    // The stylesheet multiplies this by a per-tile pace to get the cycle
+    // length, so a count that disagrees with the DOM is a strip running at the
+    // wrong speed. The loop GEOMETRY does not depend on it (see below), which
+    // is why being wrong here is a pace bug and not a seam.
+    const out = renderLogoMarquee(LOGOS);
+    const declared = Number(out.match(/--qf-marquee-tiles:\s*(\d+)/)?.[1]);
+    // Count the tiles in the FIRST row only — the second is the loop's copy.
+    const firstRow = out.slice(0, out.indexOf('<ul class="qf-marquee__row" role="list" aria-hidden'));
+    const perRow = (firstRow.match(/<li class="qf-logo-tile">/g) ?? []).length;
+    expect(declared).toBe(perRow);
+    // A two-entry list is padded up to MIN_TILES_PER_ROW, so the count tracks
+    // what was RENDERED rather than what was passed in.
+    expect(declared).toBeGreaterThan(LOGOS.length);
+    // The real registry is long enough that no padding happens at all.
+    expect(Number(renderLogoMarquee(HOME_PARTNER_LOGOS).match(/--qf-marquee-tiles:\s*(\d+)/)?.[1]))
+      .toBe(HOME_PARTNER_LOGOS.length);
+  });
+
+  it('loads its tiles eagerly, because a transformed strip defeats lazy loading', () => {
+    // A lazy image loads on intersection, and these tiles are moved by a
+    // transform inside an `overflow: clip` box — so the ones off to the right
+    // would pop in exactly as the animation carried them past the cut.
+    const out = renderLogoMarquee([{ name: 'Example Freight Co', src: '/carrier-logos/example.webp' }]);
+    expect(out).toContain('<img');
+    expect(out).not.toContain('loading="lazy"');
+    expect(out).toContain('fetchpriority="low"');
+  });
+
   it('falls back to a monogram built from the company\'s own name, never a borrowed mark', () => {
-    const out = renderLogoMarquee([{ name: 'Example Freight Co' }], 1000);
+    const out = renderLogoMarquee([{ name: 'Example Freight Co' }]);
     expect(out).toContain('qf-logo-tile__mono');
     expect(out).toContain('>EF<'); // monogramInitials('Example Freight Co')
     expect(out).not.toContain('<img');
@@ -269,44 +307,100 @@ describe('homepage: the logo marquee', () => {
     expect(reduced).toContain('overflow-x: auto');
     expect(reduced).toContain('.qf-marquee__row[aria-hidden="true"] { display: none; }');
   });
+
+  it('keeps the loop self-correcting and the pace independent of list length', () => {
+    const css = strip(read('src/server/public/landing-logo-marquee.css'));
+    // THE SEAM. A half-track translate always matches whatever was laid out, so
+    // adding a carrier cannot introduce a jump. A hand-computed pixel advance
+    // could, which is why one must not appear here.
+    expect(css).toMatch(/to\s*\{\s*transform:\s*translate3d\(-50%, 0, 0\)/);
+    // THE PACE. Duration is tiles × per-tile seconds, so eleven tiles and
+    // twenty-six tiles travel at the same px/s. A bare `60s` is the regression.
+    expect(css).toContain('calc(var(--qf-marquee-tiles, 12) * var(--qf-marquee-tile-secs))');
+    expect(css).not.toMatch(/animation:\s*qf-logo-marquee-scroll\s+\d+s/);
+    // The two rows are separated by exactly the in-row gap, or the join reads
+    // as a wide seam once per cycle.
+    const row = css.slice(css.indexOf('.qf-marquee__row {'));
+    expect(row).toMatch(/gap: 24px/);
+    expect(row).toMatch(/margin: 0 24px 0 0/);
+  });
+
+  it('paints the tiles on a light surface in BOTH themes, so no mark can vanish', () => {
+    // These tiles hold other companies' artwork, drawn for a light ground and
+    // not ours to invert or filter. Flipping the tile with the theme does not
+    // adapt the wall — it deletes whichever marks happen to be dark (Werner,
+    // TCI) and leaves the rest untouched.
+    const css = strip(read('src/server/public/landing-logo-marquee.css'));
+    expect(css).toContain('--qf-logo-tile-bg:');
+    expect(css).toMatch(/\.qf-logo-tile \{[^}]*background: var\(--qf-logo-tile-bg\)/);
+    expect(css).toMatch(/\.qf-logo-tile \{[^}]*border: 1px solid var\(--qf-logo-tile-border\)/);
+    // The tile surface must NOT be one of the flipping theme tokens.
+    expect(css).not.toMatch(/\.qf-logo-tile \{[^}]*background: var\(--surface/);
+    // …and nothing else in the sheet may hardcode a colour: exactly the three
+    // pinned tile values, all declared together on the one scope.
+    const literals = [...css.matchAll(/#[0-9a-f]{3,8}\b/gi)].map((m) => m[0]);
+    expect(literals).toHaveLength(3);
+  });
+
+  it('sizes the tile to the artwork canvas so no mark is resampled down', () => {
+    // Every mark is normalised onto a 220x96 sheet with its optical weight
+    // matched to the rest. A narrower tile silently rescales all of them, and
+    // the 180x96-with-padding this section shipped with rescaled them to ~59%.
+    // 222x98 with `border-box` is that canvas plus its 1px rim, so the CONTENT
+    // box is exactly 220x96 and no mark is resampled at all.
+    const css = strip(read('src/server/public/landing-logo-marquee.css'));
+    const tile = css.slice(css.indexOf('.qf-logo-tile {'), css.indexOf('.qf-logo-tile__link'));
+    expect(tile).toMatch(/box-sizing: border-box/);
+    expect(tile).toMatch(/width: 222px/);
+    expect(tile).toMatch(/height: 98px/);
+    expect(tile).toMatch(/padding: 0/);
+  });
 });
 
-describe('homepage: the carrier count is read, not typed', () => {
+describe('homepage: the marquee heading claims nothing about the companies below it', () => {
   const LOGOS: PartnerLogo[] = [{ name: 'Example Freight Co' }];
 
-  it('renders whatever the directory reports, formatted', () => {
-    expect(renderLogoMarquee(LOGOS, 331482)).toContain('331,482 carriers');
-    // A different directory size gives a different heading — the number tracks
-    // its input rather than being decoration around a constant.
-    expect(renderLogoMarquee(LOGOS, 7)).toContain('7 carriers');
-    expect(renderLogoMarquee(LOGOS, 7)).not.toContain('331,482');
+  it('says who the product is FOR, in two tones and one size', () => {
+    const out = renderLogoMarquee(LOGOS);
+    expect(out).toContain('>Built for<');
+    expect(out).toContain('>drivers, brokers and importers<');
+    expect(out).toContain('qf-marquee-head__lead');
+    expect(out).toContain('qf-marquee-head__soft');
   });
 
-  it('omits the number entirely rather than guessing when the count is unknown', () => {
-    const out = renderLogoMarquee(LOGOS, null);
-    expect(out).toContain('Carriers listed in the QuoteFleet directory');
-    expect(out).not.toMatch(/\d[\d,]*\s+carriers/);
+  it('never implies these carriers use, trust or endorse QuoteFleet', () => {
+    // The tiles are marks of companies with NO relationship to QuoteFleet. This
+    // is the assertion that stops a future copy edit from turning a directory
+    // listing into a customer claim.
+    const out = renderLogoMarquee(HOME_PARTNER_LOGOS);
+    expect(out).not.toMatch(
+      /customers?|clients?|trusted by|companies use|our partners|powered by|work with us|join \d/i,
+    );
   });
 
-  it('has no carrier-count literal anywhere in the source of the band', () => {
-    // A four-or-more digit run (with or without separators) in either the
-    // module or the markup is how this drifts: someone pastes today's total in
-    // and it is wrong by the next ingest.
+  it('prints NO count anywhere in the band — not of carriers, and not of users', () => {
+    // The heading used to state the directory's size. It was sourced and it was
+    // true, but a figure above a wall of other people's logos invites the
+    // reader to bind the two, so the number went and the plumbing with it.
     const bandMarkup = strip(LANDING_SRC.slice(LANDING_SRC.indexOf(LEGACY_SECTIONS_SLOT)));
     for (const [label, src] of [
-      // MIN_TILES_PER_ROW / the cache TTL are structural constants, not claims;
-      // neither is a number the page prints.
-      ['homeSections.ts', strip(MODULE_SRC).replace(/^.*(TTL_MS|MIN_TILES_PER_ROW).*$/gm, '')],
+      // MIN_TILES_PER_ROW is a structural constant, not a claim the page prints.
+      ['homeSections.ts', strip(MODULE_SRC).replace(/^.*MIN_TILES_PER_ROW.*$/gm, '')],
       ['the new homepage band', bandMarkup],
+      ['the rendered marquee', strip(renderLogoMarquee(HOME_PARTNER_LOGOS))],
     ] as const) {
       const counts = src.match(/\b\d{1,3}(,\d{3})+\b|\b\d{4,}\b/g) ?? [];
       expect(counts, `${label} must not carry a hard-coded count`).toEqual([]);
     }
+    expect(renderLogoMarquee(LOGOS)).not.toMatch(/\b\d[\d,]*\s+(carriers|shippers|users|companies|businesses)\b/i);
   });
 
-  it('states a directory size, not a customer or partner count', () => {
-    const out = renderLogoMarquee(LOGOS, 331482);
-    expect(out).toContain('listed in the QuoteFleet directory');
-    expect(out).not.toMatch(/customers|clients|trusted by|companies use/i);
+  it('reads no database at all — the band is a pure function of committed data', () => {
+    // `applyHomeSections` used to take a carrier total fetched behind a cache.
+    // Nothing here may reach for the directory's queries again: the homepage's
+    // request path has no DB dependency and this is what keeps it that way.
+    expect(strip(MODULE_SRC)).not.toContain('getPersistedCarrierTotal');
+    expect(strip(MODULE_SRC)).not.toContain("from '../directory/queries.js'");
+    expect(renderLogoMarquee(HOME_PARTNER_LOGOS)).toBe(renderLogoMarquee(HOME_PARTNER_LOGOS));
   });
 });

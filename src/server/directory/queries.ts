@@ -960,27 +960,14 @@ export async function getPersistedCarrierDataAsOf(): Promise<Date | null> {
   }
 }
 
-/**
- * The DIRECTORY-WIDE CARRIER TOTAL for marketing surfaces, read from the
- * persisted singleton only. Same contract as getPersistedCarrierDataAsOf above,
- * and for the same reason: the homepage must never be able to trigger the live
- * ~330k-row scan, so this stops at the PK lookup and answers `null` when the
- * singleton has not been populated yet. A `null` is not an error — the caller
- * omits the claim rather than printing a number it cannot source. Never throws.
- *
- * `0` is a legitimate answer (an empty directory) and is returned as `0`, not
- * folded into `null`; the caller decides what an empty directory means for it.
- */
-export async function getPersistedCarrierTotal(): Promise<number | null> {
-  try {
-    const persisted = await loadPersistedAggregates();
-    const total = persisted?.summary?.total;
-    return typeof total === 'number' && Number.isFinite(total) && total >= 0 ? total : null;
-  } catch (err) {
-    console.warn('[directory] getPersistedCarrierTotal failed (non-fatal):', err);
-    return null;
-  }
-}
+/* `getPersistedCarrierTotal()` lived here from #546 until the homepage stopped
+   headlining the carrier count. It had exactly one caller — the marquee heading
+   in home/homeSections.ts — and when that copy changed to "Built for drivers,
+   brokers and importers" the function had none, so it went with it rather than
+   staying as an exported read nothing reads. The directory's own pages get
+   their totals from `loadPersistedAggregates()` directly, which is what this
+   wrapped; a future marketing surface that wants the number should call that,
+   and should NOT reach for the live ~330k-row scan. */
 
 // ─── Faceted filter model ─────────────────────────────────────────────────
 //

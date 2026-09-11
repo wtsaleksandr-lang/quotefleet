@@ -567,8 +567,8 @@ export function createApp(): express.Express {
     // applyHomeSections fills the two below-the-bento-grid slots: the hidden
     // legacy band (empty while HOME_LEGACY_SECTIONS_ENABLED is false — see
     // home/homeSections.ts for the one-line restore) and the logo marquee
-    // (empty while HOME_PARTNER_LOGOS is). Like the freshness injector it is
-    // synchronous and reads a process-local cache, so the homepage still has
+    // (empty while HOME_PARTNER_LOGOS is). It is a pure string substitution
+    // over committed data — no cache, no database — so the homepage still has
     // no request-path DB dependency.
     return void readFile(resolve(publicDir, 'landing.html'), 'utf8')
       .then((raw) => applyHomeSections(raw))
