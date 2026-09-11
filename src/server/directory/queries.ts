@@ -299,6 +299,18 @@ export interface DirectorySummary {
   intermodalTotal: number;
   states: number;
   byState: { state: string; count: number }[];
+  /**
+   * Live per-domicile-country row counts, descending. THE SOURCE OF TRUTH for
+   * whether a country control may render a given flag at all: a code absent
+   * here (or present with 0) has no carriers, so offering it would be a filter
+   * that returns nothing. Folded out of the SAME grouped scan that produces
+   * `byState` — it costs no extra pass over the ~330k-row table.
+   *
+   * Optional for the same reason `dataAsOf` is: persisted JSONB summary rows
+   * written before this field existed simply lack it, and callers fall back to
+   * "don't render the control" rather than guessing.
+   */
+  byCountry?: { country: string; count: number }[];
   byPort: { code: string; name: string; city: string; state: string; count: number }[];
   /**
    * The DIRECTORY-WIDE FMCSA data vintage: `max(updated_at)` as an ISO string.
@@ -333,6 +345,7 @@ function emptyDirectorySummary(): DirectorySummary {
     intermodalTotal: 0,
     states: 0,
     byState: [],
+    byCountry: [],
     byPort: (() => {
       const seen = new Map<string, { code: string; name: string; city: string; state: string; count: number }>();
       for (const p of CONTAINER_PORTS) {
@@ -878,10 +891,18 @@ async function getDirectorySummaryUnsafe(budgetMs?: number): Promise<DirectorySu
   // REQUEST path passes no budget (unchanged 8s-per-statement ceiling); the
   // OFF-path recompute passes a total budget so the whole transaction is bounded.
   const { byStateRows, byPortRows, intermodalRow, asOfRow } = await withAggregateTimeout(async (tx) => {
+    // Grouped by (state, country) rather than state alone: BOTH aggregates fold
+    // out of this ONE scan, so the country control costs no extra pass over the
+    // ~330k rows (see the aggregate-hardening note above — scans here are the
+    // thing that took the site to 000, so a new one would not be free).
     const byStateRows = await tx
-      .select({ state: carrierDirectory.state, n: sql<number>`count(*)::int` })
+      .select({
+        state: carrierDirectory.state,
+        country: carrierDirectory.country,
+        n: sql<number>`count(*)::int`,
+      })
       .from(carrierDirectory)
-      .groupBy(carrierDirectory.state);
+      .groupBy(carrierDirectory.state, carrierDirectory.country);
 
     const byPortRows = await tx
       .select({ port: carrierDirectory.nearestPortCode, n: sql<number>`count(*)::int` })
@@ -903,9 +924,28 @@ async function getDirectorySummaryUnsafe(budgetMs?: number): Promise<DirectorySu
     return { byStateRows, byPortRows, intermodalRow, asOfRow };
   }, budgetMs);
 
-  const byState = byStateRows
-    .filter((r) => r.state)
-    .map((r) => ({ state: r.state as string, count: r.n }))
+  // Re-sum per state: the scan now groups by (state, country), so a state code
+  // that exists in two countries yields two rows and must be added back up.
+  const stateTotals = new Map<string, number>();
+  for (const r of byStateRows) {
+    if (!r.state) continue;
+    stateTotals.set(r.state, (stateTotals.get(r.state) ?? 0) + r.n);
+  }
+  const byState = [...stateTotals.entries()]
+    .map(([state, count]) => ({ state, count }))
+    .sort((a, b) => b.count - a.count);
+
+  // Per-country totals out of the same rows. Rows with a null/blank country are
+  // skipped rather than bucketed into a guess — an unknown domicile is not a
+  // country, and the control must never offer a flag it cannot filter on.
+  const countryTotals = new Map<string, number>();
+  for (const r of byStateRows) {
+    const code = (r.country ?? '').toUpperCase();
+    if (!code) continue;
+    countryTotals.set(code, (countryTotals.get(code) ?? 0) + r.n);
+  }
+  const byCountry = [...countryTotals.entries()]
+    .map(([country, count]) => ({ country, count }))
     .sort((a, b) => b.count - a.count);
 
   const portCountByCode = new Map(byPortRows.filter((r) => r.port).map((r) => [r.port as string, r.n]));
@@ -932,6 +972,7 @@ async function getDirectorySummaryUnsafe(budgetMs?: number): Promise<DirectorySu
     intermodalTotal: intermodalRow[0]?.n ?? 0,
     states: byState.length,
     byState,
+    byCountry,
     byPort,
     dataAsOf: asOfDate && !Number.isNaN(asOfDate.getTime()) ? asOfDate.toISOString() : null,
   };
@@ -1104,6 +1145,62 @@ export const DRIVERS_BUCKETS: ReadonlyArray<{ id: DriversBucketId; label: string
   { id: '250+', label: '250+ drivers', min: 251, max: null },
 ];
 
+/**
+ * DOMICILE-COUNTRY FACET — the registry, NOT a claim of coverage.
+ *
+ * `carrier_directory.country` is set by the ingest from the carrier's FMCSA
+ * physical state/province (carrierIngest.carrierCountry): a US state/territory →
+ * 'US', a Canadian province → 'CA' (gated behind the ingest's `includeCanada`,
+ * which runIngest defaults ON), anything else → the row is DROPPED.
+ *
+ * This list is therefore the set of countries the schema can REPRESENT, and is
+ * deliberately NOT the set the UI renders. Every surface that draws a country
+ * control drives it off the live per-country COUNT (DirectorySummary.byCountry /
+ * FacetCounts.country) and renders only the codes that actually have rows — so a
+ * flag can never advertise a filter that returns nothing. See
+ * `countriesWithData()` and `directorySearchHero` in pages.ts.
+ *
+ * MX is listed because FMCSA genuinely licenses ~13k Mexico-domiciled active
+ * property carriers under US cross-border authority, and the column can hold
+ * 'MX' the moment an ingest admits them. It renders only if/when it has rows.
+ */
+export const COUNTRY_OPTIONS: ReadonlyArray<{ id: string; code: string; label: string; name: string }> = [
+  { id: 'US', code: 'US', label: 'US', name: 'United States' },
+  { id: 'CA', code: 'CA', label: 'CA', name: 'Canada' },
+  { id: 'MX', code: 'MX', label: 'MX', name: 'Mexico' },
+];
+
+/** Accepted `?country=` values — anything else degrades to null (unfiltered). */
+export const COUNTRY_IDS: ReadonlySet<string> = new Set(COUNTRY_OPTIONS.map((c) => c.id));
+
+/** Display name for a stored country code ('CA' → 'Canada'); falls back to the
+ *  raw code so an unrecognised value still renders rather than blanking a chip. */
+export function countryName(code: string): string {
+  return COUNTRY_OPTIONS.find((c) => c.id === code)?.name ?? code;
+}
+
+/**
+ * THE HONESTY GATE for every country control on the site.
+ *
+ * Given live per-country counts, return the COUNTRY_OPTIONS entries that
+ * actually have carriers — in canonical order, each with its real count. A
+ * control built from this can only ever offer a filter that returns rows.
+ *
+ * Returns `[]` when fewer than two countries have data: a segmented control
+ * with a single real choice is not a filter, it is decoration that implies the
+ * other options were rejected rather than absent. Callers render nothing then.
+ */
+export function countriesWithData(
+  counts: ReadonlyArray<{ country: string; count: number }> | undefined,
+): Array<{ id: string; code: string; label: string; name: string; count: number }> {
+  if (!counts?.length) return [];
+  const byCode = new Map(counts.map((c) => [c.country.toUpperCase(), c.count]));
+  const present = COUNTRY_OPTIONS.map((o) => ({ ...o, count: byCode.get(o.id) ?? 0 })).filter(
+    (o) => o.count > 0,
+  );
+  return present.length >= 2 ? present : [];
+}
+
 export const SAFETY_OPTIONS: ReadonlyArray<{ id: SafetyId; label: string; letter: string | null }> = [
   { id: 'satisfactory', label: 'Satisfactory', letter: 'S' },
   { id: 'conditional', label: 'Conditional', letter: 'C' },
@@ -1151,6 +1248,10 @@ const RECENT_DAYS = 365;
 /** Normalized, fully-clamped facet state — safe to hand straight to SQL. */
 export interface DirectoryFilters {
   state: string | null;
+  /** Domicile country ('US' | 'CA' | 'MX'); null = every country. Single-select,
+   *  ANDed with `state` (a state already implies its country, so the pair is
+   *  consistent rather than contradictory). See COUNTRY_OPTIONS. */
+  country: string | null;
   port: string | null;
   citySlug: string | null;
   fleet: FleetBucketId | null;
@@ -1331,6 +1432,12 @@ export function normalizeFilters(
   // other unrecognised facet value already degrades.
   const portRawUnchecked = str(raw.port).toUpperCase().slice(0, 8);
   const portRaw = portRawUnchecked && isKnownPortCode(portRawUnchecked) ? portRawUnchecked : '';
+  // `?country=` is WHITELISTED against COUNTRY_OPTIONS for the same reason
+  // `?port=` is: an unbounded string would mint real 200 pages with zero results.
+  // The WHOLE value is matched — deliberately NOT `.slice(0, 2)`, which would
+  // fold `?country=USANYTHING` into a real, self-canonicalising US results page
+  // and hand a crawler an unbounded supply of near-duplicate URLs.
+  const countryRaw = str(raw.country).toUpperCase();
   const fleetRaw = str(raw.fleet) as FleetBucketId;
   const driversRaw = str(raw.drivers) as DriversBucketId;
   const sortRaw = str(raw.sort).toLowerCase() as SortId;
@@ -1352,6 +1459,7 @@ export function normalizeFilters(
   const cargo: CargoId[] = parseMultiFacet<CargoId>(raw.cargo, CARGO_IDS, CARGO_OPTIONS.map((c) => c.id));
   return {
     state: overrides && 'state' in overrides ? overrides.state ?? null : /^[A-Z]{2}$/.test(stateRaw) ? stateRaw : null,
+    country: COUNTRY_IDS.has(countryRaw) ? countryRaw : null,
     port: overrides && 'port' in overrides ? overrides.port ?? null : portRaw || null,
     citySlug:
       overrides && 'citySlug' in overrides ? overrides.citySlug ?? null : str(raw.city) ? citySlugify(str(raw.city)) : null,
@@ -1378,6 +1486,7 @@ export function normalizeFilters(
 /** Which facet keys, if present on /directory, switch it from landing → results. */
 export const FACET_QUERY_KEYS = [
   'state',
+  'country',
   'port',
   'city',
   'fleet',
@@ -1491,6 +1600,7 @@ const recentCutoff = (): Date => new Date(Date.now() - RECENT_DAYS * 24 * 60 * 6
 export function buildConditions(f: DirectoryFilters, exclude: Set<string> = new Set()): SQL[] {
   const c: SQL[] = [];
   if (f.state && !exclude.has('state')) c.push(eq(carrierDirectory.state, f.state));
+  if (f.country && !exclude.has('country')) c.push(eq(carrierDirectory.country, f.country));
   if (f.port && !exclude.has('port')) {
     const pc = portCondition(f.port);
     if (pc) c.push(pc);
@@ -1677,6 +1787,10 @@ async function listCarriersUnsafe(filters: DirectoryFilters): Promise<CarrierLis
 
 // ─── Facet counts ─────────────────────────────────────────────────────────
 export interface FacetCounts {
+  /** Per-domicile-country counts for the CURRENT filter set, keyed by country
+   *  code ('US' | 'CA' | 'MX'). Excludes the country dimension itself, like
+   *  every other facet, so each flag shows what picking it would yield. */
+  country: Record<string, number>;
   fleet: Record<FleetBucketId, number>;
   drivers: Record<DriversBucketId, number>;
   /** Per-equipment/cargo-type counts, keyed by EquipmentId (all FMCSA columns). */
@@ -1707,6 +1821,7 @@ export interface FacetCounts {
 
 function emptyFacetCounts(): FacetCounts {
   return {
+    country: {},
     fleet: { '1-25': 0, '26-100': 0, '101-500': 0, '500+': 0 },
     drivers: { '1-10': 0, '11-50': 0, '51-250': 0, '250+': 0 },
     equipment: { drayage: 0, dryvan: 0, reefer: 0, hazmat: 0, tanker: 0, flatbed: 0, drybulk: 0 },
@@ -1774,6 +1889,7 @@ const FACET_COUNTS_CACHE_MAX = 1500;
 export function facetCacheKey(filters: DirectoryFilters): string {
   const k: Omit<DirectoryFilters, 'sort' | 'dir' | 'page' | 'perPage'> = {
     state: filters.state,
+    country: filters.country,
     port: filters.port,
     citySlug: filters.citySlug,
     fleet: filters.fleet,
@@ -1916,6 +2032,16 @@ async function getFacetCountsUnsafe(filters: DirectoryFilters, budgetMs?: number
       return c.length ? and(...c) : undefined;
     };
 
+    // Domicile country — one grouped scan, excluding the country dimension so
+    // each flag's badge is "what you'd get if you picked this", matching every
+    // other facet's semantics.
+    await arm();
+    const countryRows = await tx
+      .select({ code: carrierDirectory.country, n: sql<number>`count(*)::int` })
+      .from(carrierDirectory)
+      .where(whereOf('country'))
+      .groupBy(carrierDirectory.country);
+
     // Fleet buckets — one grouped scan.
     await arm();
     const fleetRows = await tx
@@ -2031,6 +2157,12 @@ async function getFacetCountsUnsafe(filters: DirectoryFilters, budgetMs?: number
     ]);
 
     const out = emptyFacetCounts();
+    // Null/blank country rows are skipped, not bucketed — an unknown domicile is
+    // not a country, and a flag must never be offered for one we can't filter.
+    for (const r of countryRows) {
+      const code = (r.code ?? '').toUpperCase();
+      if (code) out.country[code] = (out.country[code] ?? 0) + r.n;
+    }
     for (const r of fleetRows) if (r.bucket in out.fleet) out.fleet[r.bucket as FleetBucketId] = r.n;
     for (const r of driversRows) if (r.bucket in out.drivers) out.drivers[r.bucket as DriversBucketId] = r.n;
     const eqCounts = equipmentRows[0];

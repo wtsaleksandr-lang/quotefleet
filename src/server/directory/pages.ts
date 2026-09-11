@@ -37,6 +37,9 @@ import {
   SORT_OPTIONS,
   SORT_DIR_DEFAULTS,
   FACET_QUERY_KEYS,
+  COUNTRY_OPTIONS,
+  countriesWithData,
+  countryName,
   sortIsDirectional,
   citySlugify,
   titleCaseCity,
@@ -2072,6 +2075,17 @@ export const DIRECTORY_CSS = `
   .dsh-pill { font-family: var(--font-mono); font-size: 12px; letter-spacing: 0.04em; padding: 8px 16px; border-radius: var(--radius-pill); border: 1px solid var(--cta-sec-border); background: transparent; color: var(--accent-ink); text-decoration: none; white-space: nowrap; transition: border-color .2s ease; }
   .dsh-pill:hover { border-color: var(--accent-ink); }
   .dsh-pill.is-on { border-color: var(--accent-ink); border-width: 2px; padding: 8px 16px; }
+  /* Domicile-country segment. The active option is a SOLID pill; the rest sit
+     transparent on the blue card. --accent-ink/--accent-fill are white/blue in
+     BOTH themes (the card is always blue), so the contrast is fixed, not
+     theme-dependent — unlike --surface/--ink, which invert in dark. */
+  .dsh-cseg { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin: 0 0 12px; }
+  .dsh-cpill { display: inline-flex; align-items: center; gap: 8px; padding: 8px 16px; border-radius: var(--radius-pill); border: 1px solid var(--cta-sec-border); background: transparent; color: var(--accent-ink); text-decoration: none; white-space: nowrap; font-family: var(--font-mono); font-size: 12px; letter-spacing: 0.04em; transition: border-color .2s ease, background .2s ease; }
+  .dsh-cpill:hover { border-color: var(--accent-ink); }
+  .dsh-cpill.is-on { background: var(--accent-ink); border-color: var(--accent-ink); color: var(--accent-fill); font-weight: 600; }
+  /* Fixed box so a flag never squeezes; rounded to hint at a real flag edge. */
+  .dsh-flag { flex: 0 0 auto; width: 16px; height: 12px; border-radius: 0; display: block; }
+  .dsh-ccode { line-height: 1; }
   .dsh-adv { margin: 0 0 24px; font-size: 13px; }
   .dsh-adv a { color: var(--accent-ink); text-decoration: underline; text-underline-offset: 3px; }
   .dsh-chipwrap { width: 100%; border-top: 1px solid var(--cta-sec-border); padding-top: 24px; }
@@ -2108,6 +2122,14 @@ export const DIRECTORY_CSS = `
        scrolling segmented control is the canonical phone form anyway. The
        scroll is contained, so the page itself never scrolls sideways. */
     .dsh-seg { flex-wrap: nowrap; overflow-x: auto; justify-content: flex-start; width: 100%; }
+    /* Country wraps rather than scrolling, so no option can hide off the edge.
+       NO-ORPHAN RULE: All + three countries is 4 pills, which overflows a 375px
+       row and free-wraps 3+1 — one pill stranded on its own line. Grid it 2×2
+       instead. Three pills (All + two countries) still fit one line, so they
+       keep the flex row. */
+    .dsh-cseg { flex-wrap: wrap; justify-content: flex-start; width: 100%; }
+    .dsh-cseg[data-count="4"] { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .dsh-cseg[data-count="4"] .dsh-cpill { justify-content: center; }
     .dsh-inner { align-items: flex-start; text-align: left; }
     .dsh-sub, .dsh-adv { text-align: left; }
   }
@@ -2990,6 +3012,7 @@ function pageHref(scope: FacetScope, f: DirectoryFilters, page: number): string 
 function currentParams(f: DirectoryFilters, locked: Set<string>): Record<string, string> {
   const p: Record<string, string> = {};
   if (!locked.has('state') && f.state) p.state = f.state;
+  if (!locked.has('country') && f.country) p.country = f.country;
   if (!locked.has('port') && f.port) p.port = f.port;
   if (!locked.has('city') && f.citySlug) p.city = f.citySlug;
   if (f.fleet) p.fleet = f.fleet;
@@ -3021,6 +3044,7 @@ function actionBarFilterQuery(f: DirectoryFilters): string {
 type FacetChange = Partial<
   Record<
     | 'state'
+    | 'country'
     | 'port'
     | 'city'
     | 'fleet'
@@ -3449,6 +3473,35 @@ function renderSidebar(scope: FacetScope, f: DirectoryFilters, counts: FacetCoun
     facetCount(counts, counts.recent),
   );
 
+  // Domicile country — rendered ONLY where two or more countries have rows
+  // (countriesWithData returns [] otherwise), and only where country is not the
+  // page's locked subject. Uses facetOptionRow, so it is a `.facet-opt` link and
+  // therefore participates in the X-QF-Partial in-page results swap and the
+  // single-select sibling-deactivation that DIRECTORY_NAV_SCRIPT already does
+  // for every other single-choice facet — no new client code.
+  let countryGroup = '';
+  if (!scope.locked.has('country')) {
+    const present = countriesWithData(
+      COUNTRY_OPTIONS.map((o) => ({ country: o.id, count: counts.country?.[o.id] ?? 0 })),
+    );
+    if (present.length) {
+      const rows = present
+        .map((c) =>
+          facetOptionRow(
+            f.country === c.id,
+            hrefWith(scope, f, { country: f.country === c.id ? null : c.id }),
+            c.name,
+            facetCount(counts, counts.country?.[c.id]),
+          ),
+        )
+        .join('\n');
+      countryGroup = facetGroup(
+        'Country',
+        `<span class="facet-src">FMCSA physical domicile</span>${rows}`,
+      );
+    }
+  }
+
   // 'all' scope only — quick state refine (links to canonical state pages / scope).
   let stateGroup = '';
   if (scope.kind === 'all' && summary) {
@@ -3480,6 +3533,7 @@ function renderSidebar(scope: FacetScope, f: DirectoryFilters, counts: FacetCoun
   // rendered BEFORE this rail (see facetedLayoutInner) so the rail unfolds
   // directly under the button. DIRECTORY_NAV_SCRIPT wires it (delegated).
   return `<aside class="dir-rail" id="dir-rail">
+    ${countryGroup}
     ${stateGroup}
     ${portsGroup}
     ${facetGroup('Equipment &amp; cargo', `<span class="facet-src">FMCSA cargo-type flags</span>${equipment}`)}
@@ -3498,6 +3552,7 @@ function appliedChips(scope: FacetScope, f: DirectoryFilters): string {
     chips.push(`<a class="applied-chip" href="${hrefWith(scope, f, change)}">${esc(label)} <span class="x">✕</span></a>`);
   if (f.q) add(`Name: “${f.q}”`, { q: null });
   if (!scope.locked.has('state') && f.state) add(stateByCode(f.state)?.name ?? f.state, { state: null });
+  if (!scope.locked.has('country') && f.country) add(countryName(f.country), { country: null });
   if (!scope.locked.has('port') && f.port) {
     const g = PORT_GROUPS.find((x) => x.code === f.port) ?? portGroupForMemberCode(f.port);
     add(g?.label ?? f.port, { port: null });
@@ -4155,6 +4210,80 @@ export function renderDirectoryLanding(
 }
 
 /**
+ * FLAG ICONS — INLINE SVG, DELIBERATELY NOT EMOJI.
+ *
+ * The reference uses 🇨🇦/🇺🇸/🇲🇽 emoji. Those are regional-indicator PAIRS, and
+ * WINDOWS HAS NO FLAG GLYPHS: Segoe UI Emoji ships none, so Chrome/Edge/Firefox
+ * on Windows fall back to rendering the two letters in boxes — "🇺🇸" comes out as
+ * a literal "US" tile pair beside our own "US" label. Verified on Win10/Chrome
+ * before choosing this. Android/iOS/macOS render them fine, which is exactly
+ * what makes emoji the wrong call: it looks correct to most reviewers and broken
+ * to a large share of real desktop traffic.
+ *
+ * These are 16×12 inline SVGs instead — identical on every platform, ~120 bytes
+ * each, no font dependency, no network request. They carry the national colours
+ * as literal hex BY NECESSITY: a flag's colours are not ours to tokenise, and
+ * this is markup, not DIRECTORY_CSS (the token guard scans the stylesheet).
+ * They are decorative — `aria-hidden`, with the country name in real text
+ * beside them — so a screen reader reads "United States", never "flag".
+ */
+/** ["Canada"] → "Canada"; ["Canada","Mexico"] → "Canada and Mexico"; 3+ → Oxford
+ *  comma list. Used so the hero's coverage clause reads as a sentence whether
+ *  one, two or three countries actually have carriers. */
+function listPhrase(items: string[]): string {
+  if (items.length <= 1) return items[0] ?? '';
+  if (items.length === 2) return `${items[0]} and ${items[1]}`;
+  return `${items.slice(0, -1).join(', ')}, and ${items[items.length - 1]}`;
+}
+
+const COUNTRY_FLAG_SVG: Readonly<Record<string, string>> = {
+  US: `<svg class="dsh-flag" viewBox="0 0 16 12" width="16" height="12" aria-hidden="true" focusable="false"><rect width="16" height="12" fill="#B22234"/><g fill="#FFFFFF"><rect y="1.7" width="16" height="1.7"/><rect y="5.1" width="16" height="1.7"/><rect y="8.5" width="16" height="1.7"/></g><rect width="7" height="6.8" fill="#3C3B6E"/></svg>`,
+  CA: `<svg class="dsh-flag" viewBox="0 0 16 12" width="16" height="12" aria-hidden="true" focusable="false"><rect width="16" height="12" fill="#FFFFFF"/><g fill="#D52B1E"><rect width="4" height="12"/><rect x="12" width="4" height="12"/><path d="M8 2.4l.8 1.9 1.9-.5-.7 1.8 1.1.6-1.7 1.2.3 1.1-1.4-.3v1.4h-.6V8.2l-1.4.3.3-1.1L4.9 6.2 6 5.6l-.7-1.8 1.9.5z"/></g></svg>`,
+  MX: `<svg class="dsh-flag" viewBox="0 0 16 12" width="16" height="12" aria-hidden="true" focusable="false"><rect width="16" height="12" fill="#FFFFFF"/><rect width="5.34" height="12" fill="#006847"/><rect x="10.66" width="5.34" height="12" fill="#CE1126"/><circle cx="8" cy="6" r="1.6" fill="none" stroke="#8C6239" stroke-width="0.9"/></svg>`,
+};
+
+/**
+ * THE DOMICILE-COUNTRY SEGMENT — the reference's All/CA/US/MX control, built
+ * from LIVE COUNTS instead of from the reference's option list.
+ *
+ * `countriesWithData()` returns only codes with rows, and returns nothing at all
+ * below two codes, so this renders exactly when it is a real choice. At time of
+ * writing `carrier_directory` is 100% 'US' (the ingest tags Canadian carriers
+ * only when INGEST_INCLUDE_CANADA is on AND a re-ingest has run, and drops
+ * Mexico-domiciled carriers outright), so this control is CORRECTLY INVISIBLE in
+ * production today and lights up on its own the moment the data arrives —
+ * without a code change, and never before. That is the whole point: the owner
+ * asked for the flags, and the flags appear when they would not be a lie.
+ */
+function countrySegment(
+  present: ReturnType<typeof countriesWithData>,
+  activeCountry: string | null,
+): string {
+  if (!present.length) return '';
+  const pill = (href: string, on: boolean, icon: string, label: string, title: string) =>
+    `<a class="dsh-cpill${on ? ' is-on' : ''}" href="${esc(href)}"${on ? ' aria-current="true"' : ''} title="${esc(title)}">${icon}<span class="dsh-ccode">${esc(label)}</span></a>`;
+  const globe = `<svg class="dsh-flag" viewBox="0 0 16 12" width="16" height="12" aria-hidden="true" focusable="false"><circle cx="8" cy="6" r="5" fill="none" stroke="currentColor" stroke-width="1.1"/><ellipse cx="8" cy="6" rx="2.1" ry="5" fill="none" stroke="currentColor" stroke-width="1.1"/><path d="M3 6h10" stroke="currentColor" stroke-width="1.1"/></svg>`;
+  const all = pill('/directory?sort=featured', !activeCountry, globe, 'All', 'Carriers in every country');
+  const rest = present
+    .map((c) =>
+      pill(
+        `/directory?country=${encodeURIComponent(c.id)}&sort=featured`,
+        activeCountry === c.id,
+        COUNTRY_FLAG_SVG[c.id] ?? '',
+        c.label,
+        `${c.name} — ${fmtNum(c.count)} carriers`,
+      ),
+    )
+    .join('');
+  // data-count drives the mobile wrap. Four pills (All + three countries) are
+  // one too wide for a 375px row and would wrap 3+1, leaving an orphan; the
+  // stylesheet turns exactly that case into a 2×2 grid. Three still fit on one
+  // line. See the no-orphan rule in the mobile block of DIRECTORY_CSS.
+  const n = 1 + present.length;
+  return `<div class="dsh-cseg" data-count="${n}" role="group" aria-label="Filter by domicile country">${all}${rest}</div>`;
+}
+
+/**
  * THE /directory SEARCH HERO.
  *
  * A deep-blue card at the top of the landing page holding the whole entry
@@ -4166,13 +4295,23 @@ export function renderDirectoryLanding(
  * only the fill differs, because the owner asked for the deep-blue treatment
  * here.
  *
+ * THE COUNTRY SEGMENT (the reference's All/CA/US/MX row) is rendered by
+ * countrySegment() from LIVE per-country counts — see its note. It appears only
+ * when two or more countries actually have carriers, so it cannot advertise
+ * coverage we do not have. The fleet-size segment stays underneath it: it is a
+ * different question (how big) from the country one (where), both are
+ * single-select, and at 375px they stack as two scrollable rows rather than
+ * competing for one. Country leads because it is the coarser cut.
+ *
  * WHAT WE DELIBERATELY DID NOT COPY FROM THE REFERENCE:
  *
- *  • ITS All / CA / US / MX COUNTRY SEGMENT. carrier_directory is the FMCSA
- *    census — it is US-only. Rendering a Canada or Mexico pill would advertise
- *    coverage that does not exist. The segment is fleet size instead
- *    (FLEET_BUCKETS), which is single-select like a country segment, is a real
- *    indexed column, and is the first thing a shipper actually narrows on.
+ *  • ITS "1,000,000+ ACROSS CANADA, THE UNITED STATES AND MEXICO" FRAMING. Our
+ *    sub-line states OUR live COUNT(*) and describes OUR coverage: FMCSA-
+ *    registered carriers, and — only when the data says so — the cross-border
+ *    operators domiciled outside the US that hold US authority.
+ *  • ITS "VERIFIED COMPANIES" BULLET. We do not verify companies. We restate
+ *    FMCSA's own authority status and safety rating, which is what the trust
+ *    row says, in those words.
  *  • ITS "TRACK YOUR PARS" TILE. That is a customs feature we have not built.
  *    A placeholder for it would be a promise we cannot keep.
  *  • ITS EMPTY-DATA AESTHETIC. Every number in this block is a live COUNT(*)
@@ -4180,6 +4319,27 @@ export function renderDirectoryLanding(
  */
 function directorySearchHero(summary: DirectorySummary, stateCount: number, isEmpty: boolean): string {
   const total = fmtNum(summary.total);
+  // Live country mix. Drives BOTH the segment and the sub-line's coverage
+  // clause, so the sentence and the control can never disagree.
+  const present = countriesWithData(summary.byCountry);
+  const crossBorder = present.filter((c) => c.id !== 'US');
+  // Every carrier here holds US operating authority — that is what being in the
+  // FMCSA L&I file MEANS. What varies is DOMICILE. So the "US" in the eyebrow
+  // and headline is dropped once non-US domiciles are present, rather than
+  // sitting next to a Canada flag and a sentence that names Mexico.
+  const eyebrow = crossBorder.length ? 'North America carrier directory' : 'US carrier directory';
+  const heading = crossBorder.length
+    ? 'Find the right carrier for your shipment'
+    : 'Find the right US carrier for your shipment';
+  // The searchable-by clause stays attached to the verb; the coverage aside goes
+  // LAST. ("…domiciled in Canada and Mexico by name, fleet size…" garden-paths.)
+  const searchableBy =
+    'by name, fleet size, equipment, cargo, safety rating and operating authority';
+  const coverage = crossBorder.length
+    ? `Search ${total} FMCSA-registered freight and drayage carriers ${searchableBy} — including ${fmtNum(
+        crossBorder.reduce((s, c) => s + c.count, 0),
+      )} cross-border operators domiciled in ${listPhrase(crossBorder.map((c) => c.name))}.`
+    : `Search ${total} FMCSA-registered US freight and drayage carriers ${searchableBy}.`;
   // Segmented row — fleet size. `sort=featured` matches the rest of the
   // directory's entry links so the landing and the results agree on ordering.
   const seg = [
@@ -4218,12 +4378,10 @@ function directorySearchHero(summary: DirectorySummary, stateCount: number, isEm
   <section class="dsh" aria-labelledby="dsh-title">
     <div class="dsh-card">
       <div class="dsh-inner">
-        <p class="dsh-eyebrow">US carrier directory</p>
-        <h1 class="dsh-title" id="dsh-title">Find the right US carrier for your shipment</h1>
+        <p class="dsh-eyebrow">${esc(eyebrow)}</p>
+        <h1 class="dsh-title" id="dsh-title">${esc(heading)}</h1>
         <p class="dsh-sub">${
-          isEmpty
-            ? 'The carrier directory is being set up — carriers are loading.'
-            : `Search ${total} FMCSA-registered US freight and drayage carriers by name, fleet size, equipment, cargo, safety rating and operating authority.`
+          isEmpty ? 'The carrier directory is being set up — carriers are loading.' : coverage
         }</p>
         <form class="dsh-form" role="search" method="get" action="/directory" aria-label="Search carriers by company name">
           <label class="dsh-lbl" for="dsh-q">Company name</label>
@@ -4234,6 +4392,7 @@ function directorySearchHero(summary: DirectorySummary, stateCount: number, isEm
           </div>
           <input type="hidden" name="sort" value="featured">
         </form>
+        ${countrySegment(present, null)}
         <div class="dsh-seg" role="group" aria-label="Narrow by fleet size">${seg}</div>
         <p class="dsh-adv"><a href="/directory?sort=featured">Advanced search — equipment, cargo, drivers, safety, authority <span class="arr">→</span></a></p>
         <div class="dsh-chipwrap">
