@@ -1,6 +1,6 @@
 /* ═══════════════════════════════════════════════════════════════════════════
-   REGENERATES THE HOMEPAGE HERO WASH
-   src/server/public/brand/hero-wash-{light,dark}.webp
+   REGENERATES THE HERO WASH RASTERS
+   src/server/public/brand/{hero-wash-light,hero-wash-dark,dir-hero-wash}.webp
 
    WHY THIS FILE EXISTS.  The hero card's backdrop is a soft multi-stop blue.
    Our design law forbids CSS gradients, so it ships as a decorative raster
