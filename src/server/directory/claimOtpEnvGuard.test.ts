@@ -13,7 +13,7 @@
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 
-const sendEmail = vi.fn(async () => ({ ok: true, provider: 'resend' as const, id: 'msg_1' }));
+const sendEmail = vi.fn(async (_msg: { to: string }) => ({ ok: true, provider: 'resend' as const, id: 'msg_1' }));
 vi.mock('../../email/send.js', async () => {
   const actual = await vi.importActual<typeof import('../../email/send.js')>('../../email/send.js');
   return { ...actual, sendEmail };
