@@ -71,10 +71,18 @@ body.qf-app-calculator .qf-suggestions {
   backdrop-filter: var(--wg-blur-ultra);
   box-shadow: var(--wg-shadow);
 }
+/* The hazmat class menu is the ONE popover here that must stay OPAQUE.
+   Two reasons, both measured:
+     · it painted `--w-bg`, a STATIC legacy token applyTheme() never emits, so
+       on midnight/cream/tesla/booking it came up as a near-WHITE panel inside a
+       charcoal dialog and its shell-coloured labels went white-on-white;
+     · unlike .qf-suggestions (which floats over the page shell), this menu
+       overlays the dialog's OWN chip grid — frosting it renders the chips'
+       bold labels straight through the class names underneath.
+   It now paints the same runtime surface as the dialog it lives in, so text
+   contrast is the engine-guaranteed --w-text pair on every preset. */
 body.qf-app-calculator .qf-hz-list {
-  background: color-mix(in srgb, var(--w-bg, #E6E3E0) 82%, transparent);
-  -webkit-backdrop-filter: var(--wg-blur-ultra);
-  backdrop-filter: var(--wg-blur-ultra);
+  background: var(--w-surface, var(--w-bg, #E6E3E0));
   box-shadow: var(--wg-shadow);
 }
 /* Secondary sub-label ("CA, USA", city/region) inside an address row. It reads
@@ -195,7 +203,7 @@ body.qf-app-calculator .qf-modal-foot {
     background: var(--w-input-bg, #E6E3E0) !important;
   }
   body.qf-app-calculator .qf-hz-list {
-    background: var(--w-bg, #E6E3E0);
+    background: var(--w-surface, var(--w-bg, #E6E3E0));
   }
   body.qf-app-calculator .qf-booking-summary,
   body.qf-app-calculator .qf-modal-head,

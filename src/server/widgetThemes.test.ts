@@ -39,9 +39,12 @@ const REQUIRED_TOKENS = [
   '--w-surface-frost', '--w-frost-blur',
   // Context foregrounds — contrast-audit fixes (footer / hints / result card /
   // active tab), each engine-guaranteed ≥ AA on its own rendered surface.
-  '--w-footer-text', '--w-hint-text',
+  '--w-footer-text', '--w-hint-text', '--w-panel-accent',
   '--w-oncard-text', '--w-oncard-muted', '--w-oncard-accent',
   '--w-tab-active-text',
+  // Selected add-on chip pair — the tint the chip paints, and a label the
+  // engine guarantees ≥ AA on THAT tint (the blue-on-blue "Hazmat · Class 5" fix).
+  '--w-chip-sel-bg', '--w-chip-sel-text',
 ] as const;
 
 const HEX6 = /^#[0-9a-fA-F]{6}$/;
@@ -125,6 +128,38 @@ describe('resolveWidgetTheme', () => {
       expect(values, `${preset.id} contains teal`).not.toContain('#06b6d4');
       expect(values, `${preset.id} contains teal`).not.toContain('#0891b2');
     }
+  });
+
+  it('the SELECTED add-on chip label clears AA on its own tint in every preset', () => {
+    // Regression: the chip painted a hardcoded rgba(37,99,235,.10) tint and used
+    // --w-accent-solid (a FILL token) as its label, so "Hazmat · Class 5" landed
+    // at 2.09:1 on midnight and 1.09:1 on citron. The pair is now derived.
+    for (const preset of WIDGET_PRESET_LIST) {
+      const t = resolveWidgetTheme({ themePreset: preset.id });
+      const bg = t.tokens['--w-chip-sel-bg'];
+      const fg = t.tokens['--w-chip-sel-text'];
+      expect(bg, `${preset.id} chip tint`).toMatch(HEX6);
+      expect(fg, `${preset.id} chip label`).toMatch(HEX6);
+      expect(
+        contrastRatio(fg, bg),
+        `${preset.id} selected chip ${fg} on ${bg}`,
+      ).toBeGreaterThanOrEqual(WCAG.NORMAL);
+    }
+    // The highlighted row of the hazmat class list paints --w-surface-2 and
+    // labels the picked class with the accent — AA on THAT panel, not on the
+    // shell surface (--w-pill-text measured 4.48:1 on midnight there).
+    for (const preset of WIDGET_PRESET_LIST) {
+      const t = resolveWidgetTheme({ themePreset: preset.id });
+      expect(
+        contrastRatio(t.tokens['--w-panel-accent'], t.tokens['--w-surface-2']),
+        `${preset.id} panel accent`,
+      ).toBeGreaterThanOrEqual(WCAG.NORMAL);
+    }
+    // A tenant accent override re-derives the pair rather than inheriting the
+    // preset's — a lime carrier gets a lime-tinted chip that is still readable.
+    const t = resolveWidgetTheme({ themePreset: 'midnight', accentOverride: '#C3F832' });
+    expect(contrastRatio(t.tokens['--w-chip-sel-text'], t.tokens['--w-chip-sel-bg']))
+      .toBeGreaterThanOrEqual(WCAG.NORMAL);
   });
 
   it('exposes exactly twelve presets and eight fonts', () => {
