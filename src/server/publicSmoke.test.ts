@@ -14,7 +14,16 @@ describe('public static page smoke checks', () => {
     const html = renderStaticPage('landing.html');
     expect(html).toContain('See your own freight quote calculator &mdash; live in seconds.');
     expect(html).toContain('Stop losing loads to slow, manual quoting.');
-    expect(html).toContain('For carriers, brokers &amp; forwarders');
+    // NO AUDIENCE EYEBROW, in either panel. The Carriers / Shippers segmented
+    // control sits directly above the headline block and already states who
+    // the page is talking to; the eyebrow under it repeated that in 12px
+    // uppercase and cost a line of the stack above the action cards. VALUE per
+    // docs/design-refactor/test-inventory.md — the rule this guarded (the hero
+    // states its audience) is intact, in the control rather than in a label.
+    expect(html).not.toContain('For carriers, brokers &amp; forwarders');
+    expect(html).not.toContain('For shippers &amp; BCOs');
+    expect(html).toMatch(/data-aud="carriers"[^>]*>Carriers</);
+    expect(html).toMatch(/data-aud="shippers"[^>]*>Shippers</);
     // The illustrated hosted URL must be a domain WE OWN. `yourquote.net` is a
     // GoDaddy/Afternic for-sale parking page belonging to someone else (307 →
     // forsale.godaddy.com, NS = ns1.afternic.com, verified 2026-09-11) and is
@@ -24,12 +33,17 @@ describe('public static page smoke checks', () => {
     expect(html, 'the homepage must not illustrate the product with a domain we do not own')
       .not.toContain('yourquote.net');
     expect(html).toContain('email signature');
-    // CRO hero: outcome-first subhead, short toggle labels, FMCSA trust line,
-    // and the redundant "See a live demo" link removed from the hero.
+    // CRO hero: outcome-first subhead and short toggle labels.
     expect(html).toContain('A branded quote page your customers fill out themselves');
     expect(html).toContain('>Carriers</button>');
     expect(html).toContain('>Shippers</button>');
-    expect(html).toContain('Set up in ~5 minutes · sourced from FMCSA public data.');
+    // The two helper lines under the field are gone at the owner's request —
+    // the setup-time claim and the FMCSA-source line both restated what the
+    // headline and the directory already say. VALUE, not RULE: no honesty
+    // claim goes with them (the FMCSA sourcing is still stated on /directory
+    // and in the shipper panel's `data-qf-fmcsa-asof` line), only duplication.
+    expect(html).not.toContain('Set up in ~5 minutes · sourced from FMCSA public data.');
+    expect(html).not.toContain('hero-trust-line');
     // The hero's redundant "See a live demo" link (class="demo-link") is gone.
     expect(html).not.toContain('class="demo-link"');
     expect(html).toContain('Branded PDF quotes');
@@ -340,14 +354,17 @@ describe('public static page smoke checks', () => {
 describe('"Find your company" carrier finder', () => {
   it('landing carrier hero renders the finder input + accessible listbox + microcopy', async () => {
     const html = renderStaticPage('landing.html');
-    // Input, placeholder, combobox/listbox wiring, and the FMCSA microcopy.
+    // Input, placeholder, combobox/listbox wiring. The FMCSA microcopy under
+    // the field was removed at the owner's request; the WIRING it sat next to
+    // is what this test protects, and every assertion for it is still here.
     expect(html).toContain('data-carrier-finder');
     expect(html).toContain('id="qf-finder-input"');
     expect(html).toContain('placeholder="Enter your company name"');
     expect(html).toContain('role="combobox"');
     expect(html).toContain('id="qf-finder-listbox"');
     expect(html).toContain('role="listbox"');
-    expect(html).toContain('No sign-up. We pull your details from public FMCSA records.');
+    expect(html).not.toContain('No sign-up. We pull your details from public FMCSA records.');
+    expect(html).toContain('data-finder-status');
     // The client script is registered on the page.
     expect(html).toContain('/landing-carrier-finder.js');
   });

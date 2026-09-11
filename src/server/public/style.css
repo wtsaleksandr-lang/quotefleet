@@ -1953,7 +1953,7 @@ html[data-theme="dark"],
    the field per-pixel in float from these same tokens, adds a low-frequency
    value-noise mesh so it is never a pure ramp, and applies ±1 LSB triangular
    dither — which is what keeps a 2560px-wide wash from banding at 8 bits.
-   2560×1100, ~16 KB light / ~12 KB dark.
+   2560×1100, 18.1 KB light / 12.8 KB dark.
 
    THE FIELD IS A CENTRE-LIT VIGNETTE, and the first cut was not. It deepened
    toward the bottom-left and lifted to NEAR-WHITE at the opposite corner, and
@@ -1968,20 +1968,26 @@ html[data-theme="dark"],
    tone falls away to the left and right rails and toward the bottom. The rails
    are structurally text-free (copy is capped at 780px inside a card up to
    2509px wide), so they carry the range — and they sit exactly where the card
-   meets the page. Measured on the rendered page: palest pixel 0.786 against
-   the 0.954 page ground (1.20:1), rails down to 0.418 (1.89:1 at the 1440
-   crop), and the lead paragraph's `--muted` never drops below 4.8:1.
+   meets the page. The blue was then DEEPENED a step at the owner's request.
+   Measured on the regenerated field: 0.3152 → 0.7651 full range (was
+   0.418 → 0.786), so the palest pixel is 0.765 against the 0.954 page ground
+   (1.22:1) and the rails now bottom out at 0.3152 — a 2.58:1 page-to-rail step
+   where the old field managed 1.89:1. Re-measured on the RENDERED page with
+   the glyphs blanked, worst case not mean, across 375 / 1024 / 1440 / 2560:
+   H1 13.77:1 and the lead paragraph 5.25:1 at its very worst (2560, light).
+   Nothing regressed — the old floor was 5.07:1 — because the texture layer
+   that replaced the grain only ever lightens.
 
-   --surface-hero-grain is the TEXTURE, and it is a second, tiled layer rather
-   than part of the wash for a mechanical reason: `cover` downscales the wash,
-   and downscaling averages per-pixel grain out of existence. Tiled 1:1 at its
-   natural 192×192 it renders identically at every card width. It is
-   theme-invariant by construction — grey speckle over a constant low alpha
-   darkens a light ground and lightens a dark one by the same amount — so one
-   17.5 KB asset serves both themes and there is no second token to keep in
-   sync. Amplitude is 3.85 RMS from the local mean, set against a measurement
-   of the reference treatment (~4.3 RMS): enough to read as texture at 100%,
-   not enough to read as dirt or to cost text contrast.
+   --surface-hero-grain is the TEXTURE: fine WHITE STREAKS, not dots. It is a
+   second, tiled layer rather than part of the wash for a mechanical reason:
+   `cover` downscales the wash, and downscaling averages per-pixel texture out
+   of existence. Tiled 1:1 at its natural 256×256 it renders identically at
+   every card width. Every pixel in it is WHITE and only the alpha varies, so
+   one 13.9 KB asset serves both themes, and the layer can only ever LIGHTEN
+   the ground — which is why deepening the wash cost the light theme's dark ink
+   nothing, and why the dark theme's light ink is the only contrast the texture
+   has to be bounded against. See scripts/make-hero-wash.mjs for the
+   row-strength field and the alpha ceiling.
 
    Split light/dark by the SAME cascade `--surface-hero` uses six lines up, so
    one switch drives both the base colour and the image. The dark variant is a
@@ -1989,7 +1995,9 @@ html[data-theme="dark"],
    suppression: a flat rectangle in dark next to a washed card in light reads
    as the unfinished theme. Its envelope is bounded at the TOP instead of the
    bottom — dark `--muted` #90A1B9 needs the ground under luminance 0.0386 —
-   so it runs 0.018 → 0.035, a 1.23:1 step off the #0C111D page ground.
+   so it runs 0.0111 → 0.0304 after the deepening (was 0.018 → 0.035), a
+   1.28:1 step off the #0C111D page ground. Rendered worst case with the white
+   streaks composited on top: H1 14.17:1, lead 5.36:1.
 
    Appended at EOF for baseline-protocol.md rule 1 (the guards key file:line).
    ───────────────────────────────────────────────────────────────────────── */
@@ -2004,5 +2012,45 @@ html[data-theme="dark"],
 @media (prefers-color-scheme: light) {
   :root:not([data-theme="dark"]) {
     --surface-hero-image: url("/brand/hero-wash-light.webp");
+  }
+}
+
+/* ── Wave 6: THE ACCENT THAT SURVIVES A DARK GROUND, AND THE ICON TILE ────
+   `--accent` is not usable as a glyph colour on this site's dark surfaces, and
+   the reason is a cascade fact rather than a theory: style.css defines it as
+   the lightened #8DA2F9 under html[data-theme="dark"], but
+   landing-wefixtrades-cleanup.css re-declares `--accent: #3356EE !important`
+   at :root for the whole marketing bundle, so on the landing page it resolves
+   to the FILL blue in both themes. #3356EE measures 2.50:1 against the hero
+   card's dark ground (#1A2333 with the tile tint over it) — under the 3:1 AA
+   floor for non-text, and well under 4.5:1 for a label.
+
+   `--accent-legible` is the accent chosen by GROUND rather than by theme
+   variable: the brand fill where the ground is light, and the lightened step
+   (the same value the footer already uses for exactly this reason) where it is
+   dark. Measured on the composited tile: 4.87:1 light / 5.08:1 dark.
+
+   `--icon-tile-bg` is the tint behind a card icon. It is stated here rather
+   than borrowed from `--accent-soft` because that token is itself rewritten
+   with !important by two sheets in this bundle, so a tile built on it would
+   change opacity depending on which page it appeared on. Dark needs the
+   heavier alpha: the same 10% over #1A2333 is a 3-level lift and reads as
+   nothing at all.
+
+   Appended at EOF for baseline-protocol.md rule 1 (the guards key file:line).
+   ───────────────────────────────────────────────────────────────────────── */
+:root {
+  --accent-legible: var(--accent-fill);
+  --icon-tile-bg:   rgba(51, 86, 238, 0.10);
+}
+html[data-theme="dark"],
+:root:not([data-theme="light"]) {
+  --accent-legible: var(--footer-accent);
+  --icon-tile-bg:   rgba(51, 86, 238, 0.28);
+}
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]) {
+    --accent-legible: var(--accent-fill);
+    --icon-tile-bg:   rgba(51, 86, 238, 0.10);
   }
 }
