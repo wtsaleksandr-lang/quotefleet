@@ -716,7 +716,24 @@ test.describe('OS/OW calculator — the empty state a first-time visitor meets',
     // ONE disclaimer on the empty page, not three: the banner states the claim,
     // the five-item exclusion list is a disclosure, and the sentence beside the
     // number appears with the number.
-    await expect(page.locator('.ow-truth')).toBeVisible();
+    //
+    // THE BANNER IS NOW A FOLD. #518 replaced the always-open `.ow-truth` box
+    // with `details.qt-fold` — the same "About this…" disclosure every tool page
+    // on the site now carries (heavyHaulQuote / osowPermits / pilotCars /
+    // seasonalRestrictions), and the page's own source comment records the
+    // reason: the claim was being made three times and the fold is the one that
+    // is not the heading and not the results-column list. The CONTRACT is
+    // unchanged, so this asserts it harder than the bare visibility check it
+    // replaces: exactly one such disclosure on the page, and the claim itself is
+    // still inside it. `.ow-truth` only proved a box existed; if the sentence had
+    // been deleted from it the old assertion would still have passed.
+    const claim = page.locator('details.qt-fold');
+    await expect(claim).toHaveCount(1);
+    await expect(claim).toBeVisible();
+    await expect(claim.locator('summary')).toContainText('About this calculator');
+    await claim.locator('summary').click();
+    await expect(claim).toContainText('STATE PERMIT FEES ONLY: no line haul, no fuel, no margin');
+    await expect(claim).toContainText('never inside the permit total');
     const restatements = await page.evaluate(
       () => (document.body.textContent ?? '').match(/not a freight quote/gi)?.length ?? 0,
     );
