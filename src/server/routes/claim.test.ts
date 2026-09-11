@@ -90,7 +90,11 @@ vi.mock('./tenantProvision.js', () => ({
 }));
 // The claim PAGE reads the merged public row via queries.carrierBySlug; back it
 // with the in-memory store so the render path needs no DB.
-vi.mock('../directory/queries.js', () => ({
+vi.mock('../directory/queries.js', async (importOriginal) => ({
+  // PARTIAL mock: pages.ts also imports FACET_QUERY_KEYS (and more) from this
+  // module, so replacing it wholesale breaks the render path in a full-suite
+  // run even though a narrow run happens to resolve the real module first.
+  ...(await importOriginal<typeof import('../directory/queries.js')>()),
   carrierBySlug: vi.fn(async (slug: string) => {
     const c = memStore?.carriers.find((x) => x.slug === slug);
     return c
@@ -129,6 +133,10 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
+  // Null-safe: when beforeAll throws (a bad module mock, say) `server` is never
+  // assigned, and an unguarded close() buries the real error under a
+  // "Cannot read properties of undefined" from teardown.
+  if (!server) return;
   await new Promise<void>((resolve) => server.close(() => resolve()));
 });
 
