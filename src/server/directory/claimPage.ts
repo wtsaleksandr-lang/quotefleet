@@ -14,8 +14,19 @@
  * Pure render (no I/O) so it is unit-tested by string assertions.
  */
 import { layout, esc, carrierName, crumbsHtml, VERIFIED_OWNER_BADGE, type Crumb } from './pages.js';
+import type { ClaimMethod, ManualReason } from './claims.js';
 import type { VisibleCarrier } from './queries.js';
 import { stateByCode } from './usStates.js';
+
+/** The viewer's own claim on THIS profile that is still open, so a reload
+ *  resumes it instead of restarting at step 1. */
+export interface ClaimPending {
+  method: ClaimMethod;
+  /** Masked census address — only for a live `email_otp` code. */
+  maskedEmail: string | null;
+  /** Only for `manual`: why it is with support (drives the copy). */
+  reason: ManualReason | null;
+}
 
 export interface ClaimViewer {
   email: string;
@@ -25,9 +36,36 @@ export interface ClaimViewer {
   ownsThisProfile: boolean;
   /** Owner who has NOT yet started the quote-tool trial → show the upsell CTA. */
   canActivateTrial: boolean;
+  /** This viewer's open claim on this profile, if any. */
+  pending?: ClaimPending | null;
 }
 
 const SUPPORT = 'support@quotefleet.net';
+
+/**
+ * The two manual sub-reasons, as the carrier should read them. `no_email` is a
+ * fact about the FMCSA record; `delivery_failed` is a fact about OUR send — and
+ * telling a carrier who can see their own email on the profile that we "couldn't
+ * find" one reads as a bug and costs us the claim.
+ */
+function manualCopy(usdot: string): Record<ManualReason, string> {
+  return {
+    no_email: `We couldn't find an email on your FMCSA record. Email <a href="mailto:${SUPPORT}">${SUPPORT}</a> from your company address with your USDOT and we'll verify within 1 business day.`,
+    delivery_failed: `We couldn't deliver a code to the email on file for this carrier. Email <a href="mailto:${SUPPORT}">${SUPPORT}</a> from your company address with your USDOT ${esc(usdot)} and we'll verify within 1 business day.`,
+  };
+}
+
+/** The manual-path block, with both sub-reasons present and the inactive one
+ *  hidden — the client reveals whichever the API reported. */
+function manualVariants(usdot: string, active: ManualReason | null): string {
+  const copy = manualCopy(usdot);
+  return (['no_email', 'delivery_failed'] as const)
+    .map(
+      (r) =>
+        `<p data-manual-reason="${r}"${active === r ? '' : ' hidden'}>${copy[r]}</p>`,
+    )
+    .join('\n        ');
+}
 
 /** Copy shared by the success step and the bottom-of-page card. */
 function upsellCard(opts: { profileHref: string; muted: boolean }): string {
@@ -74,7 +112,21 @@ export function renderClaimPage(opts: { carrier: VisibleCarrier; viewer: ClaimVi
       <div class="claim-actions"><a class="btn btn-primary" href="${esc(profileHref)}">Open my profile <span class="arr">→</span></a></div>
       ${v.canActivateTrial ? upsellCard({ profileHref, muted: false }) : ''}
     </section>`;
+  } else if (v?.pending?.method === 'manual') {
+    // With support: a reload must show "we have it", not an empty step 1 that
+    // invites a duplicate request.
+    main = `<section class="cp-card claim-step" data-pending="manual">
+      <h2>Request received — pending review</h2>
+      ${manualVariants(c.usdot, v.pending.reason ?? 'no_email')}
+      <p>What happens next: our team checks your request against the FMCSA record and emails <strong>${esc(v.email)}</strong> when your profile is verified — usually within 1 business day. There is nothing else to do here, and claiming stays free, forever.</p>
+      <div class="claim-actions">
+        <a class="btn btn-secondary" href="${esc(profileHref)}">Back to the profile <span class="arr">→</span></a>
+        <a class="claim-quiet" href="mailto:${SUPPORT}">Contact ${SUPPORT}</a>
+      </div>
+    </section>
+    ${upsellCard({ profileHref, muted: true })}`;
   } else {
+    const pendingOtp = v?.pending?.method === 'email_otp' ? v.pending : null;
     const step1Body = v
       ? v.hasTenant
         ? `<p class="claim-as">Claiming as <strong>${esc(v.email)}</strong>. <a class="claim-quiet" href="/api/auth/logout" data-signout>Not you? Sign out</a></p>
@@ -96,22 +148,22 @@ export function renderClaimPage(opts: { carrier: VisibleCarrier; viewer: ClaimVi
          </form>`;
 
     main = `<ol class="claim-stepper" data-stepper>
-      <li aria-current="step">Your email</li>
-      <li>Verify ownership</li>
+      <li${pendingOtp ? ' class="is-done"' : ' aria-current="step"'}>Your email</li>
+      <li${pendingOtp ? ' aria-current="step"' : ''}>Verify ownership</li>
       <li>Done</li>
     </ol>
 
-    <section class="cp-card claim-step" data-step="1">
+    <section class="cp-card claim-step" data-step="1"${pendingOtp ? ' hidden' : ''}>
       <h2>Your email</h2>
       <p>Use the address you run ${esc(name)} from. If it matches the email on the FMCSA record we can verify you instantly.</p>
       ${step1Body}
       <p class="claim-msg" data-msg role="status" aria-live="polite"></p>
     </section>
 
-    <section class="cp-card claim-step" data-step="2" hidden>
+    <section class="cp-card claim-step" data-step="2"${pendingOtp ? '' : ' hidden'}>
       <h2>Verify ownership</h2>
-      <div data-variant="otp" hidden>
-        <p>We sent a 6-digit code to <strong data-masked></strong> — the email on ${esc(name)}'s FMCSA record. Enter it below. Codes expire in 15 minutes.</p>
+      <div data-variant="otp"${pendingOtp ? '' : ' hidden'}>
+        <p>We sent a 6-digit code to <strong data-masked>${pendingOtp?.maskedEmail ? esc(pendingOtp.maskedEmail) : ''}</strong> — the email on ${esc(name)}'s FMCSA record. Enter it below. Codes expire in 15 minutes.</p>
         <form class="claim-form" data-claim-verify novalidate>
           <label class="join-field claim-code">
             <span class="join-field-label">6-digit code</span>
@@ -124,7 +176,7 @@ export function renderClaimPage(opts: { carrier: VisibleCarrier; viewer: ClaimVi
         </form>
       </div>
       <div data-variant="manual" hidden>
-        <p>We couldn't find an email on your FMCSA record. Email <a href="mailto:${SUPPORT}">${SUPPORT}</a> from your company address with your USDOT and we'll verify within 1 business day.</p>
+        ${manualVariants(c.usdot, null)}
         <p class="claim-quiet">Your USDOT: <strong>${esc(c.usdot)}</strong>. Your request is saved — nothing else to do here.</p>
       </div>
       <div data-variant="magic_link" hidden>
@@ -219,15 +271,30 @@ const CLAIM_SCRIPT = `
     for(var i=1;i<=3;i++){ var s=step(i); if(s) s.hidden=(i!==n); }
     var items=root.querySelectorAll('[data-stepper] li');
     for(var k=0;k<items.length;k++){ var li=items[k]; li.removeAttribute('aria-current'); li.classList.remove('is-done'); if(k+1<n) li.classList.add('is-done'); if(k+1===n) li.setAttribute('aria-current','step'); }
+    // The step that just appeared can be entirely below the fold on a phone
+    // (the stepper + heading scroll off), so bring it into view. Honour
+    // prefers-reduced-motion: jump instead of animating.
+    var target=root.querySelector('[data-stepper]')||step(n);
+    if(target&&target.scrollIntoView){
+      var reduce=window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      try{ target.scrollIntoView({behavior:reduce?'auto':'smooth',block:'start'}); }catch(e){ target.scrollIntoView(); }
+    }
     var first=step(n)&&step(n).querySelector('input'); if(first) first.focus();
   }
   function variant(name){ var vs=root.querySelectorAll('[data-variant]'); for(var i=0;i<vs.length;i++){ vs[i].hidden=(vs[i].getAttribute('data-variant')!==name); } }
+  // The manual block carries BOTH sub-reasons; reveal the one the API reported
+  // so a carrier whose record HAS an email is never told we couldn't find one.
+  function manualReason(reason){
+    var rs=root.querySelectorAll('[data-manual-reason]');
+    var want=reason==='delivery_failed'?'delivery_failed':'no_email';
+    for(var i=0;i<rs.length;i++){ rs[i].hidden=(rs[i].getAttribute('data-manual-reason')!==want); }
+  }
   function post(url,body){ return fetch(url,{method:'POST',headers:{'Content-Type':'application/json','Accept':'application/json'},credentials:'same-origin',body:JSON.stringify(body||{})}).then(function(r){ return r.json().then(function(j){ return {ok:r.ok,status:r.status,j:j||{}}; }); }); }
   function handleStart(res,s1){
     var j=res.j, kind=j.kind;
     if(kind==='verified'){ verified=true; showStep(3); return; }
     if(kind==='otp_sent'){ var m=q('[data-masked]'); if(m) m.textContent=j.maskedEmail||''; variant('otp'); showStep(2); say(step(2),''); return; }
-    if(kind==='needs_manual'){ variant('manual'); showStep(2); return; }
+    if(kind==='needs_manual'){ manualReason(j.reason); variant('manual'); showStep(2); return; }
     if(kind==='magic_link'){ var c=q('[data-claimant]'); if(c) c.textContent=j.email||''; variant('magic_link'); showStep(2); return; }
     if(kind==='already_claimed'){ say(s1,'This profile was just claimed by someone else. Reload to see its status.','claim-msg--err'); return; }
     say(s1,(j&&(j.message||j.error))||'Something went wrong. Try again.','claim-msg--err');

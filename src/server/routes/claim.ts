@@ -31,10 +31,17 @@ import { publicAutocompleteLimiter, signupLimiter } from '../rateLimits.js';
 import { setNoStore } from '../directory/httpCache.js';
 import { carrierBySlug } from '../directory/queries.js';
 import { carrierName, renderCarrierNotFound } from '../directory/pages.js';
-import { renderClaimFinder, renderClaimPage } from '../directory/claimPage.js';
+import {
+  renderClaimFinder,
+  renderClaimPage,
+  type ClaimPending,
+  type ClaimViewer,
+} from '../directory/claimPage.js';
 import {
   activateOwnerTrial,
   dbClaimStore,
+  manualReasonOf,
+  maskEmail,
   neutralClaimSlug,
   reviewClaim,
   startClaim,
@@ -79,6 +86,29 @@ async function issueClaimMagicLink(userId: number, email: string, slug: string):
 }
 
 export function registerClaimRoutes(app: Express, store: ClaimStore = dbClaimStore) {
+  // Legacy directory links (?claim=<usdot>) belong to the FREE claim flow, not
+  // the trial signup. signup.html also redirects client-side, but that leaves
+  // no-JS visitors and crawlers on the trial page — and the crawler's view is
+  // what Google indexes for those links. Answer with a real 302 here.
+  // MUST be registered before app.ts's static `/signup` handler (it is: the
+  // claim router is mounted earlier, and Express matches in registration
+  // order). An unknown/absent USDOT falls through to the normal signup page,
+  // where the JS path still applies.
+  app.get('/signup', async (req: Request, res: Response, next) => {
+    const raw = typeof req.query.claim === 'string' ? req.query.claim : '';
+    if (!raw || raw === '1') return next();
+    try {
+      const dot = normalizeDot(raw);
+      const carrier = dot ? await store.carrierByUsdot(dot) : null;
+      if (!carrier) return next();
+      setNoStore(res);
+      return res.redirect(302, `/claim/${encodeURIComponent(carrier.slug)}`);
+    } catch (err) {
+      console.warn('[claim] ?claim= redirect failed; serving signup:', err);
+      return next();
+    }
+  });
+
   app.get('/claim', publicAutocompleteLimiter, (_req: Request, res: Response) => {
     res.type('html').send(renderClaimFinder());
   });
@@ -102,7 +132,7 @@ export function registerClaimRoutes(app: Express, store: ClaimStore = dbClaimSto
       if (!carrier) return res.status(404).type('html').send(renderCarrierNotFound());
 
       const ctx = await lookupSession(req.cookies?.[SESSION_COOKIE_NAME]);
-      let viewer = null;
+      let viewer: ClaimViewer | null = null;
       if (ctx) {
         const tid = ctx.user.tenantId;
         const owns = tid != null && carrier.claimedTenantId === tid;
@@ -111,7 +141,24 @@ export function registerClaimRoutes(app: Express, store: ClaimStore = dbClaimSto
           const t = await store.tenantTrial(tid);
           canActivateTrial = !!t && t.isDirectoryOwner && t.trialEndsAt == null;
         }
-        viewer = { email: ctx.user.email, hasTenant: tid != null, ownsThisProfile: owns, canActivateTrial };
+        // Resume an open claim instead of restarting at step 1: a live code
+        // reopens step 2, and a claim with support renders "pending review".
+        let pending: ClaimPending | null = null;
+        const dot = normalizeDot(carrier.usdot);
+        if (!owns && tid != null && dot) {
+          const open = await store.pendingClaim(Number(dot), tid);
+          if (open?.method === 'manual') {
+            pending = { method: 'manual', maskedEmail: null, reason: manualReasonOf(open) };
+          } else if (open?.method === 'email_otp' && open.otpExpiresAt && open.otpExpiresAt.getTime() > Date.now()) {
+            const census = await store.carrierByUsdot(dot);
+            pending = {
+              method: 'email_otp',
+              maskedEmail: census?.email ? maskEmail(census.email) : null,
+              reason: null,
+            };
+          }
+        }
+        viewer = { email: ctx.user.email, hasTenant: tid != null, ownsThisProfile: owns, canActivateTrial, pending };
       }
       res.type('html').send(renderClaimPage({ carrier, viewer }));
     } catch (err) {
@@ -202,7 +249,7 @@ export function registerClaimRoutes(app: Express, store: ClaimStore = dbClaimSto
         case 'otp_sent':
           return res.json({ ok: true, kind: r.kind, method: 'email_otp', maskedEmail: r.maskedEmail, expiresAt: r.expiresAt.toISOString() });
         case 'needs_manual':
-          return res.json({ ok: true, kind: r.kind, method: 'manual', needs_manual: true });
+          return res.json({ ok: true, kind: r.kind, method: 'manual', needs_manual: true, reason: r.reason });
       }
     } catch (err) {
       console.error('[claim] start failed:', err);

@@ -88,6 +88,17 @@ vi.mock('./tenantProvision.js', () => ({
     return { tenantId: 42, userId: 7, slug: 'acme', hostDomain: 'quotefleet.net', embedToken: 'e', trialEndsAt: null };
   }),
 }));
+// The claim PAGE reads the merged public row via queries.carrierBySlug; back it
+// with the in-memory store so the render path needs no DB.
+vi.mock('../directory/queries.js', () => ({
+  carrierBySlug: vi.fn(async (slug: string) => {
+    const c = memStore?.carriers.find((x) => x.slug === slug);
+    return c
+      ? { slug: c.slug, legalName: c.name, dbaName: null, usdot: c.usdot, mcNumber: c.mcNumber, city: 'SAVANNAH', state: 'GA', email: c.email, claimedTenantId: c.claimedTenantId, capabilities: {}, aboutOverride: null, provenance: {} }
+      : null;
+  }),
+}));
+
 // Rate limiters are pass-through so the tests can hit the routes repeatedly.
 vi.mock('../rateLimits.js', () => {
   const pass = (_req: unknown, _res: unknown, next: () => void) => next();
@@ -97,14 +108,20 @@ vi.mock('../rateLimits.js', () => {
 let server: Server;
 let baseUrl: string;
 let store: MemoryClaimStore;
+/** Module-scope handle the queries.js mock reads (mocks are hoisted above `store`). */
+let memStore: MemoryClaimStore | undefined;
 
 beforeAll(async () => {
   const { registerClaimRoutes } = await import('./claim.js');
   store = memoryClaimStore();
+  memStore = store;
   const app = express();
   app.use(express.json());
   app.use(cookieParser());
   registerClaimRoutes(app, store);
+  // Stands in for app.ts's static /signup handler, which is registered AFTER
+  // the claim router — so this is what a non-redirected ?claim= must reach.
+  app.get('/signup', (_req, res) => res.type('html').send('SIGNUP_PAGE'));
   await new Promise<void>((resolve) => {
     server = app.listen(0, () => resolve());
   });
@@ -123,6 +140,10 @@ beforeEach(() => {
   store.claimedMarks.length = 0;
   store.tenants.clear();
   store.users.clear();
+  store.purged.length = 0;
+  // Full reset of the shared store: a test that simulates an undeliverable
+  // provider must not leak that into the next one.
+  store.emailDeliverable = true;
   store.carriers.push(memoryCarrier());
   store.users.set(7, { id: 7, email: 'owner@acme.com', verified: false });
   store.tenants.set(42, { isDirectoryOwner: false, trialEndsAt: null, dotNumber: null, mcNumber: null });
@@ -205,7 +226,7 @@ describe('POST /api/claim/:usdot/start — anonymous', () => {
     store.carriers[0].email = null;
     const r = await post('/api/claim/107080/start', { email: 'owner@acme.com' });
     expect(r.status).toBe(200);
-    expect(r.json).toMatchObject({ kind: 'needs_manual', method: 'manual', needs_manual: true });
+    expect(r.json).toMatchObject({ kind: 'needs_manual', method: 'manual', needs_manual: true, reason: 'no_email' });
     expect(store.sentCodes).toHaveLength(0);
     expect(store.claims[0].method).toBe('manual');
   });
@@ -302,5 +323,63 @@ describe('POST /api/tenant/trial/activate — the 30-days-free upsell', () => {
     expect(r.status).toBe(409);
     expect(r.json.error).toBe('not_eligible');
     expect((await post('/api/tenant/trial/activate', {})).status).toBe(401);
+  });
+});
+
+describe('manual sub-reason reaches the client', () => {
+  it("a record WITH an email that could not be delivered reports 'delivery_failed', not 'no_email'", async () => {
+    store.emailDeliverable = false;
+    const r = await post('/api/claim/107080/start', { email: 'owner@acme.com' });
+    expect(r.status).toBe(200);
+    expect(r.json).toMatchObject({ kind: 'needs_manual', reason: 'delivery_failed' });
+  });
+});
+
+describe('GET /signup?claim= redirects server-side (no-JS + crawlers)', () => {
+  it('302s a known USDOT to the slug claim page', async () => {
+    const res = await fetch(`${baseUrl}/signup?claim=107080`, { redirect: 'manual' });
+    expect(res.status).toBe(302);
+    expect(res.headers.get('location')).toBe('/claim/acme-drayage-inc-107080');
+  });
+
+  it('falls through to the signup page for an unknown or absent USDOT', async () => {
+    for (const url of ['/signup?claim=999999', '/signup?claim=1', '/signup']) {
+      const res = await fetch(`${baseUrl}${url}`, { redirect: 'manual' });
+      expect(res.status, url).toBe(200);
+      expect(await res.text(), url).toBe('SIGNUP_PAGE');
+    }
+  });
+});
+
+describe('GET /claim/:slug resumes an open claim instead of restarting at step 1', () => {
+  beforeEach(() => {
+    h.state.session = { id: 7, email: 'owner@acme.com', tenantId: 42, role: 'tenant_owner' };
+  });
+
+  it('a claim with support renders "Request received — pending review" with the matching reason', async () => {
+    store.carriers[0].email = null;
+    await post('/api/claim/107080/start', {}, SIGNED_IN);
+    const html = await (await fetch(`${baseUrl}/claim/acme-drayage-inc-107080`, { headers: { Cookie: SIGNED_IN } })).text();
+    expect(html).toContain('Request received — pending review');
+    expect(html).toContain('data-pending="manual"');
+    expect(html).toContain("We couldn't find an email on your FMCSA record");
+    // Not back at square one.
+    expect(html).not.toContain('data-claim-start novalidate');
+  });
+
+  it('a live code reopens step 2 with the masked address already filled in', async () => {
+    await post('/api/claim/107080/start', {}, SIGNED_IN);
+    const html = await (await fetch(`${baseUrl}/claim/acme-drayage-inc-107080`, { headers: { Cookie: SIGNED_IN } })).text();
+    expect(html).toContain('<strong data-masked>d***@acme.com</strong>');
+    expect(html).toContain('data-step="1" hidden');
+    expect(html).toContain('data-step="2"');
+    expect(html).not.toContain('data-step="2" hidden');
+  });
+
+  it('an anonymous visitor still gets step 1', async () => {
+    h.state.session = null;
+    const html = await (await fetch(`${baseUrl}/claim/acme-drayage-inc-107080`)).text();
+    expect(html).toContain('data-claim-start novalidate');
+    expect(html).not.toContain('Request received');
   });
 });

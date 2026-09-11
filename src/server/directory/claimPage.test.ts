@@ -94,6 +94,25 @@ describe('/claim/:slug — anonymous visitor, unclaimed profile', () => {
     expect(html).toContain('Codes expire in 15 minutes');
   });
 
+  it('the manual block ships BOTH sub-reasons, hidden, for the client to pick', () => {
+    // A carrier who can see their own email on the profile must never be told
+    // we could not find one — that reads as a bug and costs us the claim.
+    expect(html).toContain('data-manual-reason="no_email"');
+    expect(html).toContain('data-manual-reason="delivery_failed"');
+    expect(html).toContain("We couldn't deliver a code to the email on file for this carrier");
+    // Both start hidden; the API's `reason` reveals one.
+    expect(html).toContain('data-manual-reason="no_email" hidden');
+    expect(html).toContain('data-manual-reason="delivery_failed" hidden');
+    expect(html).toContain('function manualReason(reason)');
+    expect(html).toContain('manualReason(j.reason)');
+  });
+
+  it('showStep scrolls the new step into view and honours prefers-reduced-motion', () => {
+    expect(html).toContain("prefers-reduced-motion: reduce");
+    expect(html).toContain("behavior:reduce?'auto':'smooth'");
+    expect(html).toContain('scrollIntoView');
+  });
+
   it('success step: Verified owner + Open my profile', () => {
     expect(html).toContain('Verified owner of ACME DRAYAGE INC');
     expect(html).toContain('href="/directory/carrier/acme-drayage-inc-107080">Open my profile');
@@ -199,5 +218,62 @@ describe('signup.html hands legacy ?claim= links to the free claim flow', () => 
     expect(fields).toBeGreaterThan(0);
     expect(notice).toBeGreaterThan(fields);
     expect(plans).toBeGreaterThan(notice);
+  });
+});
+
+describe('/claim/:slug resumes an open claim (a reload must not restart at step 1)', () => {
+  const viewer = (pending: NonNullable<Parameters<typeof renderClaimPage>[0]['viewer']>['pending']) => ({
+    email: 'owner@acme.com',
+    hasTenant: true,
+    ownsThisProfile: false,
+    canActivateTrial: false,
+    pending,
+  });
+
+  it('a manual claim renders "Request received — pending review" with the delivery-failed copy', () => {
+    const html = renderClaimPage({
+      carrier: carrier(),
+      viewer: viewer({ method: 'manual', maskedEmail: null, reason: 'delivery_failed' }),
+    });
+    expect(html).toContain('Request received — pending review');
+    expect(html).toContain('data-pending="manual"');
+    expect(html).toContain('data-manual-reason="delivery_failed"');
+    expect(html).toContain("We couldn't deliver a code to the email on file for this carrier");
+    // The no_email variant is present but hidden, so only one sentence shows.
+    expect(html).toContain('data-manual-reason="no_email" hidden');
+    expect(html).toContain('usually within 1 business day');
+    expect(html).not.toContain('data-claim-start novalidate');
+    expect(html).not.toContain('<ol class="claim-stepper"');
+  });
+
+  it('a manual claim with no email on file uses the no-email sentence instead', () => {
+    const html = renderClaimPage({
+      carrier: carrier(),
+      viewer: viewer({ method: 'manual', maskedEmail: null, reason: 'no_email' }),
+    });
+    expect(html).toContain('data-manual-reason="no_email"');
+    expect(html).not.toContain('data-manual-reason="no_email" hidden');
+    expect(html).toContain('data-manual-reason="delivery_failed" hidden');
+  });
+
+  it('a live code reopens step 2 with the masked address, step 1 collapsed', () => {
+    const html = renderClaimPage({
+      carrier: carrier(),
+      viewer: viewer({ method: 'email_otp', maskedEmail: 'd***@acme.com', reason: null }),
+    });
+    expect(html).toContain('<strong data-masked>d***@acme.com</strong>');
+    expect(html).toContain('data-step="1" hidden');
+    expect(html).not.toContain('data-step="2" hidden');
+    expect(html).toContain('<div data-variant="otp">');
+    // The stepper reflects where they actually are.
+    expect(html).toContain('<li class="is-done">Your email</li>');
+    expect(html).toContain('<li aria-current="step">Verify ownership</li>');
+  });
+
+  it('no pending claim still renders step 1', () => {
+    const html = renderClaimPage({ carrier: carrier(), viewer: viewer(null) });
+    expect(html).toContain('data-step="1"');
+    expect(html).not.toContain('data-step="1" hidden');
+    expect(html).not.toContain('Request received');
   });
 });
