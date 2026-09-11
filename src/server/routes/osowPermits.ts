@@ -786,7 +786,15 @@ const OSOW_CSS = `
   /* A PILL MUST NEVER WRAP. Broken across two lines an outlined chip reads as a
      rendering fault, so the chip is nowrap and the cell around it is what
      absorbs a narrow column. */
-  .ow-sum .ow-st { display: inline-block; white-space: nowrap; font-size: 11px; font-family: var(--font-mono); letter-spacing: 0.04em; text-transform: uppercase; padding: 4px 8px; border-radius: var(--radius-pill); border: 1px solid var(--border-strong); color: var(--muted); }
+  /* Status pill. Deliberately tight: the whole 7-column table has to fit a
+     554px results column without scrolling (asserted in
+     tests/e2e/osow-permit-calculator.spec.ts). --font-mono is a PLATFORM stack
+     as of wave 2, so its metrics vary by OS — on Linux the generic monospace
+     face is DejaVu Sans Mono, materially wider than the webfont this used to
+     load, and the old 8px side padding pushed the table 2px past the column. 4px
+     side padding plus tighter tracking buys ~10px of headroom so the fit
+     survives whichever mono face the reader's OS supplies. */
+  .ow-sum .ow-st { display: inline-block; white-space: nowrap; font-size: 11px; font-family: var(--font-mono); letter-spacing: 0.02em; text-transform: uppercase; padding: 4px; border-radius: var(--radius-pill); border: 1px solid var(--border-strong); color: var(--muted); }
   .ow-sum .ow-st--review { border-color: var(--warn); color: var(--warn); }
   .ow-sum .ow-st--none { border-color: var(--error); color: var(--error); }
   .ow-sum .ow-st--np { border-color: var(--warn); color: var(--warn); }
