@@ -25,8 +25,37 @@
 import { sql } from 'drizzle-orm';
 import { db } from '../../db/client.js';
 import { carrierDirectory } from '../../db/schema.js';
-import { runIngest, type IngestSummary } from './carrierIngest.js';
+import { runIngest, INGEST_NOOP_MARKER, type IngestSummary } from './carrierIngest.js';
 import { runTrackedJob, jobSuccess, jobFailure, type JobOutcome } from '../jobHealth.js';
+
+/**
+ * The ingest's outcome as ONE greppable, queryable line for `job_runs.detail`.
+ *
+ * THE POINT: before this, the ledger recorded `ingested` — rows WRITTEN — and
+ * the upsert writes every mutable column of every row unconditionally, so a run
+ * that refreshed nothing recorded the same 330,218 as a run that refreshed
+ * everything. Sun 2026-09-06 was exactly that run and it went green. The detail
+ * now carries the numbers that tell those two apart, in a fixed `key=value`
+ * shape so they can be read straight out of the ledger:
+ *
+ *     select started_at, status, detail from job_runs
+ *      where job = 'directory-reingest' order by started_at desc limit 8;
+ *
+ * and a no-op is one predicate away: `detail like '%changed=0 %'`.
+ *
+ * `changed=n/a` (never a bare 0) when the store could not measure it, so an
+ * unmeasured run can never be misread as a measured zero.
+ */
+export function formatIngestDetail(summary: IngestSummary, prefix: string): string {
+  const changed = summary.changed === null ? 'n/a' : String(summary.changed);
+  const noop = summary.changed === 0 && summary.ingested > 0 ? ` ${INGEST_NOOP_MARKER}` : '';
+  const degraded = summary.warnings > 0 ? ' DEGRADED' : '';
+  return (
+    `${prefix} seen=${summary.carriersSeen} written=${summary.ingested} changed=${changed} ` +
+    `warnings=${summary.warnings} duration_ms=${summary.durationMs} ` +
+    `finished_at=${summary.finishedAt.toISOString()}${noop}${degraded}`
+  );
+}
 
 /**
  * Postgres advisory-lock key for the carrier-directory auto-ingest. Constant,
@@ -165,13 +194,13 @@ export async function maybeAutoHealCarrierDirectory(
     void deps
       .runFullIngest()
       .then(async (summary) => {
-        deps.log(`[autoheal] carrier_directory auto-ingest complete — ${summary.ingested} carriers`);
+        deps.log(`[autoheal] carrier_directory auto-ingest complete — ${formatIngestDetail(summary, 'auto-heal')}`);
         // This path only runs when the table was EMPTY (a phantom drop). If the
         // recovery ingest writes nothing, the public directory stays empty and
         // NOBODY finds out — the worst version of a silent failure. Report it.
         await deps.reportIngestOutcome(
           summary.ingested > 0
-            ? jobSuccess(summary.ingested, `auto-heal recovered ${summary.ingested} carriers into an empty table`)
+            ? jobSuccess(summary.ingested, formatIngestDetail(summary, 'auto-heal recovered an empty table:'))
             : jobFailure(
                 `carrier_directory auto-heal ran on an EMPTY table but wrote 0 carriers ` +
                   `(saw ${summary.carriersSeen}). The public directory is still empty.`,
@@ -237,13 +266,20 @@ export async function forceReingestCarrierDirectory(
     void deps
       .runFullIngest()
       .then(async (summary) => {
-        deps.log(`[autoheal] force re-ingest complete — ${summary.ingested} carriers`);
+        deps.log(`[autoheal] force re-ingest complete — ${formatIngestDetail(summary, 're-ingest')}`);
         // A run that finished but wrote NOTHING is a failed fetch, not an empty
         // world — FMCSA always has ~330k carriers. Recording it as a zero-result
         // success is exactly the lie the ledger exists to prevent.
+        //
+        // A run that WROTE everything and CHANGED nothing is the second, quieter
+        // half of that same lie, and it is the one that actually happened (Sun
+        // 2026-09-06). It is deliberately NOT a `failure` — an upstream snapshot
+        // that genuinely did not move is legitimate, and alerting on it weekly
+        // would train us to ignore the alert. It is recorded as the no-op it is,
+        // in a shape the ledger can be queried for. Visibility, not fragility.
         await deps.reportIngestOutcome(
           summary.ingested > 0
-            ? jobSuccess(summary.ingested, `re-ingested ${summary.ingested} of ${summary.carriersSeen} carriers seen`)
+            ? jobSuccess(summary.ingested, formatIngestDetail(summary, 're-ingest:'))
             : jobFailure(
                 `FMCSA re-ingest completed but wrote 0 carriers (saw ${summary.carriersSeen}). ` +
                   `Treat as a failed/empty upstream fetch, not an empty directory.`,
