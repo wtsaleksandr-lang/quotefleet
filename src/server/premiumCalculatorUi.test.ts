@@ -18,19 +18,28 @@ describe('premium calculator UI', () => {
     expect(html).toContain('qf-result');
   });
 
-  it('keeps premium visual hooks in the calculator stylesheet', async () => {
+  it('keeps the calculator visual hooks — flat, with no decorative layers', async () => {
     const css = await file('public-calculator-ux.css');
 
     expect(css).toContain('Phase BJ');
     expect(css).toContain('premium calculator visual system');
-    expect(css).toContain('.qf-widget::before');
-    expect(css).toContain('.qf-widget::after');
-    // The header eyebrow badge is now data-driven (shows the carrier's tagline,
+    // The header eyebrow badge is data-driven (shows the carrier's tagline,
     // live) instead of a hardcoded string; the "Instant freight estimate"
     // fallback moved to renderHeader() in widget.js.
     expect(css).toContain('attr(data-eyebrow)');
+    // The result badge is a real labelled affordance, not decoration — it stays.
     expect(css).toContain('Quote estimate');
-    expect(css).toContain('radial-gradient');
     expect(css).toContain('.qf-result::before');
+
+    // Design refactor wave 1 — the measured reference design has ZERO
+    // gradients, so the calculator must not reintroduce one. This file used to
+    // REQUIRE a radial-gradient aurora plus the .qf-widget::before/::after
+    // decorative stack, directly contradicting calculatorNoGradients.test.ts.
+    // The contradiction is resolved in favour of NO GRADIENTS;
+    // calculatorNoGradients.test.ts remains the authoritative rule.
+    expect(css).not.toContain('radial-gradient');
+    expect(css).not.toContain('linear-gradient');
+    expect(css).not.toContain('.qf-widget::before');
+    expect(css).not.toContain('.qf-widget::after');
   });
 });
