@@ -24,7 +24,7 @@
   align-items: center;
   gap: 6px;
   color: #8DA2F9; /* was var(--accent): computes cobalt #0d3cfc on qf-wft — 2.6:1 */
-  font-family: var(--font-mono, "JetBrains Mono", monospace);
+  font-family: var(--font-mono);
   font-size: 11px;
   letter-spacing: 0.16em;
   text-transform: uppercase;

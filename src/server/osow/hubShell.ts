@@ -711,9 +711,6 @@ export function hubPage(opts: HubPageOpts): string {
   <meta name="description" content="${esc(opts.description)}">
   <link rel="canonical" href="${SITE}${esc(opts.path)}">
   ${opts.dateModified ? `<meta name="last-modified" content="${esc(opts.dateModified)}">` : ''}
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/style.css">
   <link rel="stylesheet" href="/nav-unify.css">
   <style>${HUB_CSS}${opts.extraCss ?? ''}</style>

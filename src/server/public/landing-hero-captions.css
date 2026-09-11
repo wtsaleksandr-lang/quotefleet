@@ -64,7 +64,7 @@ body.qf-wft .qf-hero-cap__kicker {
   display: inline-flex !important;
   align-items: center;
   gap: 8px;
-  font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace !important;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace !important;
   font-weight: 600 !important;
   letter-spacing: 0.16em !important;
   text-transform: uppercase !important;

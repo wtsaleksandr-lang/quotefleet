@@ -10,7 +10,7 @@ body.qf-wft .qf-refined-inner {
   margin: 0 auto;
 }
 body.qf-wft .qf-refined-eyebrow {
-  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   text-transform: uppercase;
   letter-spacing: 0.16em;
   font-size: 12px;

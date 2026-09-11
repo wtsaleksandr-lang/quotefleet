@@ -193,7 +193,7 @@ html[data-theme="light"] .qf-public-wft {
   --qf-wft-line-strong: var(--border-strong);
   --qf-wft-text: var(--ink);
   --qf-wft-muted: var(--muted);
-  --qf-wft-faint: var(--muted-soft);
+  --qf-wft-faint: var(--muted);         /* --muted-soft is DE-EMPHASIS only: this token inks 11px form labels (2.63:1 on white) */
   --qf-wft-cream: var(--accent);        /* paired dark-on-cream rules re-inked below */
 }
 

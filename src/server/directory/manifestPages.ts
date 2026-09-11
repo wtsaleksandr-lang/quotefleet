@@ -139,7 +139,7 @@ const MCP_CSS = `
 .mcp-tbl tr:last-child td{border-bottom:0}
 /* Break at word boundaries first — word-break:break-all snapped names in half
    ("Manag/er") in the applicant cell. Only the SHA-256 wants a hard break. */
-.mcp-mono{font-family:var(--font-mono,'JetBrains Mono',monospace);font-size:11px;color:var(--muted);overflow-wrap:anywhere;word-break:normal;white-space:normal;max-width:220px}
+.mcp-mono{font-family:var(--font-mono);font-size:11px;color:var(--muted);overflow-wrap:anywhere;word-break:normal;white-space:normal;max-width:220px}
 .mcp-mono.hash{word-break:break-all;font-size:10.5px}
 /* min-width, not just max-width: with table-layout:auto a max-width alone lets
    the column collapse narrower than its content, which spilled the variations
