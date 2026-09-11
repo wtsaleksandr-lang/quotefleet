@@ -65,6 +65,26 @@ jobs:
   # configuration: every OS/OW surface is built to render with the database
   # down, and running the suite this way proves it on every pull request
   # instead of asserting it in a report.
+  #
+  # DO NOT "FIX" THIS BY ADDING A POSTGRES SERVICE CONTAINER. It looks like a
+  # gap and it is not one. The job's log is full of `ECONNREFUSED 127.0.0.1:59999`
+  # lines, but every one of them is the app's own non-fatal retry/degrade
+  # logging — NOT a failing test. Measured on 2026-09-11 across six consecutive
+  # runs on main: 140 of 142 specs passed in ~4 minutes, and the two that failed
+  # were stale selectors left behind by the #518 UX refactor, with no database
+  # involvement at all. Reading the noise as the failure count is an easy and
+  # expensive mistake to make.
+  #
+  # More to the point, specs DEPEND on this port being unreachable:
+  # tests/e2e/pilot-car-directory.spec.ts asserts that a dispatcher with the
+  # store down is told "We cannot reach the directory right now" and never
+  # "no operators found" — the single most important assertion in that file, and
+  # it can only run while the database is genuinely unreachable. Standing a
+  # Postgres service up under this job deletes that coverage.
+  #
+  # If DB-UP coverage is wanted (seeded carrier listings, profile pages, a real
+  # /healthz ping), it belongs in a SECOND job with its own service container and
+  # its own specs — added alongside this one, never in place of it.
   # ──────────────────────────────────────────────────────────────────────────
   e2e:
     runs-on: ubuntu-latest
