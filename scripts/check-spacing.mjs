@@ -13,6 +13,10 @@
  * What it flags:
  *   1. OFF-SCALE SPACING — any padding/margin/gap/inset numeric `px` value
  *      not in {0,4,8,12,16,24,32,48,60,80,120}.
+ *   1b. OFF-RAMP RADII — any border-*-radius numeric `px` value not in
+ *      {0,6,10,12,16,20,24,9999}. Radii are a SEPARATE token category from
+ *      spacing: a corner radius tracks a control's optical size, not the 8px
+ *      layout grid, so merging the two ramps would weaken the grid rule.
  *   2. SUB-MIN TAP TARGETS — width/height/min-width/min-height on an
  *      interactive selector resolving < 24px  -> ERROR (fails).
  *      24-43px -> warn only ("below 44 target"), never fails.
@@ -43,6 +47,17 @@ const WRITE_BASELINE = process.argv.includes("--write-baseline");
 
 // ── The one allowed ramp (design-tokens/spacing.json) ──────────────────────
 const ALLOWED = new Set([0, 4, 8, 12, 16, 24, 32, 48, 60, 80, 120]);
+
+// ── Border-radius is its OWN token category ────────────────────────────────
+// Radii are NOT spacing. The 8px grid above governs rhythm along an axis
+// (margin/padding/gap/inset) — a corner radius is a shape constant that has to
+// track the control's optical size, not the layout grid. The design system's
+// radius ramp is 6 / 10 / 16 / 24 / 9999 (pill); 12 and 20 are retained because
+// existing components use them legally. Folding 6 and 10 into ALLOWED instead
+// would silently legalise 6px and 10px margins/padding/gaps and weaken the
+// 8px grid rule for every layout property — hence the separate set.
+const RADIUS_ALLOWED = new Set([0, 6, 10, 12, 16, 20, 24, 9999]);
+
 const TAP_MIN = 24;
 const TAP_TARGET = 44;
 const LH_MIN = 1.4;
@@ -59,6 +74,15 @@ const SPACING_PROPS = new Set([
   "gap", "row-gap", "column-gap",
   "top", "right", "bottom", "left",
   "inset", "inset-block", "inset-inline",
+]);
+
+// Properties validated against RADIUS_ALLOWED (the radius ramp), not ALLOWED.
+const RADIUS_PROPS = new Set([
+  "border-radius",
+  "border-top-left-radius", "border-top-right-radius",
+  "border-bottom-left-radius", "border-bottom-right-radius",
+  "border-start-start-radius", "border-start-end-radius",
+  "border-end-start-radius", "border-end-end-radius",
 ]);
 
 const SIZE_PROPS = new Set(["width", "height", "min-width", "min-height"]);
@@ -120,14 +144,14 @@ function stripComments(src) {
 }
 
 // ── px-value extraction for a declaration value ────────────────────────────
-function offGridPx(value) {
+function offGridPx(value, allowed = ALLOWED) {
   // Skip values that aren't plain px literals we can reason about.
   const bad = [];
   const re = /(-?\d*\.?\d+)px\b/g;
   let m;
   while ((m = re.exec(value)) !== null) {
     const n = Math.abs(parseFloat(m[1]));
-    if (!ALLOWED.has(n)) bad.push(n);
+    if (!allowed.has(n)) bad.push(n);
   }
   return bad;
 }
@@ -180,6 +204,13 @@ function scanFile(absPath) {
     if (SPACING_PROPS.has(prop)) {
       for (const n of offGridPx(value)) {
         violations.push({ file: relPath, line, kind: "spacing", sel, snippet: `${prop}: ${value}`, detail: `${n}px off-grid` });
+      }
+    }
+
+    // 1b. Off-ramp border-radius (own token category — see RADIUS_ALLOWED).
+    if (RADIUS_PROPS.has(prop)) {
+      for (const n of offGridPx(value, RADIUS_ALLOWED)) {
+        violations.push({ file: relPath, line, kind: "radius", sel, snippet: `${prop}: ${value}`, detail: `${n}px off radius ramp` });
       }
     }
 
@@ -299,6 +330,7 @@ for (const v of fresh) {
   console.error(`  ${v.file}:${v.line}  [${v.kind}]  ${v.sel}  {${v.snippet}}  — ${v.detail}`);
 }
 console.error("\nFix: snap the value onto the 8px ramp {0,4,8,12,16,24,32,48,60,80,120}");
+console.error("Radii use their OWN ramp {0,6,10,12,16,20,24,9999} — see RADIUS_ALLOWED.");
 console.error("via var(--space-*), or bump the interactive box to >=24px (44 preferred).");
 console.error("See design-tokens/spacing.json + the design-guardrails spec.");
 process.exit(1);
