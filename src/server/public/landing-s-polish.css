@@ -34,7 +34,7 @@
 .js [data-reveal] {
   opacity: 0;
   transform: translateY(18px);
-  transition: opacity .55s ease, transform .55s ease;
+  transition: all .3s ease;
 }
 .js [data-reveal].is-visible,
 .no-js [data-reveal] {
@@ -64,7 +64,7 @@
 .scheduler-card {
   border: 1px solid rgba(110,139,255,.18);
   border-radius: 24px;
-  background: linear-gradient(180deg, rgba(27,33,35,.96), rgba(18,21,26,.98));
+  background: rgba(27,33,35,.96);
   box-shadow: var(--shadow-md);
   padding: 18px;
 }
@@ -126,10 +126,9 @@
   min-height: 400px;
 }
 .flow-card {
-  transition: transform .18s ease, border-color .18s ease;
+  transition: all .2s ease;
 }
 .flow-card:hover {
-  transform: translateY(-3px);
   border-color: rgba(110,139,255,.34);
 }
 
@@ -140,9 +139,7 @@
   --accent-soft: rgba(13, 60, 252, 0.10);
   --accent-ink: #ffffff;
   --success: #22c55e;
-  background:
-    radial-gradient(ellipse 70% 38% at 50% -6%, rgba(13, 60, 252, .10), transparent 64%),
-    linear-gradient(180deg, #0a1018 0%, #0d1219 45%, #0b0f15 100%);
+  background: #0a1018;
 }
 .landing-v2 .site-header {
   background: rgba(8, 13, 19, 0.92);
@@ -151,21 +148,11 @@
 .landing-v2 .site-logo {
   position: relative;
   overflow: hidden;
-  background: linear-gradient(135deg, #101923 0%, #172434 100%);
+  background: #101923;
   border: 1px solid rgba(148, 163, 184, 0.28);
   color: #eef2ff;
-  box-shadow: inset 0 1px 0 rgba(255,255,255,.08), 0 12px 28px -22px rgba(13,60,252,.55);
-}
-.landing-v2 .site-logo::before {
-  content: '';
-  position: absolute;
-  inset: 6px 5px auto;
-  height: 2px;
-  border-radius: 999px;
-  background: linear-gradient(90deg, transparent, #6E8BFF, transparent);
-  opacity: .9;
-}
-.landing-v2 .site-logo::after {
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.08), var(--qf-shadow-lift);
+}.landing-v2 .site-logo::after {
   content: 'QF';
   position: relative;
   z-index: 1;
@@ -179,9 +166,7 @@
   letter-spacing: -0.025em;
 }
 .landing-v2 .hero::before {
-  background:
-    radial-gradient(ellipse 56% 40% at 72% 18%, rgba(13,60,252,.10), transparent 68%),
-    radial-gradient(ellipse 44% 30% at 20% 18%, rgba(59, 130, 246, .07), transparent 72%);
+  background: rgba(59, 130, 246, .07);
 }
 .landing-v2 .eyebrow,
 .landing-v2 .section-kicker {
@@ -197,12 +182,12 @@
   background: #0D3CFC;
   color: #ffffff;
   border-color: #0D3CFC;
-  box-shadow: 0 18px 42px -28px rgba(13,60,252,.78), inset 0 1px 0 rgba(255,255,255,.18);
+  box-shadow: var(--qf-shadow-lift), inset 0 1px 0 rgba(255,255,255,.18);
 }
 .landing-v2 .btn-primary:hover {
   background: #0B34D6;
   border-color: #0B34D6;
-  box-shadow: 0 20px 46px -28px rgba(13,60,252,.84), inset 0 1px 0 rgba(255,255,255,.18);
+  box-shadow: var(--qf-shadow-lift), inset 0 1px 0 rgba(255,255,255,.18);
 }
 .landing-v2 .demo-link,
 .landing-v2 a {
@@ -215,8 +200,8 @@
   border-color: rgba(148, 163, 184, .18);
 }
 .landing-v2 .flow-card {
-  background: linear-gradient(180deg, rgba(17,25,35,.96), rgba(10,15,22,.98));
-  box-shadow: 0 24px 60px -40px rgba(0,0,0,.76), inset 0 1px 0 rgba(255,255,255,.045);
+  background: rgba(17,25,35,.96);
+  box-shadow: var(--qf-shadow-md), inset 0 1px 0 rgba(255,255,255,.045);
 }
 .landing-v2 .flow-card:hover {
   border-color: rgba(110, 139, 255, .30);
@@ -243,7 +228,7 @@
   background: rgba(13,60,252,.07);
 }
 .landing-v2 .flow-arrow {
-  background: linear-gradient(90deg, rgba(13,60,252,.12), rgba(110,139,255,.70));
+  background: rgba(13,60,252,.12);
 }
 
 @media (prefers-reduced-motion: reduce) {

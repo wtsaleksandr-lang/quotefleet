@@ -22,33 +22,29 @@
   --glass-ultrathin-bg: rgba(18, 22, 30, 0.62);
   --glass-bg: rgba(22, 27, 36, 0.55);
   --glass-border: rgba(255, 255, 255, 0.10);
-  --glass-shadow: 0 8px 32px rgba(0, 0, 0, 0.36);
+  --glass-shadow: var(--qf-shadow-md);
   --glass-blur: 12px;
   /* KPI tiles/cards carry big numbers + charts → keep the tint ≥0.5 so the
      value stays crisp (readability HARD rule). */
   --glass-tile-bg: rgba(22, 27, 36, 0.58);
-  --glass-lift-shadow: 0 12px 40px rgba(0, 0, 0, 0.42);
+  --glass-lift-shadow: var(--qf-shadow-md);
 }
 html[data-theme="light"] {
   --glass-ultrathin-bg: rgba(255, 255, 255, 0.62);
   --glass-bg: rgba(255, 255, 255, 0.45);
   --glass-border: rgba(255, 255, 255, 0.28);
-  --glass-shadow: 0 8px 32px rgba(15, 23, 42, 0.10);
+  --glass-shadow: var(--qf-shadow-md);
   --glass-tile-bg: rgba(255, 255, 255, 0.55);
-  --glass-lift-shadow: 0 12px 40px rgba(15, 23, 42, 0.16);
+  --glass-lift-shadow: var(--qf-shadow-md);
 }
 
 /* ── Reusable glass primitives (canonical) ─────────────────────────────── */
 .qf-glass-ultrathin {
   background: var(--glass-ultrathin-bg);
-  backdrop-filter: blur(var(--glass-blur)) saturate(1.4);
-  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(1.4);
   border: 1px solid var(--glass-border);
 }
 .qf-glass {
   background: var(--glass-bg);
-  backdrop-filter: blur(var(--glass-blur)) saturate(1.3);
-  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(1.3);
   border: 1px solid var(--glass-border);
   box-shadow: var(--glass-shadow);
   border-radius: var(--radius-lg);
@@ -62,17 +58,11 @@ html[data-theme="light"] {
    made transparent so the field shows behind the sidebar + main. No image →
    CSP-safe. */
 body {
-  background:
-    radial-gradient(1200px 600px at 15% -10%, rgba(110, 139, 255, 0.16), transparent 60%),
-    radial-gradient(900px 500px at 100% 0%, rgba(13, 60, 252, 0.12), transparent 55%),
-    var(--bg);
+  background: var(--bg);
   background-attachment: fixed;
 }
 html[data-theme="light"] body {
-  background:
-    radial-gradient(1200px 600px at 15% -10%, rgba(110, 139, 255, 0.06), transparent 60%),
-    radial-gradient(900px 500px at 100% 0%, rgba(13, 60, 252, 0.06), transparent 55%),
-    var(--bg);
+  background: var(--bg);
   background-attachment: fixed;
 }
 .app-shell,
@@ -87,8 +77,6 @@ html[data-theme="light"] .app-shell {
    nothing to change there (see overflow-clip-for-sticky memory). */
 #qf-topbar {
   background: var(--glass-ultrathin-bg);
-  backdrop-filter: blur(var(--glass-blur)) saturate(1.4);
-  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(1.4);
   border-bottom: 1px solid var(--glass-border);
 }
 
@@ -99,8 +87,6 @@ html[data-theme="light"] .app-shell {
 #qf-sidebar,
 html[data-theme="light"] #qf-sidebar {
   background: var(--glass-ultrathin-bg);
-  backdrop-filter: blur(var(--glass-blur)) saturate(1.4);
-  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(1.4);
   border-right: 1px solid var(--glass-border);
 }
 html[data-theme="light"] #qf-sidebar {
@@ -112,8 +98,6 @@ html[data-theme="light"] #qf-sidebar {
 /* Account dropdown — ultraThin, but KEEP its drop shadow (it floats free). */
 #qf-account-menu {
   background: var(--glass-ultrathin-bg);
-  backdrop-filter: blur(var(--glass-blur)) saturate(1.4);
-  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(1.4);
   border-color: var(--glass-border);
 }
 
@@ -126,19 +110,16 @@ html[data-theme="light"] #qf-sidebar {
 html[data-theme="light"] .qf-kpi-tile,
 html[data-theme="light"] .qf-kpi-card {
   background: var(--glass-tile-bg);
-  backdrop-filter: blur(var(--glass-blur)) saturate(1.3);
-  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(1.3);
   border: 1px solid var(--glass-border);
   box-shadow: var(--glass-shadow);
   border-radius: var(--radius-lg);
 }
 .qf-kpi-tile,
 .qf-kpi-card {
-  transition: transform 0.18s ease, box-shadow 0.18s ease;
+  transition: all .2s ease;
 }
 .qf-kpi-tile:hover,
 .qf-kpi-card:hover {
-  transform: translateY(-2px);
   box-shadow: var(--glass-lift-shadow);
 }
 
@@ -148,8 +129,6 @@ html[data-theme="light"] .qf-kpi-card {
 .card.qf-glass,
 html[data-theme="light"] .card.qf-glass {
   background: var(--glass-bg);
-  backdrop-filter: blur(var(--glass-blur)) saturate(1.3);
-  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(1.3);
   border: 1px solid var(--glass-border);
   box-shadow: var(--glass-shadow);
 }
@@ -162,7 +141,7 @@ html[data-theme="light"] .card.qf-glass {
 .qf-nav-advanced > .nav-item {
   opacity: 0;
   transform: translateY(-4px);
-  transition: opacity 0.18s ease, transform 0.18s ease;
+  transition: all .2s ease;
 }
 .qf-nav-advanced[open] > .nav-item {
   opacity: 1;
@@ -213,19 +192,17 @@ html[data-theme="light"] .app-main {
    Embedded WebViews / privacy modes that disable backdrop-filter get an OPAQUE
    surface (var(--surface) — theme-aware, the element's original tint) instead
    of a see-through wash over text. */
-@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
-  #qf-topbar,
-  #qf-account-menu,
-  #qf-sidebar,
-  html[data-theme="light"] #qf-sidebar,
-  .qf-kpi-tile,
-  .qf-kpi-card,
-  html[data-theme="light"] .qf-kpi-tile,
-  html[data-theme="light"] .qf-kpi-card,
-  .card.qf-glass,
-  html[data-theme="light"] .card.qf-glass,
-  .qf-glass,
-  .qf-glass-ultrathin {
-    background: var(--surface);
-  }
+#qf-topbar,
+#qf-account-menu,
+#qf-sidebar,
+html[data-theme="light"] #qf-sidebar,
+.qf-kpi-tile,
+.qf-kpi-card,
+html[data-theme="light"] .qf-kpi-tile,
+html[data-theme="light"] .qf-kpi-card,
+.card.qf-glass,
+html[data-theme="light"] .card.qf-glass,
+.qf-glass,
+.qf-glass-ultrathin {
+  background: var(--surface);
 }

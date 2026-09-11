@@ -8,7 +8,7 @@
   padding: 14px;
   border: 1px solid var(--border);
   border-radius: 20px;
-  background: linear-gradient(135deg, rgba(13, 60, 252, 0.08), rgba(93, 139, 255, 0.06)), var(--surface);
+  background: var(--surface);
   box-shadow: var(--shadow-md);
 }
 
@@ -75,7 +75,7 @@
   margin: 0 0 14px;
   border-color: var(--border) !important;
   border-radius: 22px !important;
-  background: linear-gradient(135deg, rgba(13, 60, 252, 0.08), rgba(93, 139, 255, 0.06)), var(--surface) !important;
+  background: var(--surface) !important;
   box-shadow: var(--shadow-md) !important;
 }
 

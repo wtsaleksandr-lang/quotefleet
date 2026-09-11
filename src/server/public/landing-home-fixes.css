@@ -24,7 +24,6 @@ body.qf-wft .site-header {
   background: transparent !important;
   border: none !important;
   box-shadow: none !important;
-  backdrop-filter: none !important;
   padding: 12px 20px 0 !important;
 }
 
@@ -34,11 +33,9 @@ body.qf-wft .site-header-inner {
   padding: 10px 22px !important;
   gap: 24px !important;
   border-radius: 14px !important;
-  background: rgba(24, 29, 31, 0.72) !important;
-  backdrop-filter: blur(24px) saturate(1.2) !important;
-  -webkit-backdrop-filter: blur(24px) saturate(1.2) !important;
+  background: rgb(24, 29, 31) !important;
   border: 1px solid rgba(255, 255, 255, 0.10) !important;
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.18) !important;
+  box-shadow: var(--qf-shadow-md) !important;
 }
 
 /* Bare minimal logo mark — no cream box, no busy truck icon */
@@ -94,7 +91,7 @@ body.qf-wft .site-actions .signin {
   background: transparent !important;
   border-radius: 8px !important;
   padding: 8px 12px !important;
-  transition: color 0.15s ease !important;
+  transition: all .2s ease !important;
 }
 
 body.qf-wft .site-nav a:hover,
@@ -127,7 +124,7 @@ body.qf-wft .site-actions .btn-secondary {
   font-weight: 600 !important;
   letter-spacing: 0 !important;
   box-shadow: none !important;
-  transition: background 0.16s ease, transform 0.16s ease, box-shadow 0.16s ease !important;
+  transition: all .2s ease !important;
 }
 
 body.qf-wft .site-actions .btn-secondary .arr {
@@ -138,7 +135,7 @@ body.qf-wft .site-actions .btn-secondary:hover {
   background: rgba(255, 255, 255, 0.06) !important;
   border-color: rgba(255, 255, 255, 0.5) !important;
   transform: translateY(-1px) !important;
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.18) !important;
+  box-shadow: var(--qf-shadow-md) !important;
 }
 
 /* ── Hero eyebrow — clean top-left kicker (drop the heavy bordered pill) ── */
@@ -318,9 +315,7 @@ body.qf-wft .chat-art {
      later via @import) so the translucent frosted background actually wins. */
   body.qf-wft.landing-v2 .site-header {
     padding: 0 !important;
-    background: rgba(18, 22, 26, 0.66) !important;
-    backdrop-filter: blur(22px) saturate(1.7) !important;
-    -webkit-backdrop-filter: blur(22px) saturate(1.7) !important;
+    background: rgb(18, 22, 26) !important;
     border-bottom: 1px solid rgba(255, 255, 255, 0.08) !important;
   }
   body.qf-wft.landing-v2 .site-header-inner {
@@ -333,8 +328,6 @@ body.qf-wft .chat-art {
     border: 0 !important;
     border-radius: 0 !important;
     box-shadow: none !important;
-    backdrop-filter: none !important;
-    -webkit-backdrop-filter: none !important;
   }
 
   body.qf-wft .site-nav {
@@ -403,11 +396,9 @@ body.qf-wft .site-mobile-menu {
     margin: 8px 0 0;
     padding: 8px;
     border-radius: 14px;
-    background: rgba(24, 29, 31, 0.94);
-    backdrop-filter: blur(24px) saturate(1.2);
-    -webkit-backdrop-filter: blur(24px) saturate(1.2);
+    background: rgb(24, 29, 31);
     border: 1px solid rgba(255, 255, 255, 0.10);
-    box-shadow: 0 12px 28px rgba(0, 0, 0, 0.32);
+    box-shadow: var(--qf-shadow-md);
   }
   body.qf-wft .site-mobile-menu a {
     font-family: "JetBrains Mono", ui-monospace, monospace;
@@ -419,7 +410,7 @@ body.qf-wft .site-mobile-menu {
     text-decoration: none;
     padding: 12px 14px;
     border-radius: 10px;
-    transition: color 0.15s ease, background 0.15s ease;
+    transition: all .2s ease;
   }
   body.qf-wft .site-mobile-menu a:hover,
   body.qf-wft .site-mobile-menu a:focus-visible {
@@ -653,7 +644,7 @@ body.qf-wft.landing-v2 .hiw-card .hiw-body p {
    and guard-safe. ── */
 body.qf-wft .site-logo .qf-brand-mark {
   transform-origin: center;
-  transition: transform 0.18s ease;
+  transition: all .2s ease;
   will-change: transform;
 }
 body.qf-wft .site-brand:hover .qf-brand-mark,

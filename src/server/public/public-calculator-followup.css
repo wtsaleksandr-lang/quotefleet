@@ -2,7 +2,7 @@
 .qf-followup-choice-panel {
   border: 1px solid rgba(37, 99, 235, 0.18);
   border-radius: 14px;
-  background: linear-gradient(135deg, #f8fbff, #eff6ff);
+  background: #f8fbff;
   padding: 13px;
   margin-top: 13px;
 }

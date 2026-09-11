@@ -30,10 +30,10 @@
   border-radius: 14px;
   background: var(--surface-2);
   border: 1px solid var(--border);
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.18);
+  box-shadow: var(--qf-shadow-md);
 }
 html[data-theme="light"] .site-header-inner {
-  box-shadow: 0 1px 0 var(--border), 0 6px 20px rgba(10, 37, 64, 0.06);
+  box-shadow: var(--qf-shadow-sm), var(--qf-shadow-md);
 }
 
 /* Brand */
@@ -58,7 +58,7 @@ html[data-theme="light"] .site-header-inner {
   width: auto;
   height: 30px;
   transform-origin: center;
-  transition: transform 0.18s ease;
+  transition: all .2s ease;
 }
 .site-brand:hover .qf-brand-mark,
 .site-brand:focus-visible .qf-brand-mark {
@@ -81,7 +81,7 @@ html[data-theme="light"] .site-header-inner {
   text-decoration: none;
   padding: 8px 12px;
   border-radius: 8px;
-  transition: color 0.15s ease, background 0.15s ease;
+  transition: all .2s ease;
 }
 .site-nav a:hover,
 .site-nav a:focus-visible,
@@ -108,7 +108,7 @@ html[data-theme="light"] .site-header-inner {
   cursor: pointer;
   padding: 8px 12px;
   border-radius: 8px;
-  transition: color 0.15s ease;
+  transition: all .2s ease;
 }
 .nav-dd-trigger:hover,
 .nav-dd-trigger:focus-visible,
@@ -118,7 +118,7 @@ html[data-theme="light"] .site-header-inner {
 .nav-dd-caret {
   width: 12px;
   height: 12px;
-  transition: transform 0.18s ease;
+  transition: all .2s ease;
 }
 .nav-dd.is-open .nav-dd-caret { transform: rotate(180deg); }
 .nav-dd-panel {
@@ -133,11 +133,11 @@ html[data-theme="light"] .site-header-inner {
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 14px;
-  box-shadow: 0 18px 42px rgba(0, 0, 0, 0.42);
+  box-shadow: var(--qf-shadow-md);
   z-index: 80;
 }
 html[data-theme="light"] .nav-dd-panel {
-  box-shadow: 0 18px 42px rgba(10, 37, 64, 0.14);
+  box-shadow: var(--qf-shadow-md);
 }
 .nav-dd-panel[hidden] { display: none; }
 .nav-dd-group {
@@ -204,7 +204,7 @@ html[data-theme="light"] .nav-dd-panel {
   font-size: 13px;
   font-weight: 600;
   text-decoration: none;
-  transition: background 0.16s ease, transform 0.16s ease, border-color 0.16s ease;
+  transition: all .2s ease;
 }
 .site-actions .btn-secondary .arr { color: currentColor; }
 .site-actions .btn-secondary:hover {
@@ -271,10 +271,10 @@ html[data-theme="light"] .nav-dd-panel {
     border-radius: 14px;
     background: var(--surface);
     border: 1px solid var(--border);
-    box-shadow: 0 12px 28px rgba(0, 0, 0, 0.32);
+    box-shadow: var(--qf-shadow-md);
   }
   html[data-theme="light"] .site-mobile-menu:not([hidden]) {
-    box-shadow: 0 12px 28px rgba(10, 37, 64, 0.14);
+    box-shadow: var(--qf-shadow-md);
   }
   .site-mobile-menu a {
     font-size: 14px;
@@ -284,7 +284,7 @@ html[data-theme="light"] .nav-dd-panel {
     text-decoration: none;
     padding: 12px 14px;
     border-radius: 10px;
-    transition: color 0.15s ease, background 0.15s ease;
+    transition: all .2s ease;
   }
   .site-mobile-menu a:hover,
   .site-mobile-menu a:focus-visible {
@@ -316,7 +316,7 @@ html[data-theme="light"] .nav-dd-panel {
     content: '▾';
     font-size: 11px;
     color: var(--muted);
-    transition: transform 0.18s ease;
+    transition: all .2s ease;
   }
   .site-mobile-menu .mm-group[open] > summary.mm-head::after { transform: rotate(180deg); }
   .site-mobile-menu summary.mm-head:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; border-radius: 10px; }
@@ -509,11 +509,11 @@ html[data-theme="light"] .nav-dd-panel {
     border: 1px solid var(--border);
     border-radius: 14px;
     background: var(--surface-2);
-    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.18);
+    box-shadow: var(--qf-shadow-md);
   }
   html[data-theme="light"] .site-header-inner {
     background: var(--surface-2);
-    box-shadow: 0 1px 0 var(--border), 0 6px 20px rgba(10, 37, 64, 0.06);
+    box-shadow: var(--qf-shadow-sm), var(--qf-shadow-md);
   }
   /* Push the action cluster to the trailing edge now that .site-nav (which
      carried `margin-left:auto`) is hidden. */
@@ -696,7 +696,7 @@ html[data-theme="light"] .nav-dd-panel {
   color: var(--muted);
   text-decoration: none;
   white-space: nowrap;
-  transition: color 0.16s ease;
+  transition: all .2s ease;
 }
 .site-actions .site-oog:hover,
 .site-actions .site-oog:focus-visible {

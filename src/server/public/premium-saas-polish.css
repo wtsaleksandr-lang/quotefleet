@@ -1,12 +1,12 @@
 /* Phase AF: premium SaaS polish for dashboard feedback, loading, and modal groundwork. */
 #loading {
-  background: radial-gradient(circle at 20% 0%, rgba(13, 60, 252,.10), transparent 32rem), var(--bg) !important;
+  background: var(--bg) !important;
 }
 #loading > div {
   min-width: 260px;
   border: 1px solid var(--border);
   border-radius: 20px;
-  background: linear-gradient(180deg, rgba(255,255,255,.035), rgba(255,255,255,.012)), var(--surface);
+  background: var(--surface);
   color: var(--ink-soft);
   padding: 18px;
   box-shadow: var(--shadow-md);
@@ -19,7 +19,7 @@
   width: 100%;
   border-radius: 999px;
   margin-bottom: 14px;
-  background: linear-gradient(90deg, rgba(13, 60, 252,.16), rgba(13, 60, 252,.16), rgba(13, 60, 252,.16));
+  background: rgba(13, 60, 252,.16);
   background-size: 220% 100%;
   animation: qf-skeleton 1.3s ease-in-out infinite;
 }
@@ -36,13 +36,12 @@
   border: 1px solid var(--border-strong);
   border-left: 4px solid var(--accent);
   border-radius: 15px;
-  background: linear-gradient(180deg, rgba(255,255,255,.045), rgba(255,255,255,.018)), var(--surface);
+  background: var(--surface);
   color: var(--ink-soft);
   box-shadow: var(--shadow-lg);
   padding: 12px 13px;
   transform: translateY(8px);
   opacity: 0;
-  animation: qf-toast-in .18s ease forwards;
 }
 .qf-toast strong {
   display: block;
@@ -62,15 +61,14 @@
   display: none;
   place-items: center;
   padding: 18px;
-  background: rgba(3, 8, 14, .68);
-  backdrop-filter: blur(8px);
+  background: rgb(3, 8, 14);
 }
 .qf-modal-backdrop.is-open { display: grid; }
 .qf-modal-card {
   width: min(520px, 100%);
   border: 1px solid var(--border-strong);
   border-radius: 22px;
-  background: linear-gradient(180deg, rgba(255,255,255,.045), rgba(255,255,255,.018)), var(--surface);
+  background: var(--surface);
   color: var(--ink-soft);
   box-shadow: var(--shadow-lg);
   padding: 20px;
@@ -98,7 +96,7 @@
 .app-main button:not(.nav-item):not(.qf-mobile-nav-toggle),
 .app-main .btn-primary,
 .app-main .btn-danger {
-  transition: transform .15s ease, border-color .15s ease, box-shadow .15s ease, opacity .15s ease;
+  transition: all .2s ease;
 }
 .app-main button:not(.nav-item):not(.qf-mobile-nav-toggle):hover {
   transform: translateY(-1px);
@@ -110,7 +108,7 @@
   transform: none !important;
 }
 .app-main .table tbody tr {
-  transition: background .15s ease, box-shadow .15s ease;
+  transition: all .2s ease;
 }
 .qf-page-skeleton {
   display: grid;
@@ -120,7 +118,7 @@
 .qf-page-skeleton span {
   height: 14px;
   border-radius: 999px;
-  background: linear-gradient(90deg, rgba(255,255,255,.05), rgba(255,255,255,.12), rgba(255,255,255,.05));
+  background: rgba(255,255,255,.05);
   background-size: 220% 100%;
   animation: qf-skeleton 1.3s ease-in-out infinite;
 }
@@ -130,9 +128,6 @@
 @keyframes qf-skeleton {
   0% { background-position: 0% 50%; }
   100% { background-position: -220% 50%; }
-}
-@keyframes qf-toast-in {
-  to { transform: translateY(0); opacity: 1; }
 }
 @media (max-width: 700px) {
   .qf-toast-stack { left: 14px; right: 14px; bottom: 14px; }
@@ -154,7 +149,7 @@
   margin-top: 4px;
   border: 1px solid var(--border-strong);
   border-radius: 14px;
-  background: linear-gradient(180deg, rgba(255,255,255,.04), rgba(255,255,255,.015)), var(--surface);
+  background: var(--surface);
 }
 .qf-ingest-spinner {
   flex: none;
@@ -276,7 +271,7 @@
 
 /* ── AI import: staged microcopy (cross-fade the processing subtitle) ── */
 .qf-ingest-processing-sub {
-  transition: opacity .2s ease, transform .2s ease;
+  transition: all .2s ease;
 }
 .qf-ingest-processing-sub.is-swapping {
   opacity: 0;
@@ -304,10 +299,7 @@
   display: block;
   height: 12px;
   border-radius: 999px;
-  background: linear-gradient(90deg,
-    color-mix(in srgb, var(--ink) 6%, transparent),
-    color-mix(in srgb, var(--ink) 16%, transparent),
-    color-mix(in srgb, var(--ink) 6%, transparent));
+  background: color-mix(in srgb, var(--ink);
   background-size: 220% 100%;
   animation: qf-skeleton 1.3s ease-in-out infinite;
 }
@@ -335,38 +327,10 @@
   width: 12%;
   height: 100%;
   border-radius: 999px;
-  background: linear-gradient(90deg,
-    color-mix(in srgb, var(--accent) 65%, transparent),
-    var(--accent));
-  transition: width .85s cubic-bezier(.22, .61, .36, 1);
-}
-.qf-ingest-progress-fill::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  border-radius: 999px;
-  background: linear-gradient(90deg, transparent,
-    color-mix(in srgb, var(--surface) 60%, transparent), transparent);
-  background-size: 45% 100%;
-  background-repeat: no-repeat;
-  animation: qf-ingest-sheen 1.4s ease-in-out infinite;
-}
-@keyframes qf-ingest-sheen {
-  0% { background-position: -45% 0; }
-  100% { background-position: 145% 0; }
-}
-
-/* ── AI import: animated review reveal ──────────────────────────────── */
-.qf-reveal-in {
-  animation: qf-review-reveal .42s cubic-bezier(.22, .61, .36, 1) both;
-}
-.qf-reveal-row {
+  background: color-mix(in srgb, var(--accent);
+  transition: all .3s ease;
+}.qf-reveal-row {
   opacity: 0;
-  animation: qf-review-reveal .4s cubic-bezier(.22, .61, .36, 1) both;
-}
-@keyframes qf-review-reveal {
-  from { opacity: 0; transform: translateY(10px); }
-  to { opacity: 1; transform: translateY(0); }
 }
 
 /* ── AI import: self-drawing confidence checkmark ───────────────────── */
@@ -380,14 +344,10 @@
 .qf-check-draw.is-animating .qf-check-circle {
   stroke-dasharray: 64;
   stroke-dashoffset: 64;
-  animation: qf-check-circle .4s ease-out forwards;
 }
 .qf-check-draw.is-animating .qf-check-path {
   stroke-dashoffset: 24;
-  animation: qf-check-path .35s .28s ease-out forwards;
 }
-@keyframes qf-check-circle { to { stroke-dashoffset: 0; } }
-@keyframes qf-check-path { to { stroke-dashoffset: 0; } }
 
 /* ── AI import: Recent-uploads table — no clip/wrap at 375px ─────────── */
 .qf-table-scroll {

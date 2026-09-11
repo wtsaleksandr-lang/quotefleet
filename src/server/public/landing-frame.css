@@ -97,7 +97,7 @@ body.landing-v2.qf-wft .hero .qf-hero-media::before {
      media box (0%) so the dot field never bleeds into the copy column and under
      the H1/lead — the ≥48px column gap keeps a clean margin (A2). */
   inset: -8% -2% -8% 0%;
-  background-image: radial-gradient(rgba(255, 255, 255, 0.15) 1px, transparent 1px);
+  background-image: rgba(255, 255, 255, 0.15);
   background-size: 22px 22px;
   background-position: 0 0;
   /* Broad, centre-weighted fade so the dotted field is clearly visible across
@@ -154,7 +154,7 @@ html[data-theme="light"] body.landing-v2.qf-wft main > section::after {
 
 /* 3. Hero dotted grid → subtle black dots (size / position / mask unchanged) */
 html[data-theme="light"] body.landing-v2.qf-wft .hero .qf-hero-media::before {
-  background-image: radial-gradient(rgba(0, 0, 0, 0.14) 1px, transparent 1px);
+  background-image: rgba(0, 0, 0, 0.14);
 }
 
 /* ── Theme toggle — read as a distinct CONTROL in the top-right cluster ────

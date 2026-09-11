@@ -9,7 +9,7 @@
   --qdoc-panel: #ffffff;
 }
 body {
-  background: radial-gradient(circle at 18% -10%, rgba(37,99,235,.12), transparent 28rem), linear-gradient(180deg, #eef3f6, #f8fafc);
+  background: #eef3f6;
 }
 .qdoc-shell {
   width: min(100%, 980px);
@@ -19,7 +19,7 @@ body {
 .qdoc {
   border-color: rgba(16,35,48,.12);
   border-radius: 18px;
-  box-shadow: 0 28px 80px -46px rgba(11,17,23,.35), 0 1px 0 rgba(255,255,255,.9) inset;
+  box-shadow: var(--qf-shadow-md), 0 1px 0 rgba(255,255,255,.9) inset;
 }
 .qdoc {
   padding: 18px;
@@ -46,7 +46,7 @@ body {
 .qdoc-callback button {
   padding: 8px 11px;
   border-radius: 999px;
-  transition: transform .15s ease, border-color .15s ease, background .15s ease;
+  transition: all .2s ease;
 }
 .qdoc-actions button:hover,
 .qdoc-actions a:hover,
@@ -56,12 +56,12 @@ body {
 }
 .qdoc-actions .qdoc-action-primary,
 .qdoc-callback button:not(.ghost) {
-  background: linear-gradient(135deg, var(--qdoc-primary), #1e40af);
+  background: var(--qdoc-primary);
   border-color: var(--qdoc-primary);
 }
 .qdoc-print-hint {
   border-color: rgba(37,99,235,.22);
-  background: linear-gradient(135deg, rgba(37,99,235,.08), rgba(245,165,36,.06));
+  background: rgba(37,99,235,.08);
   border-radius: 12px;
 }
 .qdoc-header {
@@ -79,17 +79,17 @@ body {
 }
 .qdoc-summary-box {
   border-radius: 14px;
-  box-shadow: 0 12px 34px -26px rgba(11,17,23,.3);
+  box-shadow: var(--qf-shadow-md);
 }
 .qdoc-summary-box div:last-child {
-  background: linear-gradient(135deg, rgba(37,99,235,.10), rgba(245,165,36,.08));
+  background: rgba(37,99,235,.10);
 }
 .qdoc-summary-box div:last-child strong {
   color: var(--qdoc-primary);
 }
 .qdoc-route-card {
   border-radius: 16px;
-  background: linear-gradient(135deg, rgba(37,99,235,.08), rgba(245,165,36,.05));
+  background: rgba(37,99,235,.08);
   border-color: rgba(37,99,235,.18);
   padding: 16px;
 }
@@ -104,10 +104,10 @@ body {
 .qdoc-panel {
   border-radius: 15px;
   border-color: var(--qdoc-line);
-  box-shadow: 0 12px 34px -28px rgba(11,17,23,.25);
+  box-shadow: var(--qf-shadow-md);
 }
 .qdoc-panel h2 {
-  background: linear-gradient(135deg, #f8fafc, #eef3f6);
+  background: #f8fafc;
   border: 1px solid #e5ebf2;
   color: var(--qdoc-ink);
   border-radius: 10px;
@@ -119,9 +119,9 @@ body {
   padding: 9px 10px;
 }
 .qdoc-total-box {
-  background: linear-gradient(135deg, var(--qdoc-primary), #1e40af);
+  background: var(--qdoc-primary);
   border-radius: 14px;
-  box-shadow: 0 16px 38px -26px rgba(37,99,235,.7);
+  box-shadow: var(--qf-shadow-lift);
   /* The blue gradient is dark, so every label on it must be white.
      quote-polish.css darkens these for a light box; restore white here
      (the box this file paints is always the deep-blue accent). */
@@ -159,7 +159,7 @@ body {
   height: 54px;
   margin: 0 auto 12px;
   border-radius: 18px;
-  background: linear-gradient(135deg, var(--qdoc-primary), var(--qdoc-accent));
+  background: var(--qdoc-primary);
 }
 @media (max-width: 860px) {
   .qdoc-actions { justify-content: flex-start; }

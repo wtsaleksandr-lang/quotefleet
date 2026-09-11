@@ -40,7 +40,7 @@ body.qf-wft .qf-final-cta .qf-cta-secondary {
   opacity: 1 !important;
   border-radius: 10px;
   box-shadow: none;
-  transition: background .16s ease, transform .16s ease, box-shadow .16s ease;
+  transition: all .2s ease;
 }
 body.qf-wft .qf-final-cta .qf-cta-secondary .arr {
   color: #1E1E1E !important;
@@ -51,7 +51,7 @@ body.qf-wft .qf-final-cta .qf-cta-secondary:hover {
   border-color: #D4CFC9 !important;
   color: #1E1E1E !important;
   transform: translateY(-1px);
-  box-shadow: 0 4px 14px rgba(0,0,0,.18);
+  box-shadow: var(--qf-shadow-md);
 }
 
 /* ============================================================
@@ -92,13 +92,12 @@ body.qf-wft .qf-badge-tile {
   font-family: var(--font-sans);
   cursor: pointer;
   text-align: left;
-  transition: border-color .18s ease, background .18s ease, transform .18s ease;
+  transition: all .2s ease;
 }
 body.qf-wft .qf-badge-tile:hover,
 body.qf-wft .qf-badge-tile:focus-visible {
   border-color: rgba(110,139,255,.5);
   background: rgba(110,139,255,.08);
-  transform: translateY(-2px);
   outline: none;
 }
 body.qf-wft .qf-badge-ico {
@@ -139,15 +138,13 @@ body.qf-wft .qf-badge-pop {
   padding: 14px 16px;
   border: 1px solid rgba(255,255,255,.14);
   border-radius: 14px;
-  background: rgba(24,29,31,.92);
-  -webkit-backdrop-filter: blur(14px) saturate(140%);
-  backdrop-filter: blur(14px) saturate(140%);
-  box-shadow: 0 24px 60px -30px rgba(0,0,0,.9), inset 0 1px 0 rgba(255,255,255,.05);
+  background: rgb(24, 29, 31);
+  box-shadow: var(--qf-shadow-md), inset 0 1px 0 rgba(255,255,255,.05);
   opacity: 0;
   visibility: hidden;
   pointer-events: none;
   z-index: 20;
-  transition: opacity .2s ease, transform .2s ease, visibility .2s;
+  transition: all .2s ease;
 }
 body.qf-wft .qf-badge-pop p {
   margin: 0;
@@ -230,8 +227,6 @@ body.qf-wft .qf-badge.is-open .qf-badge-pop {
     opacity: 1;
     visibility: visible;
     pointer-events: auto;
-    backdrop-filter: none;
-    -webkit-backdrop-filter: none;
     box-shadow: none;
   }
   body.qf-wft .qf-badge-pop::after { display: none; }

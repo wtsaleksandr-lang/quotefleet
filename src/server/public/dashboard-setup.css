@@ -3,7 +3,7 @@
   margin: 0 0 22px;
   border: 1px solid var(--border);
   border-radius: 22px;
-  background: linear-gradient(135deg, rgba(13, 60, 252, 0.10), rgba(13, 60, 252, 0.05)), var(--surface);
+  background: var(--surface);
   box-shadow: var(--shadow-md);
   overflow: hidden;
 }
@@ -55,7 +55,7 @@
   height: 100%;
   width: var(--qf-setup-pct, 0%);
   border-radius: inherit;
-  background: linear-gradient(90deg, var(--accent), var(--accent-2));
+  background: var(--accent);
 }
 .qf-setup-steps {
   display: grid;
@@ -76,10 +76,9 @@
   color: var(--ink-soft);
   text-align: left;
   cursor: pointer;
-  transition: transform .16s ease, border-color .16s ease, background .16s ease;
+  transition: all .2s ease;
 }
 .qf-setup-step:hover {
-  transform: translateY(-2px);
   border-color: rgba(13, 60, 252, .36);
   background: rgba(13, 60, 252, .055);
 }
@@ -167,7 +166,7 @@
   margin: 0 0 16px;
   border: 1px solid var(--border);
   border-radius: 20px;
-  background: linear-gradient(135deg, rgba(93,139,255,.075), rgba(13, 60, 252,.045)), var(--surface);
+  background: var(--surface);
   box-shadow: var(--shadow-sm);
   overflow: hidden;
 }
@@ -209,8 +208,8 @@ html[data-theme="light"] .qf-setup-coach,
 html[data-theme="light"] .qf-setup-empty,
 html[data-theme="light"] .qf-onboarding-panel {
   border-color: rgba(184, 207, 245, 0.72);
-  background: linear-gradient(135deg, #ffffff 0%, #f4fbff 62%, #eefaff 100%);
-  box-shadow: 0 16px 42px rgba(37, 34, 99, 0.06);
+  background: #ffffff;
+  box-shadow: var(--qf-shadow-md);
 }
 html[data-theme="light"] .qf-onboarding-question { border-color: rgba(184,207,245,.74); background: rgba(255,255,255,.84); }
 /* Phase P2: onboarding progress clarity, current-step cue, primary action,
@@ -247,9 +246,7 @@ html[data-theme="light"] .qf-onboarding-question { border-color: rgba(184,207,24
   color: var(--cta-text);
 }
 .qf-setup-panel.is-complete {
-  background:
-    radial-gradient(circle at 8% 0%, rgba(52, 211, 153, 0.18), transparent 42%),
-    linear-gradient(135deg, rgba(13, 60, 252, 0.08), rgba(13, 60, 252, 0.04)), var(--surface);
+  background: var(--surface);
 }
 .qf-setup-live { padding: 22px; }
 .qf-setup-live-badge {
@@ -288,9 +285,7 @@ html[data-theme="light"] .qf-onboarding-question { border-color: rgba(184,207,24
 }
 .qf-setup-live .qf-quick-actions { padding: 16px 0 0; }
 html[data-theme="light"] .qf-setup-panel.is-complete {
-  background:
-    radial-gradient(circle at 8% 0%, rgba(5, 150, 105, 0.12), transparent 42%),
-    linear-gradient(135deg, #ffffff 0%, #f4fbff 62%, #eefaff 100%);
+  background: #ffffff;
 }
 @media (max-width: 980px) {
   .qf-setup-head { display: grid; }

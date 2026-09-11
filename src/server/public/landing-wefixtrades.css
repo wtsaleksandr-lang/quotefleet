@@ -25,27 +25,11 @@ body.qf-wft {
   color: var(--qf-wft-text);
   font-family: var(--qf-wft-sans);
 }
-
-body.qf-wft::before {
-  content: '';
-  position: fixed;
-  inset: 0;
-  pointer-events: none;
-  background:
-    radial-gradient(circle at 18% -8%, rgba(13,60,252,.16), transparent 26%),
-    radial-gradient(circle at 86% 8%, rgba(255,255,255,.07), transparent 22%),
-    linear-gradient(rgba(255,255,255,.018) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255,255,255,.018) 1px, transparent 1px);
-  background-size: auto, auto, 28px 28px, 28px 28px;
-  opacity: .95;
-}
-
 .wft-nav {
   position: sticky;
   top: 0;
   z-index: 50;
-  background: rgba(12,17,18,.94);
-  backdrop-filter: blur(14px);
+  background: rgb(12, 17, 18);
   border-bottom: 1px solid var(--qf-wft-line-strong);
 }
 
@@ -186,7 +170,7 @@ body.qf-wft::before {
   border: 1px solid var(--qf-wft-line);
   border-radius: var(--qf-wft-radius-lg);
   background: rgba(17,24,23,.84);
-  box-shadow: 0 28px 70px -55px rgba(0,0,0,.85), inset 0 1px 0 rgba(255,255,255,.04);
+  box-shadow: var(--qf-shadow-md), inset 0 1px 0 rgba(255,255,255,.04);
 }
 
 .wft-hero-copy {
@@ -256,7 +240,7 @@ body.qf-wft::before {
   font: 900 12px/1 var(--qf-wft-mono);
   letter-spacing: .04em;
   text-transform: uppercase;
-  transition: transform .16s ease, filter .16s ease, border-color .16s ease;
+  transition: all .2s ease;
 }
 
 .wft-cta-primary {
@@ -371,7 +355,7 @@ body.qf-wft::before {
   display: block;
   width: 74%;
   height: 100%;
-  background: linear-gradient(90deg, var(--qf-wft-blue), #59ff75);
+  background: var(--qf-wft-blue);
 }
 
 .wft-section {
@@ -380,7 +364,7 @@ body.qf-wft::before {
 
 .wft-product-suite {
   padding: 10px;
-  background-image: radial-gradient(rgba(255,255,255,.055) 1px, transparent 1px);
+  background-image: rgba(255,255,255,.055);
   background-size: 18px 18px;
 }
 
@@ -405,7 +389,7 @@ body.qf-wft::before {
   border: 1px solid var(--qf-wft-line);
   border-radius: var(--qf-wft-radius);
   padding: 16px;
-  transition: transform .16s ease, border-color .16s ease, background .16s ease;
+  transition: all .2s ease;
 }
 
 .wft-product-card:hover {
@@ -510,7 +494,7 @@ body.qf-wft::before {
   height: 30px;
   border-radius: 8px;
   border: 1px solid rgba(255,255,255,.10);
-  background: linear-gradient(90deg, rgba(13,60,252,.22), rgba(255,255,255,.04));
+  background: rgba(13,60,252,.22);
 }
 
 .wft-suite-actions {

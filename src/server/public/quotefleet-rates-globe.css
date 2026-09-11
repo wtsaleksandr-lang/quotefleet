@@ -10,26 +10,6 @@
   padding: clamp(56px, 6vw, 88px) 0 clamp(40px, 5vw, 64px);
   border-top: 1px solid var(--border, rgba(133, 128, 123, 0.18));
 }
-
-/* Soft brand glow behind the globe */
-.qf-globe-section::before {
-  content: "";
-  position: absolute;
-  left: 50%;
-  top: 44%;
-  width: min(760px, 92vw);
-  height: min(760px, 92vw);
-  transform: translate(-50%, -50%);
-  background: radial-gradient(
-    circle,
-    rgba(110, 139, 255, 0.12) 0%,
-    rgba(110, 139, 255, 0.04) 38%,
-    transparent 68%
-  );
-  pointer-events: none;
-  z-index: 0;
-}
-
 .qf-globe-head {
   position: relative;
   z-index: 3;
@@ -96,7 +76,7 @@
 
 #qf-globe-canvas {
   opacity: 0;
-  transition: opacity 0.9s ease;
+  transition: all .3s ease;
   cursor: grab;
 }
 #qf-globe-canvas:active {
@@ -115,6 +95,9 @@
   left: 0;
   right: 0;
   height: 26%;
+  /* Functional scrim, not decoration: fades the globe canvas into the
+     section background so the canvas does not end on a hard edge. Kept as a
+     gradient deliberately (design-refactor wave 1). */
   background: linear-gradient(
     to top,
     var(--bg, #161616) 0%,
@@ -197,15 +180,12 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: width 0.35s ease, height 0.35s ease, background 0.35s ease,
-    border-color 0.35s ease, box-shadow 0.35s ease;
-  backdrop-filter: blur(4px);
-  -webkit-backdrop-filter: blur(4px);
+  transition: all .3s ease;
   position: relative;
 }
 .qfg-circle svg {
   opacity: 0;
-  transition: opacity 0.3s ease;
+  transition: all .3s ease;
 }
 .qfg-circle::after {
   content: "";
@@ -219,7 +199,7 @@
   height: 40px;
   background: rgba(110, 139, 255, 0.22);
   border: 1.5px solid #0d3cfc;
-  box-shadow: 0 0 22px rgba(110, 139, 255, 0.5);
+  box-shadow: var(--qf-shadow-lift);
 }
 .qfg-circle.active svg {
   opacity: 1;
@@ -227,7 +207,6 @@
 .qfg-circle.active::after {
   inset: -4px;
   border-color: rgba(110, 139, 255, 0.3);
-  animation: qfg-ping 2s ease-out infinite;
 }
 
 /* Hub (database) marker — always emphasised */
@@ -236,21 +215,15 @@
   height: 46px;
   background: rgba(13, 60, 252, 0.22);
   border: 1.5px solid #6e8bff;
-  box-shadow: 0 0 26px rgba(110, 139, 255, 0.45);
+  box-shadow: var(--qf-shadow-lift);
 }
 .qfg-marker--hub .qfg-circle::after {
   border-color: rgba(110, 139, 255, 0.35);
-  animation: qfg-ping 2.4s ease-out infinite;
 }
 .qfg-marker--hub .qfg-circle svg {
   width: 18px;
   height: 18px;
   opacity: 1;
-}
-
-@keyframes qfg-ping {
-  0% { transform: scale(1); opacity: 1; }
-  100% { transform: scale(1.8); opacity: 0; }
 }
 
 /* Floating card above the marker */
@@ -260,18 +233,15 @@
   left: 50%;
   transform: translateX(-50%) translateY(6px);
   background: rgba(255, 255, 255, 0.04);
-  backdrop-filter: blur(24px) saturate(1.2);
-  -webkit-backdrop-filter: blur(24px) saturate(1.2);
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 12px;
   padding: 10px 12px;
   width: max-content;
   max-width: 180px;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.28),
-    inset 0 0.5px 0 rgba(255, 255, 255, 0.05);
+  box-shadow: var(--qf-shadow-md), inset 0 0.5px 0 rgba(255, 255, 255, 0.05);
   pointer-events: none;
   opacity: 0;
-  transition: opacity 0.35s ease, transform 0.35s ease;
+  transition: all .3s ease;
   white-space: nowrap;
   z-index: 20;
 }
@@ -328,5 +298,4 @@
   #qf-globe-canvas { transition: none; opacity: 1; }
   .qfg-circle.active::after,
   .qfg-marker--hub .qfg-circle::after { animation: none; }
-  @keyframes qfg-ping { 0%, 100% { transform: none; opacity: 1; } }
 }

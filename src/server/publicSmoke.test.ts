@@ -272,14 +272,17 @@ describe('public static page smoke checks', () => {
     expect(glassIdx).toBeGreaterThan(cleanupIdx);
 
     const css = await file('landing-glass.css');
-    // Canonical glass tokens (codified in DESIGN-SYSTEM.md for other surfaces).
-    expect(css).toContain('--glass-ultra-bg: rgba(255, 255, 255, 0.60)');
-    expect(css).toContain('--glass-thin-bg: rgba(255, 255, 255, 0.50)');
+    // Design refactor wave 1: the "liquid glass" material is retired. The
+    // reference design has no blurred chrome — surfaces are FLAT colour. The
+    // sheet keeps its load-order role and its bug fixes; only the material
+    // changed, so the tokens survive as opaque surface colours.
+    expect(css).toContain('--glass-ultra-bg: rgb(255, 255, 255)');
+    expect(css).toContain('--glass-thin-bg: rgb(255, 255, 255)');
     expect(css).toContain('--glass-radius: 18px');
-    expect(css).toContain('rgba(18, 22, 26, 0.58)'); // dark ultra override
-    // Every glass element pairs the -webkit- prefix and ships a solid fallback.
-    expect(css).toContain('-webkit-backdrop-filter');
-    expect(css).toContain('@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px)))');
+    expect(css).toContain('rgb(18, 22, 26)'); // dark ultra override
+    // No blur anywhere, and therefore no @supports-not fallback to pair with
+    // it — the formerly-conditional opaque values now apply unconditionally.
+    expect(css).not.toMatch(/^[^*\n]*backdrop-filter\s*:/m);
     // Selected audience segment = brand-blue OUTLINE, not a bright fill.
     expect(css).toContain('inset 0 0 0 1px var(--accent)');
   });

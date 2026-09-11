@@ -64,7 +64,7 @@
   display: flex; flex-direction: column; gap: 8px;
   padding: 8px; border: 1px solid var(--border);
   border-radius: var(--radius); background: var(--surface-2);
-  cursor: pointer; text-align: left; transition: border-color .14s ease, transform .1s ease;
+  cursor: pointer; text-align: left; transition: all .2s ease;
 }
 .qf-cz-preset:hover { border-color: var(--border-strong); }
 .qf-cz-preset:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
@@ -79,7 +79,7 @@
 }
 .qf-cz-preset-accent {
   position: absolute; right: 9px; bottom: 9px; width: 16px; height: 16px;
-  border-radius: 5px; box-shadow: 0 1px 3px rgba(0,0,0,.35);
+  border-radius: 5px; box-shadow: var(--qf-shadow-sm);
 }
 .qf-cz-preset-name { font-size: 12.5px; font-weight: 600; color: var(--ink); }
 
@@ -88,10 +88,8 @@
 .qf-cz-swatch {
   width: 30px; height: 30px; border-radius: 8px; padding: 0;
   border: 1px solid var(--border-strong); cursor: pointer;
-  position: relative; transition: transform .1s ease, box-shadow .12s ease;
-}
-.qf-cz-swatch:hover { transform: translateY(-1px); }
-.qf-cz-swatch:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  position: relative; transition: all .2s ease;
+}.qf-cz-swatch:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .qf-cz-swatch.is-selected { box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--accent-fill); }
 .qf-cz-swatch-default,
 .qf-cz-swatch-custom {
@@ -116,10 +114,8 @@
   border-radius: 999px; border: 1px solid var(--border-strong);
   background: var(--surface-2); color: var(--ink-soft);
   font-size: 12px; font-weight: 650; cursor: pointer;
-  transition: transform .1s ease, box-shadow .12s ease, border-color .12s ease, color .12s ease;
-}
-.qf-cz-hover-chip:hover { transform: translateY(-1px); }
-.qf-cz-hover-chip:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  transition: all .2s ease;
+}.qf-cz-hover-chip:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .qf-cz-hover-chip.is-selected {
   border-color: var(--accent-fill); color: var(--ink);
   box-shadow: 0 0 0 1px var(--accent-fill);
@@ -132,10 +128,8 @@
   border-radius: 999px; border: 1px solid var(--border-strong);
   background: var(--surface-2); color: var(--ink-soft);
   font-size: 12px; font-weight: 600; cursor: pointer;
-  transition: transform .1s ease, box-shadow .12s ease, border-color .12s ease, color .12s ease;
-}
-.qf-cz-mapstyle:hover { transform: translateY(-1px); }
-.qf-cz-mapstyle:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  transition: all .2s ease;
+}.qf-cz-mapstyle:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .qf-cz-mapstyle.is-selected {
   border-color: var(--accent-fill); color: var(--ink);
   box-shadow: 0 0 0 1px var(--accent-fill);
@@ -151,18 +145,18 @@
   height: 3px; transform: rotate(-24deg); transform-origin: center;
   border-radius: 2px;
 }
-.qf-ms-branded    { background: linear-gradient(135deg, #16204a, #0f1629); }
+.qf-ms-branded    { background: #16204a; }
 .qf-ms-branded::after    { background: #3f5cc0; }
-.qf-ms-grayscale  { background: linear-gradient(135deg, #f2f3f5, #d9dde2); }
+.qf-ms-grayscale  { background: #f2f3f5; }
 .qf-ms-grayscale::after  { background: #0D3CFC; }
-.qf-ms-standard   { background: linear-gradient(135deg, #e8efe4, #cfe0f0); }
+.qf-ms-standard   { background: #e8efe4; }
 .qf-ms-standard::after   { background: #0D3CFC; }
 .qf-ms-dark-routes,
-.qf-ms-dark_routes { background: linear-gradient(135deg, #2c2c2c, #0e0e0e); }
+.qf-ms-dark_routes { background: #2c2c2c; }
 .qf-ms-dark_routes::after { background: #f4f6f8; height: 4px; }
-.qf-ms-soft       { background: linear-gradient(135deg, #f4f1ea, #cfe0cf); }
+.qf-ms-soft       { background: #f4f1ea; }
 .qf-ms-soft::after       { background: #0D3CFC; }
-.qf-ms-satellite  { background: linear-gradient(135deg, #4f6b3f 0%, #8f7d5a 55%, #35597c 100%); }
+.qf-ms-satellite  { background: #4f6b3f; }
 .qf-ms-satellite::after  { background: #f4f6f8; height: 4px; }
 
 /* ── Text-colour swatches (background-aware) ──────────────────────────── */
@@ -172,10 +166,8 @@
   border-radius: 999px; border: 1px solid var(--border-strong);
   background: var(--surface-2); color: var(--ink-soft);
   font-size: 12px; font-weight: 600; cursor: pointer;
-  transition: transform .1s ease, box-shadow .12s ease, border-color .12s ease, color .12s ease;
-}
-.qf-cz-textcolor:hover { transform: translateY(-1px); }
-.qf-cz-textcolor:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  transition: all .2s ease;
+}.qf-cz-textcolor:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .qf-cz-textcolor.is-selected {
   border-color: var(--accent-fill); color: var(--ink);
   box-shadow: 0 0 0 1px var(--accent-fill);
@@ -190,7 +182,7 @@
   display: flex; flex-direction: column; align-items: center; gap: 6px;
   padding: 22px 16px; text-align: center;
   border: 1px dashed var(--border-strong); border-radius: var(--radius);
-  background: var(--surface-2); transition: border-color .14s ease, background .14s ease;
+  background: var(--surface-2); transition: all .2s ease;
 }
 .qf-cz-dropzone.is-drag { border-color: var(--accent-fill); background: var(--accent-soft); }
 .qf-cz-dropzone-title { font-size: 13px; font-weight: 600; color: var(--ink); }
@@ -257,9 +249,9 @@
   padding: 0; border-radius: 999px;
   border: 1px solid var(--border-strong); background: var(--surface-2);
   color: var(--ink-soft); cursor: pointer;
-  transition: opacity .14s ease, border-color .12s ease, color .12s ease, transform .1s ease;
+  transition: all .2s ease;
 }
-.qf-cz-carousel-arrow:hover { color: var(--ink); transform: translateY(-1px); }
+.qf-cz-carousel-arrow:hover { color: var(--ink);}
 .qf-cz-carousel-arrow:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 /* Hide at the ends. Scoped through .qf-cz-carousel so it out-specifies the
    global `.app-main button[disabled]{opacity:.62}` in premium-saas-polish.css;
@@ -299,7 +291,7 @@
   padding: 8px 12px;
   font-size: 13px; font-weight: 650; color: var(--muted);
   border-bottom: 2px solid transparent; cursor: pointer;
-  transition: color .12s ease, border-color .12s ease;
+  transition: all .2s ease;
 }
 .qf-cz-tab:hover { color: var(--ink); }
 .qf-cz-tab:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
@@ -321,7 +313,7 @@
   min-width: 32px; min-height: 28px; padding: 4px 8px;
   color: var(--ink-soft); cursor: pointer;
   font-size: 12px; font-weight: 650;
-  transition: background .12s ease, color .12s ease;
+  transition: all .2s ease;
 }
 .qf-cz-seg-btn.qf-cz-seg-text { padding: 4px 12px; }
 .qf-cz-seg-btn:hover { color: var(--ink); }
@@ -336,7 +328,7 @@
    longer swaps a host backdrop/frame, so the preview container stays a constant
    size across all three states (no apparent resize/reframe on toggle). */
 .qf-cz-frame-wrap {
-  transition: max-width .18s ease;
+  transition: all .2s ease;
 }
 .qf-cz-frame-wrap[data-device="mobile"] { max-width: 390px; margin-left: auto; margin-right: auto; }
 
@@ -376,7 +368,10 @@
   border-top-left-radius: var(--radius-lg);
   border-top-right-radius: var(--radius-lg);
   box-shadow: var(--shadow-lg);
-  transition: height 0.3s cubic-bezier(0.32, 0.72, 0, 1);
+  /* Property-specific on purpose: the sheet resizes by HEIGHT, never by
+     transform, or the page jumps under it. `all` would animate transform too,
+     so this one keeps an explicit property (customizePanel.test.ts RULE). */
+  transition: height 0.3s ease;
   overflow: hidden;
   padding-bottom: env(safe-area-inset-bottom);
 }
@@ -405,7 +400,7 @@
   height: 4px;
   border-radius: var(--radius-pill);
   background: var(--border-strong);
-  transition: background 0.15s ease;
+  transition: all .2s ease;
 }
 .qf-cz-sheet-handle:hover .qf-cz-sheet-grip { background: var(--muted); }
 
@@ -436,7 +431,7 @@
   font-weight: 650;
   white-space: nowrap;
   cursor: pointer;
-  transition: color 0.12s ease, border-color 0.12s ease, background 0.12s ease;
+  transition: all .2s ease;
 }
 .qf-cz-sheet-chip:hover { color: var(--ink); border-color: var(--accent-fill); }
 .qf-cz-sheet-chip:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
@@ -471,7 +466,7 @@
    sheet is removed (route swap) because the :has() no longer matches. */
 #app-shell:has(.qf-cz-sheet) .qf-copilot-launcher {
   bottom: calc(var(--qf-cz-peek, 96px) + 16px);
-  transition: bottom 0.42s cubic-bezier(0.32, 0.72, 0, 1), opacity 0.2s ease, transform 0.2s ease;
+  transition: all .3s ease;
 }
 #app-shell:has(.qf-cz-sheet.is-open) .qf-copilot-launcher {
   opacity: 0;
@@ -479,7 +474,7 @@
   pointer-events: none;
 }
 @media (prefers-reduced-motion: reduce) {
-  #app-shell:has(.qf-cz-sheet) .qf-copilot-launcher { transition: opacity 0.2s ease; }
+  #app-shell:has(.qf-cz-sheet) .qf-copilot-launcher { transition: all .2s ease; }
 }
 
 /* ── Guided-editing pointer: active container + arrow + preview alignment ───
@@ -902,7 +897,6 @@
   border-bottom: 1px dashed var(--border);
 }
 
-
 /* ══════════════════════════════════════════════════════════════════════════
    INTENTIONAL MOBILE-DEVICE PREVIEW (≥901px) — the 390px phone-width widget
    previously floated in a wide, empty pane ("a straw in empty space"): the
@@ -1016,7 +1010,7 @@
   background: var(--surface-2);
   color: var(--ink);
 }
-.qf-cz-mapstyle:hover { transform: translateY(-1px); border-color: var(--border-strong); }
+.qf-cz-mapstyle:hover {border-color: var(--border-strong); }
 .qf-cz-mapstyle.is-selected {
   border-color: var(--accent-fill);
   color: var(--ink);
@@ -1034,7 +1028,7 @@
   border-radius: 8px;
   border: 1px solid var(--border);
   background: var(--surface-3);
-  box-shadow: 0 1px 3px rgba(0, 0, 0, .18);
+  box-shadow: var(--qf-shadow-sm);
 }
 .qf-cz-mapstyle-name { font-size: 12.5px; font-weight: 600; color: var(--ink); text-align: left; }
 
@@ -1106,9 +1100,9 @@
   color: var(--ink);
   cursor: pointer;
   text-align: left;
-  transition: border-color .14s ease, transform .1s ease;
+  transition: all .2s ease;
 }
-.qf-gallery-tile:hover { transform: translateY(-1px); border-color: var(--border-strong); }
+.qf-gallery-tile:hover {border-color: var(--border-strong); }
 .qf-gallery-tile:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .qf-gallery-tile.is-selected {
   border-color: var(--accent-fill);
@@ -1184,21 +1178,19 @@
   pointer-events: none;
   opacity: 0;
   z-index: 1;
-  transition: opacity .16s ease;
-  backdrop-filter: blur(1.5px);
-  -webkit-backdrop-filter: blur(1.5px);
+  transition: all .2s ease;
 }
 /* The mask matches each side's colour gradient so the faint backdrop blur fades
    out inward with the shade (no hard blur seam), leaving only a soft edge. */
 .qf-cz-carousel::before {
   left: 24px;
-  background: linear-gradient(to right, var(--qf-cz-fade-bg), transparent);
+  background: var(--qf-cz-fade-bg);
   -webkit-mask-image: linear-gradient(to right, #000, transparent);
   mask-image: linear-gradient(to right, #000, transparent);
 }
 .qf-cz-carousel::after {
   right: 24px;
-  background: linear-gradient(to left, var(--qf-cz-fade-bg), transparent);
+  background: var(--qf-cz-fade-bg);
   -webkit-mask-image: linear-gradient(to left, #000, transparent);
   mask-image: linear-gradient(to left, #000, transparent);
 }
@@ -1239,7 +1231,7 @@
 .qf-cz-unfold {
   display: grid;
   grid-template-rows: 0fr;
-  transition: grid-template-rows .28s ease;
+  transition: all .3s ease;
 }
 .qf-cz-unfold.is-open { grid-template-rows: 1fr; }
 .qf-cz-unfold-inner { overflow: hidden; min-height: 0; }
@@ -1261,9 +1253,9 @@
   color: var(--ink);
   cursor: pointer;
   text-align: left;
-  transition: border-color .14s ease, transform .1s ease;
+  transition: all .2s ease;
 }
-.qf-cz-unfold-tile:hover { transform: translateY(-1px); border-color: var(--border-strong); }
+.qf-cz-unfold-tile:hover {border-color: var(--border-strong); }
 .qf-cz-unfold-tile:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .qf-cz-unfold-tile.is-selected {
   border-color: var(--accent-fill);
@@ -1275,7 +1267,7 @@
 .qf-cz-unfold-tile .qf-cz-preset-swatch { height: 92px; }
 /* "View all" toggle → label + rotating chevron. */
 .qf-cz-unfold-toggle { display: inline-flex; align-items: center; gap: 4px; }
-.qf-cz-unfold-chev { display: inline-flex; transition: transform .2s ease; }
+.qf-cz-unfold-chev { display: inline-flex; transition: all .2s ease; }
 .qf-cz-unfold-toggle.is-open .qf-cz-unfold-chev { transform: rotate(180deg); }
 @media (prefers-reduced-motion: reduce) {
   .qf-cz-unfold { transition: none; }

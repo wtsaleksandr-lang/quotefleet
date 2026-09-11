@@ -3,7 +3,7 @@
   margin: 0 0 18px;
   border: 1px solid var(--border);
   border-radius: 22px;
-  background: linear-gradient(135deg, rgba(13, 60, 252,.08), rgba(13, 60, 252,.05)), var(--surface);
+  background: var(--surface);
   box-shadow: var(--shadow-md);
   overflow: hidden;
 }
@@ -102,7 +102,7 @@
 .qf-brand-page-mock {
   border: 1px solid rgba(255,255,255,.09);
   border-radius: 20px;
-  background: linear-gradient(180deg, #15202a, #0d141c);
+  background: #15202a;
   overflow: hidden;
 }
 .qf-brand-page-top {
@@ -116,7 +116,7 @@
   width: 36px;
   height: 36px;
   border-radius: 12px;
-  background: linear-gradient(135deg, var(--accent), var(--accent-2));
+  background: var(--accent);
 }
 .qf-brand-page-top strong { color: #fff; display: block; }
 .qf-brand-page-top small { color: #A39E99; }

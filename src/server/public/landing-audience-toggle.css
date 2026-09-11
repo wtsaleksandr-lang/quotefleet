@@ -39,7 +39,7 @@
   min-height: 44px;
   border-radius: var(--radius-pill);
   white-space: nowrap;
-  transition: color 0.18s ease, background 0.18s ease;
+  transition: all .2s ease;
 }
 .qf-aud-seg:hover { color: var(--ink-soft); }
 .qf-aud-seg.is-active {
@@ -53,13 +53,7 @@
 
 /* ── Panels + cross-fade ───────────────────────────────────────────────── */
 .qf-aud-panel { display: block; }
-.qf-aud-panel[hidden] { display: none; }
-.qf-aud-panel.is-entering { animation: qfAudFade 0.28s ease both; }
-@keyframes qfAudFade {
-  from { opacity: 0; transform: translateY(8px); }
-  to   { opacity: 1; transform: translateY(0); }
-}
-@media (prefers-reduced-motion: reduce) {
+.qf-aud-panel[hidden] { display: none; }@media (prefers-reduced-motion: reduce) {
   .qf-aud-panel.is-entering { animation: none; }
   .qf-aud-seg { transition: none; }
 }
@@ -184,11 +178,10 @@
   padding: 8px 24px;
   min-height: 44px;
   cursor: pointer;
-  transition: background 0.18s ease, transform 0.18s ease;
+  transition: all .2s ease;
 }
 .qf-dir-search .qf-dir-submit:hover {
   background: var(--accent-strong);
-  transform: translateY(-1px);
 }
 .qf-dir-search .qf-dir-submit:active { transform: translateY(0); }
 

@@ -46,7 +46,7 @@ html body.qf-wft .qf-cap {
   max-width: 62%;
   opacity: 0;
   transform: translateY(6px);
-  transition: opacity 0.42s ease, transform 0.42s ease;
+  transition: all .3s ease;
 }
 html body.qf-wft .qf-cap.is-on { opacity: 1; transform: translateY(0); }
 html body.qf-wft .qf-cap__chip {
@@ -59,7 +59,7 @@ html body.qf-wft .qf-cap__chip {
   border: 1px solid var(--border);
   border-radius: var(--radius-pill);
   padding: 8px 12px;
-  box-shadow: 0 6px 18px -10px rgba(0, 0, 0, 0.55);
+  box-shadow: var(--qf-shadow-md);
   white-space: nowrap;
 }
 
@@ -155,10 +155,8 @@ html body.qf-wft .qf-cap--right .qf-cap__tip {
   html body.qf-wft .qf-caps--phone .qf-cap { max-width: 72%; }
   html body.qf-wft .qf-caps--phone .qf-cap__chip {
     color: #EEF2FF;
-    background: rgba(9, 11, 20, 0.86);
+    background: rgb(9, 11, 20);
     border-color: rgba(245, 252, 255, 0.16);
-    -webkit-backdrop-filter: blur(6px);
-    backdrop-filter: blur(6px);
   }
 
   /* Per-scene phone-cap anchors — target Y bands from the spec, arrow inward. */

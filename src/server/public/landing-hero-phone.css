@@ -23,7 +23,6 @@
   --pz-accent-edge: rgba(13, 60, 252, 0.22);
   --pz-card: #ffffff;
   --pz-card-edge: #edf1f7;
-
   display: none; /* desktop: hidden (composite shows). Mobile MQ turns it on. */
 }
 
@@ -62,10 +61,7 @@ html body.qf-wft .visual-flow.qf-hero-media > .qf-phone { display: none; }
   border: 1px solid var(--pz-bezel-edge);
   border-radius: 26px;
   padding: 5px;
-  box-shadow:
-    0 2px 2px rgba(0, 0, 0, 0.4) inset,
-    0 24px 48px -22px rgba(0, 0, 0, 0.72),
-    0 0 0 1px rgba(0, 0, 0, 0.35);
+  box-shadow: 0 2px 2px rgba(0, 0, 0, 0.4) inset, var(--qf-shadow-md), 0 0 0 1px rgba(0, 0, 0, 0.35);
 }
 .qf-hero-vphone__island {
   position: absolute;
@@ -103,10 +99,7 @@ html body.qf-wft .visual-flow.qf-hero-media > .qf-phone { display: none; }
   border: 1px solid var(--pz-bezel-edge);
   border-radius: 42px;
   padding: 10px;
-  box-shadow:
-    0 2px 2px rgba(0, 0, 0, 0.4) inset,
-    0 30px 60px -28px rgba(0, 0, 0, 0.75),
-    0 0 0 2px rgba(0, 0, 0, 0.35);
+  box-shadow: 0 2px 2px rgba(0, 0, 0, 0.4) inset, var(--qf-shadow-md), 0 0 0 2px rgba(0, 0, 0, 0.35);
 }
 
 /* Dynamic-island pill. */
@@ -245,7 +238,6 @@ html body.qf-wft .visual-flow.qf-hero-media > .qf-phone { display: none; }
 .qf-slide__route .qf-arrow {
   flex: 1 1 auto;
   height: 1px;
-  background: repeating-linear-gradient(90deg, var(--pz-chip-edge) 0 4px, transparent 4px 8px);
   position: relative;
 }
 .qf-slide__route .qf-arrow::after {
@@ -267,7 +259,7 @@ html body.qf-wft .visual-flow.qf-hero-media > .qf-phone { display: none; }
   border-radius: 10px;
   overflow: hidden;
   border: 1px solid var(--pz-card-edge);
-  box-shadow: 0 1px 2px rgba(11, 18, 32, 0.06);
+  box-shadow: var(--qf-shadow-sm);
 }
 .qf-slide__map img {
   display: block;
@@ -288,7 +280,7 @@ html body.qf-wft .visual-flow.qf-hero-media > .qf-phone { display: none; }
   border: 1px solid var(--pz-card-edge);
   color: var(--pz-ink);
   font: 700 9.5px/1.25 'Inter', system-ui, sans-serif;
-  box-shadow: 0 1px 2px rgba(11, 18, 32, 0.08);
+  box-shadow: var(--qf-shadow-sm);
 }
 .qf-map-dist::before {
   content: '';
@@ -380,7 +372,7 @@ html body.qf-wft .visual-flow.qf-hero-media > .qf-phone { display: none; }
   flex: 1 1 auto;
   height: 8px;
   border-radius: 100px;
-  background: linear-gradient(90deg, var(--pz-chip) 0%, var(--pz-accent-soft) 50%, var(--pz-chip) 100%);
+  background: var(--pz-chip);
   background-size: 200% 100%;
 }
 
@@ -438,7 +430,7 @@ html body.qf-wft .visual-flow.qf-hero-media > .qf-phone { display: none; }
   color: var(--pz-card);
   font: 800 13px/1 'Inter', system-ui, sans-serif;
   letter-spacing: -0.01em;
-  box-shadow: 0 8px 18px -8px var(--pz-accent);
+  box-shadow: var(--qf-shadow-md);
 }
 .qf-slide__cta svg { display: block; }
 
@@ -468,7 +460,7 @@ html body.qf-wft .visual-flow.qf-hero-media > .qf-phone { display: none; }
   border-radius: 100px;
   background: var(--pz-chip-edge);
   cursor: pointer;
-  transition: width 0.25s ease, background 0.25s ease;
+  transition: all .3s ease;
 }
 .qf-phone__dot.is-on {
   width: 18px;
@@ -483,40 +475,13 @@ html body.qf-wft .visual-flow.qf-hero-media > .qf-phone { display: none; }
 html.js .qf-slide .qf-reveal { opacity: 0; }
 
 html.js .qf-slide.is-playing .qf-reveal {
-  animation: qfp-rise 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
   animation-delay: var(--d, 0s);
 }
 
 /* rate + calc choreography */
 html.js .qf-slide .qf-slide__rate { opacity: 0; }
 html.js .qf-slide.is-playing .qf-slide__rate {
-  animation: qfp-pop 0.45s cubic-bezier(0.22, 1, 0.36, 1) both;
   animation-delay: 1.15s;
-}
-html.js .qf-slide.is-playing .qf-slide__calc {
-  animation: qfp-calc 1.15s ease both;
-}
-html.js .qf-slide.is-playing .qf-slide__calc .qf-calc-bar {
-  animation: qfp-shimmer 0.9s linear infinite;
-}
-
-@keyframes qfp-rise {
-  from { opacity: 0; transform: translateY(9px); }
-  to   { opacity: 1; transform: translateY(0); }
-}
-@keyframes qfp-pop {
-  0%   { opacity: 0; transform: scale(0.92); }
-  60%  { opacity: 1; transform: scale(1.02); }
-  100% { opacity: 1; transform: scale(1); }
-}
-@keyframes qfp-calc {
-  0%   { opacity: 1; }
-  82%  { opacity: 1; }
-  100% { opacity: 0; }
-}
-@keyframes qfp-shimmer {
-  from { background-position: 200% 0; }
-  to   { background-position: -200% 0; }
 }
 
 /* Reduced motion — no auto-motion; every element shows its resting state. */
