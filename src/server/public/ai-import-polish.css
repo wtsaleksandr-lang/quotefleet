@@ -114,7 +114,7 @@
   background: rgba(255,255,255,.022);
 }
 .qf-import-safe-apply b { color: var(--accent); }
-tr.qf-import-row-focus { outline: 2px solid rgba(13, 60, 252,.38); outline-offset: -2px; }
+tr.qf-import-row-focus { outline: 2px solid rgba(51, 86, 238,.38); outline-offset: -2px; }
 @media (max-width: 1000px) {
   .qf-import-grid { grid-template-columns: 1fr 1fr; }
   .qf-import-checklist { grid-template-columns: 1fr; }

@@ -27,7 +27,8 @@ describe('public auth blue accent cleanup', () => {
 
     expect(authCss).toContain('Phase BW');
     // On-dark TEXT/glyph accent is the lightened step of the wave-2 accent:
-    // #3356EE measures 2.6:1 on the dark auth card, #8DA2F9 measures 7.2:1.
+    // #3356EE measures 3.07:1 on the dark auth card (AA-large only);
+    // #8DA2F9 measures 7.19:1 and clears AA for body text.
     // The solid fills keep #3356EE. Still brand-blue, never teal.
     expect(authCss).toContain('--accent: #8DA2F9');
     expect(authCss).toContain('/quotefleet-color-system.css');

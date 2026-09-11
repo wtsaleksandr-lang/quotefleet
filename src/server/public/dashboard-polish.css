@@ -125,7 +125,7 @@ html[data-theme="light"] .price-card {
 .table .input:focus,
 .table .select:focus {
   border-color: var(--accent);
-  box-shadow: 0 0 0 2px rgba(13, 60, 252,0.14);
+  box-shadow: 0 0 0 2px rgba(51, 86, 238,0.14);
 }
 .qf-filter-row th {
   background: rgba(6,10,15,0.40) !important;
