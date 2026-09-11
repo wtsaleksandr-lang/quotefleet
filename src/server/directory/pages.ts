@@ -4622,9 +4622,9 @@ export function renderCarrierProfile(opts: {
 
     ${isClaimed ? '' : `<div class="dir-card cp-claimcard">
       <h2 style="font-size: 18px; margin: 0 0 8px;">Is this your company?</h2>
-      <p class="muted" style="margin: 0 auto 16px; max-width: 460px;">Claim your profile to control how it reads, add your lanes and contact details, and receive rate requests directly. Claiming is free, forever — no trial, no card, no plan.</p>
+      <p class="muted" style="margin: 0 0 16px; max-width: 460px;">Claim your profile to control how it reads, add your lanes and contact details, and receive rate requests directly. Claiming is free, forever — no trial, no card, no plan.</p>
       <a class="btn btn-primary" href="${claimHref}">Claim this profile — free, forever <span class="arr">→</span></a>
-      <p class="muted-small" style="margin: 16px auto 0; max-width: 460px;">Carrier data is sourced from public FMCSA records. To correct or hide your contact details, email support@quotefleet.net with your USDOT number.</p>
+      <p class="muted-small" style="margin: 16px 0 0; max-width: 460px;">Carrier data is sourced from public FMCSA records. To correct or hide your contact details, email support@quotefleet.net with your USDOT number.</p>
     </div>`}
   </main>
   <script>
