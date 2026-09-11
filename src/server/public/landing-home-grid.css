@@ -34,22 +34,42 @@
 /* The card itself: a soft blue WASH, 12px radius, a ~14px page rail down both
    sides, flush under the sticky header.
 
-   The wash is `--surface-hero-image`, a generated decorative raster (style.css
-   EOF explains how it is made and why it is a raster and not a CSS gradient —
-   the design law forbids gradients, and the reference achieves this look the
-   same way). It is layered OVER the flat `--surface-hero` colour, so a failed
-   or unsupported image leaves the card on the tint it had before, never white.
+   TWO decorative rasters, both generated (style.css EOF explains how and why
+   they are rasters and not CSS gradients — the design law forbids gradients).
+   Both sit OVER the flat `--surface-hero` colour, so a failed or unsupported
+   image leaves the card on the tint it had before, never white.
 
-   `cover` + `50% 100%` is the geometry that survives every width: the field's
-   deepening runs along the bottom edge, so anchoring to centre-bottom keeps
-   the focal area pinned to the base of the card from a 367px-wide portrait
-   crop at 375px right out to a 2509px-wide ultrawide one. */
+   Layer order is top-to-bottom in the shorthand:
+
+   1. `--surface-hero-grain` — a 192×192 film-grain tile, `repeat` at its
+      NATURAL size. It must not be part of the wash: the wash is painted with
+      `cover`, and `cover` downscales a 2560px field to ~1411px at a 1440
+      viewport, which averages per-pixel grain straight out of existence.
+      Tiled at 1:1 it survives at every card width unchanged. Theme-invariant
+      — grey speckle darkens a light ground and lightens a dark one by the
+      same amount, so one asset serves both.
+   2. `--surface-hero-image` — the wash, `cover` at `50% 100%`. The field is a
+      centre-lit vignette: a light column down the middle (the only slice a
+      narrow viewport ever sees) with the tone falling away to the left and
+      right rails and toward the bottom. Anchoring to centre-bottom keeps the
+      deep base pinned to the foot of the card from a 367px-wide portrait crop
+      at 375px right out to a 2509px-wide ultrawide one.
+
+   THE HAIRLINE IS LOAD-BEARING, not decoration. The wash's rails do most of
+   the work of separating the card from `--bg` — at 1440 the visible crop puts
+   luminance ~0.48 against the page's 0.954, a 1.89:1 step — but at 375 the
+   card is 368px of a 375px viewport, `cover` shows only the light centre
+   column, and there is barely any page ground left beside the corners. A 1px
+   `--border-strong` rim (light #CAD5E2 = 1.77:1 against the page ground; dark
+   a 28% light wash) makes the 12px radius read as an edge at every width,
+   independently of what the crop happens to show. */
 .qf-hhero__card {
   background-color: var(--surface-hero);
-  background-image: var(--surface-hero-image);
-  background-repeat: no-repeat;
-  background-position: 50% 100%;
-  background-size: cover;
+  background-image: var(--surface-hero-grain), var(--surface-hero-image);
+  background-repeat: repeat, no-repeat;
+  background-position: 0 0, 50% 100%;
+  background-size: auto, cover;
+  border: 1px solid var(--border-strong);
   border-radius: var(--radius);
   max-width: 98%;
   margin: 0 auto;

@@ -1949,24 +1949,53 @@ html[data-theme="dark"],
    image 404s or WebP is unsupported, the card falls back to the flat tint it
    has today; nothing renders white.
 
-   The asset is generated, not licensed: scripts/make-hero-wash.mjs computes
-   the field per-pixel in float from these same tokens (base = a touch richer
-   than --surface-hero, deepening toward --accent at ~26% in the bottom-left,
-   lifting to near-white at the top-right), adds a low-frequency value-noise
-   mesh so it is never a pure ramp, and applies ±1 LSB triangular dither —
-   which is what keeps a 2560px-wide wash from banding at 8 bits. 2560×1100,
-   ~13 KB each.
+   The assets are generated, not licensed: scripts/make-hero-wash.mjs computes
+   the field per-pixel in float from these same tokens, adds a low-frequency
+   value-noise mesh so it is never a pure ramp, and applies ±1 LSB triangular
+   dither — which is what keeps a 2560px-wide wash from banding at 8 bits.
+   2560×1100, ~16 KB light / ~12 KB dark.
+
+   THE FIELD IS A CENTRE-LIT VIGNETTE, and the first cut was not. It deepened
+   toward the bottom-left and lifted to NEAR-WHITE at the opposite corner, and
+   near-white is the one thing it could not be: `--bg` is #F8FAFC at luminance
+   0.9536 and the lift reached 0.948, a 1.01:1 step. A 1.01:1 step is not an
+   edge — the card had no visible corners and the wash read as a flat white
+   field. `cover` made it worse, cropping a 2560px-wide field to its middle 66%
+   at 1440 and its middle 10% at 375, so whatever range the corners carried was
+   not on screen at the widths people actually use.
+
+   So: the light column runs down the MIDDLE, where every crop lands, and the
+   tone falls away to the left and right rails and toward the bottom. The rails
+   are structurally text-free (copy is capped at 780px inside a card up to
+   2509px wide), so they carry the range — and they sit exactly where the card
+   meets the page. Measured on the rendered page: palest pixel 0.786 against
+   the 0.954 page ground (1.20:1), rails down to 0.418 (1.89:1 at the 1440
+   crop), and the lead paragraph's `--muted` never drops below 4.8:1.
+
+   --surface-hero-grain is the TEXTURE, and it is a second, tiled layer rather
+   than part of the wash for a mechanical reason: `cover` downscales the wash,
+   and downscaling averages per-pixel grain out of existence. Tiled 1:1 at its
+   natural 192×192 it renders identically at every card width. It is
+   theme-invariant by construction — grey speckle over a constant low alpha
+   darkens a light ground and lightens a dark one by the same amount — so one
+   17.5 KB asset serves both themes and there is no second token to keep in
+   sync. Amplitude is 3.85 RMS from the local mean, set against a measurement
+   of the reference treatment (~4.3 RMS): enough to read as texture at 100%,
+   not enough to read as dirt or to cost text contrast.
 
    Split light/dark by the SAME cascade `--surface-hero` uses six lines up, so
    one switch drives both the base colour and the image. The dark variant is a
    real sibling (anchored on #131A28, same field, same accent) rather than a
    suppression: a flat rectangle in dark next to a washed card in light reads
-   as the unfinished theme.
+   as the unfinished theme. Its envelope is bounded at the TOP instead of the
+   bottom — dark `--muted` #90A1B9 needs the ground under luminance 0.0386 —
+   so it runs 0.018 → 0.035, a 1.23:1 step off the #0C111D page ground.
 
    Appended at EOF for baseline-protocol.md rule 1 (the guards key file:line).
    ───────────────────────────────────────────────────────────────────────── */
 :root {
   --surface-hero-image: url("/brand/hero-wash-light.webp");
+  --surface-hero-grain: url("/brand/hero-grain.webp");
 }
 html[data-theme="dark"],
 :root:not([data-theme="light"]) {
