@@ -251,11 +251,21 @@ describe('ONE responsive collapse point — no band without navigation', () => {
     expect(DIRECTORY_PAGES_TS).toMatch(/@media \(max-width: 1023px\)[\s\S]{0,120}\.nav-shipper/);
   });
 
-  it('loads the homepage IA sheet after the glass sheet', () => {
+  it('loads the homepage IA sheet after the glass sheet — and ACTUALLY appends it', () => {
     const glass = LANDING_MOTION_JS.indexOf("loadStylesheet('/landing-glass.css')");
-    const navIa = LANDING_MOTION_JS.indexOf("loadStylesheet('/nav-ia.css')");
+    const navIa = LANDING_MOTION_JS.indexOf("loadStylesheet('/nav-ia.css'");
     expect(glass).toBeGreaterThan(-1);
     expect(navIa).toBeGreaterThan(glass);
+    // CALL ORDER WAS NOT ENOUGH, which is the half this test used to miss.
+    // landing.html ALSO links nav-ia.css statically (so a phone's first paint
+    // is already collapsed), and loadStylesheet deduped against any existing
+    // <link> — so the call below returned early and the sheet only ever
+    // occupied its EARLY head position. Every homepage sheet injected here
+    // then out-cascaded it at equal specificity: measured on the chrome wave,
+    // the header rendered translucent and the footer light-on-light. The
+    // second argument re-appends it, which is what makes "after" true.
+    expect(LANDING_MOTION_JS).toContain("loadStylesheet('/nav-ia.css', true)");
+    expect(LANDING_MOTION_JS).toMatch(/function loadStylesheet\(href, again\)[\s\S]{0,120}if \(!again &&/);
   });
 });
 

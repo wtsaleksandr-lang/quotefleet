@@ -47,9 +47,10 @@
        320px that is 233px of buttons starting 134px in, so the document scrolls
        sideways by 47px before the sheet arrives and the header visibly snaps.
        Linking it here makes the collapse render-blocking. landing-motion.js
-       still injects it afterwards, which is what keeps its late cascade
-       position for everything else in the file — this copy only ensures the
-       first paint is already collapsed. -->
+       re-appends it afterwards (loadStylesheet(..., true) — it deduped before,
+       which quietly cost the sheet its late cascade position), so this copy
+       only ensures the first paint is already collapsed while the injected
+       copy keeps the last word over the bundle loaded below it. -->
   <link rel="stylesheet" href="/nav-ia.css">
   <link rel="preload" as="image" href="/marketing/qf-hero-phone-poster.jpg">
   <link rel="icon" href="/favicon.ico" sizes="any">
