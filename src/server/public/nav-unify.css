@@ -1026,3 +1026,117 @@ html[data-theme="light"] .nav-dd-panel { box-shadow: var(--qf-shadow-md); }
     column-gap: 16px;
   }
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   WAVE 4 — FLYOUT ELEVATION. Appended at EOF for the usual reason: the two CI
+   guards baseline by `file:line` (docs/design-refactor/baseline-protocol.md
+   rule 1), so a mid-file edit renumbers every tolerated entry below it.
+
+   REPORTED: "the mega-menu is too transparent — the hero headline and the
+   product image show straight through it and the menu text is hard to read."
+
+   MEASURED, THE FILL WAS NEVER TRANSLUCENT. On every surface that carries the
+   nav — homepage, /directory, a carrier profile — the panel already resolved
+   to `background-color: rgb(242,244,247)` at alpha 1 (rgb(26,35,51) on dark),
+   `opacity: 1`, `backdrop-filter: none`. A pixel diff of the panel's interior,
+   captured once as the page ships and once with a magenta/green marker painted
+   over every element behind the header, came back byte-identical. Nothing was
+   reaching the screen through the fill.
+
+   WHAT WAS MISSING IS THE EDGE. The shell is --surface-2 and the page ground
+   is --bg — measured 1.05:1 apart on light and 1.20:1 on dark. The only other
+   separation cue was --qf-shadow-md (`0 8px 24px rgba(0,0,0,.04)`), 4% black,
+   which over a near-white page darkens the ground by roughly one 8-bit step
+   and over the dark theme is not visible at all — plus `border: 0`. A surface
+   with no edge and no shadow does not read as floating above the page; it
+   reads as a hole in it, and "the page shows through" is exactly how a hole
+   looks. So the fix is ELEVATION, not opacity:
+
+   • --qf-shadow-lift is the LARGEST of the three shadow tokens
+     (`0 4px 24px rgba(165,176,204,.20)` — 5x the alpha of --qf-shadow-md). It
+     is named directly rather than through the --shadow-lg alias because the
+     dark theme re-points --shadow-lg at --qf-shadow-md: on a dark ground the
+     lavender tint reads as the soft halo dark-mode elevation is made of,
+     whereas 4% black reads as nothing at all.
+   • A 1px hairline in --border-strong gives a hard boundary that does not
+     depend on how the shadow renders. --border-strong, not --border: measured
+     against the page's own ground with the content behind replaced by a flat
+     fill, the boundary's median adjacent-pixel step went 13 -> 16 with
+     --border (#E2E8F0 is only 20 channels off the #F6F8FA ground, and the
+     shadow ramp softens even that) against 13 -> 44 with --border-strong. It
+     is the same token the system already gives chrome that has to read as a
+     distinct object on the page — .btn-secondary, .site-burger. It is the shell's OUTER edge only — the dividers
+     BETWEEN groups are still the 4px canvas gap over --chrome-panel-bg, never
+     a rule. That contract is unchanged and still pinned by
+     siteChromeSingleSource.test.ts.
+   • The fill is restated as the `background-color` LONGHAND plus
+     `background-image: none`, so a sheet that lands later cannot slide a
+     gradient, an image or a translucent shorthand back under the link text —
+     which is what --glass-card-solid (0.98) was doing before this wave.
+   • `opacity: 1` is defensive: a translucent ANCESTOR is the one thing that
+     would make the fill see-through no matter how opaque its own colour is.
+
+   STACKING. The flyout is a child of .site-header, which is `position: sticky`
+   with `z-index: 70` — a stacking context, so the panel's own z-index is only
+   ever compared inside it and nothing in the page's root context below 70 can
+   paint over it. The drawer had NO z-index at all (`auto`), which left it
+   ordering against its header siblings by document order; it is pinned to the
+   same 80 as the desktop panel so both sit above the brand, the action cluster
+   and the theme button at every breakpoint.
+
+   MOTION. `.2s ease` on open, as a keyframe rather than a transition because
+   the panel is revealed by toggling `hidden` and `display` is not animatable.
+   Opacity reaches 1 at 40% of the 200ms, so the panel is fully opaque for the
+   settle — a see-through open would be the reported bug in miniature. Disabled
+   wholesale under prefers-reduced-motion.
+
+   UNCHANGED: every href, the three triggers, the ONE 1023px collapse point,
+   #site-burger / #site-mobile-menu and their aria wiring, .qf-theme-btn
+   [aria-pressed], header stickiness, and the 12 / 4 / 8 shell-pad-card ramp.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.nav-dd-panel,
+.site-mobile-menu:not([hidden]) {
+  background-color: var(--chrome-panel-bg);
+  background-image: none;
+  opacity: 1;
+  border: 1px solid var(--border-strong);
+  box-shadow: var(--qf-shadow-lift);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  z-index: 80;
+}
+html[data-theme="light"] .nav-dd-panel,
+html[data-theme="light"] .site-mobile-menu:not([hidden]) {
+  box-shadow: var(--qf-shadow-lift);
+}
+
+/* Open motion — see the MOTION note above. */
+@keyframes qf-flyout-in {
+  from { opacity: 0; transform: translateY(-4px); }
+  40%  { opacity: 1; }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.nav-dd-panel:not([hidden]),
+.site-mobile-menu:not([hidden]) {
+  animation: qf-flyout-in .2s ease;
+}
+@media (prefers-reduced-motion: reduce) {
+  .nav-dd-panel:not([hidden]),
+  .site-mobile-menu:not([hidden]) { animation: none; }
+}
+
+/* THE ONE THING THAT DOES PAINT OVER THE FLYOUT. The marketing chat launcher
+   is `position: fixed` at `z-index: 2147483000` in the page's ROOT stacking
+   context, i.e. above .site-header's 70 and therefore above anything the
+   header can contain. On desktop it never meets the panel, but at 375px the
+   drawer is full-width and runs the height of the viewport, and the measured
+   overlap was ~4,000px of drawer covered by the launcher — a menu item with a
+   chat button sitting on top of it. Raising the header instead is the wrong
+   direction: the header would then cover the chat PANEL and its backdrop when
+   chat is open. So the launcher stands down for as long as the drawer is open,
+   keyed on the burger's own aria state (already the source of truth for open /
+   closed) — no JS, no new class, and a browser without :has() simply keeps
+   today's behaviour. marketing-chat.js's `.qf-mc-fab` is a single class, so
+   this out-specifies it without !important however late its <style> lands. */
+body:has(#site-burger[aria-expanded="true"]) .qf-mc-fab { display: none; }

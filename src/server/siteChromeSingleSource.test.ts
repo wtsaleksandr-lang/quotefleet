@@ -333,6 +333,50 @@ describe('the header is flat, opaque and stateless', () => {
       expect(panel, name).toContain('box-shadow: var(--qf-shadow-md)');
     }
   });
+
+  /* WAVE 4. Reported as "the mega-menu is too transparent — the hero shows
+     straight through it". The fill was never translucent (measured: alpha 1,
+     opacity 1, backdrop-filter none, and a pixel diff of the panel interior
+     taken with and without a lurid marker behind the header comes back
+     byte-identical). What it lacked was an EDGE: --surface-2 shell on the --bg
+     ground is 1.05:1 apart on light, and the only other cue was --qf-shadow-md
+     at 4% black, invisible on light and absent on dark. These are the four
+     declarations that fixed it, pinned so the next sheet to touch this panel
+     cannot quietly undo them. */
+  it('gives the flyout a real edge and real elevation, in BOTH themes', () => {
+    for (const [name, css] of [['nav-unify.css', NAV_UNIFY], ['nav-ia.css', NAV_IA]] as const) {
+      const at = css.indexOf('WAVE 4');
+      expect(at, `${name} has no WAVE 4 block`).toBeGreaterThan(-1);
+      const wave4 = css.slice(at);
+      // Opaque, stated as a longhand so no later shorthand can slide a
+      // translucent fill or an image back under the link text.
+      expect(wave4, name).toContain('background-color: var(--chrome-panel-bg)');
+      expect(wave4, name).toMatch(/background-image: none/);
+      expect(wave4, name).toMatch(/opacity: 1/);
+      // The LARGEST of the three shadow tokens, named directly rather than via
+      // --shadow-lg, which the dark theme re-points at --qf-shadow-md.
+      expect(wave4, name).toContain('box-shadow: var(--qf-shadow-lift)');
+      expect(wave4, `${name} must not reach the flyout elevation through --shadow-lg`)
+        .not.toContain('box-shadow: var(--shadow-lg)');
+      // A hairline that does not depend on how the shadow renders.
+      expect(wave4, name).toMatch(/border: 1px solid var\(--border-strong\)/);
+      // Blur is forbidden by the design law AND is the wrong fix: it would
+      // still let shapes through.
+      expect(wave4, name).toMatch(/backdrop-filter: none/);
+      // The drawer had no z-index at all; both surfaces now state one.
+      expect(wave4, name).toMatch(/z-index: 80/);
+      // `.2s ease` on open, as a keyframe: the panel is revealed by toggling
+      // `hidden`, and `display` is not animatable.
+      expect(wave4, name).toContain('qf-flyout-in');
+      expect(wave4, name).toMatch(/animation: qf-flyout-in \.2s ease/);
+      expect(wave4, `${name} must honour prefers-reduced-motion`)
+        .toContain('@media (prefers-reduced-motion: reduce)');
+      // The chat launcher is fixed at z-index 2147483000 in the ROOT stacking
+      // context — the one thing that painted over the drawer at 375px.
+      expect(wave4, name).toContain('#site-burger[aria-expanded="true"]');
+      expect(wave4, name).toContain('.qf-mc-fab');
+    }
+  });
 });
 
 describe('the interaction contract survived the restyle', () => {
