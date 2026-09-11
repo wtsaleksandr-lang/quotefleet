@@ -169,29 +169,53 @@ describe('badge groups — no single badge is ever stranded on a line (global ru
     const m = html.match(/class="card-chips" data-n="(\d+)"/);
     expect(m).not.toBeNull();
     const n = Number(m![1]);
-    expect(n).toBe(6); // safety + hazmat + 4 shown + "+2 more" → capped at 6 (clean 3×2)
+    // authority + drayage + safety + hazmat + 5 equipment = 9 → 5 shown + "+4 more".
+    expect(n).toBe(6); // capped at 6 (clean 3×2)
     expect(ORPHAN_SAFE.has(n)).toBe(true);
-    expect(html).toContain('+2 more');
+    expect(html).toContain('+4 more');
   });
 
   it('list card leaves a small chip set uncapped and orphan-safe', () => {
-    // Safety + 2 equipment = 3 pills → data-n 3 (one 3-wide row, no orphan), no "+N".
+    // authority + drayage + safety + 2 equipment = 5 pills → data-n 5 (3+2, no orphan).
     const html = carrierCard(carrier({ dryVan: true, reefer: true, hazmat: false, tanker: false, flatbed: false, dryBulk: false }));
-    expect(html).toMatch(/class="card-chips" data-n="3"/);
+    expect(html).toMatch(/class="card-chips" data-n="5"/);
     expect(html).not.toContain('more');
+  });
+
+  it('list card leads its chip row with the AUTHORITY TYPE, not a country', () => {
+    // The reference design put an All/CA/US/MX country segment here. Our data is
+    // the FMCSA census — US-only — so the equivalent real classification is the
+    // operating authority, and no country pill may ever be rendered.
+    const html = carrierCard(carrier(MAXIMAL));
+    const first = html.slice(html.indexOf('class="card-chips"'));
+    expect(first).toMatch(/<span class="pill pill-auth">Common authority<\/span>/);
+    expect(html).not.toMatch(/>(Canada|Mexico|MX|CA\/US)</);
+  });
+
+  it('list card renders a logo slot: a deterministic monogram when there is no logo', () => {
+    const html = carrierCard(carrier());
+    // Hue is pinned to the brand band (214–242) so 5,000 tiles read as one family.
+    const m = html.match(/class="cc-logo" style="--dir-logo-h: (\d+)" aria-hidden="true">AD</);
+    expect(m, html.slice(0, 400)).not.toBeNull();
+    const hue = Number(m![1]);
+    expect(hue).toBeGreaterThanOrEqual(214);
+    expect(hue).toBeLessThanOrEqual(242);
+    // Stable across renders — a carrier's tile must not change colour per request.
+    expect(carrierCard(carrier())).toContain(`--dir-logo-h: ${hue}`);
   });
 });
 
 describe('renderCarrierProfile — DrayLocator-structured header', () => {
   it('renders a company monogram avatar with up to two uppercase initials', () => {
-    // "ACME DRAYAGE INC" → first letter of the first two words → "AD".
+    // "ACME DRAYAGE INC" → first letter of the first two words → "AD". The tile
+    // also carries its deterministic brand-band tint (--dir-logo-h).
     const html = renderCarrierProfile({ carrier: carrier() });
-    expect(html).toContain('class="cp-monogram" aria-hidden="true">AD<');
+    expect(html).toMatch(/class="cp-monogram" style="--dir-logo-h: \d+" aria-hidden="true">AD</);
   });
 
   it('derives two letters from a single-word name', () => {
     const html = renderCarrierProfile({ carrier: carrier({ legalName: 'MOVERS', dbaName: null }) });
-    expect(html).toContain('class="cp-monogram" aria-hidden="true">MO<');
+    expect(html).toMatch(/class="cp-monogram" style="--dir-logo-h: \d+" aria-hidden="true">MO</);
   });
 
   it('shows an FMCSA source marker with NO fabricated date', () => {
@@ -210,8 +234,22 @@ describe('renderCarrierProfile — DrayLocator-structured header', () => {
     expect(html).toContain('Own this company?');
   });
 
-  it('orders the subtitle USDOT · MC · City, State', () => {
+  it('puts the ADDRESS in the header subtitle and the identifiers in the badge row', () => {
+    // The header now reads like the reference: pin + full address under the
+    // name, with USDOT / MC moved into the wrapped badge row beside the fleet
+    // figures. Both facts are still in the header, in a stable order.
     const html = renderCarrierProfile({ carrier: carrier() });
-    expect(html).toContain('USDOT 107080 · MC MC012892 · SAVANNAH, GA');
+    const subStart = html.indexOf('class="lead cp-subtitle"');
+    const sub = html.slice(subStart, html.indexOf('</p>', subStart));
+    expect(sub).toContain('SAVANNAH, GA 31401');
+    expect(sub).toContain('<svg class="dir-ico"'); // the pin
+    const badges = html.slice(html.indexOf('class="cp-hbadges"'));
+    const dot = badges.indexOf('USDOT 107080');
+    const mc = badges.indexOf('MC MC012892');
+    expect(dot).toBeGreaterThan(-1);
+    expect(mc).toBeGreaterThan(dot);
+    // Fleet figures are badges too, and they are the stored FMCSA values.
+    expect(badges).toContain('25 trucks');
+    expect(badges).toContain('30 drivers');
   });
 });

@@ -61,18 +61,33 @@ describe('renderCarrierProfile — contact display', () => {
     expect(html).not.toContain("hidden at the carrier's request");
   });
 
-  it('omits the email row (no empty "Email —") when email is null', () => {
+  it('never shows an empty "Email —" row; a missing email is an INVITATION', () => {
+    // The Contact tab still omits the row entirely. The header contact strip
+    // keeps its Email box but renders it as a dashed empty state pointing at the
+    // free claim flow — never an em-dash, never a fabricated address.
     const html = renderCarrierProfile({ carrier: carrier({ email: null }) });
     expect(html).toContain('href="tel:9125550921"'); // phone still shown
     expect(html).not.toContain('mailto:');
-    expect(html).not.toContain('>Email<');
+    expect(html).not.toContain('<span class="v">—</span>');
+    expect(html).toContain('cp-cbox--empty');
+    expect(html).toMatch(/cp-cbox-k">Email<[\s\S]{0,200}?href="\/claim\/acme-drayage-inc-107080">Add email</);
   });
 
-  it('omits the phone row when phone is null', () => {
+  it('never shows an empty "Phone —" row; a missing phone is an INVITATION', () => {
     const html = renderCarrierProfile({ carrier: carrier({ phone: null }) });
     expect(html).not.toContain('href="tel:');
-    expect(html).not.toContain('>Phone<');
+    expect(html).not.toContain('<span class="v">—</span>');
+    expect(html).toMatch(/cp-cbox-k">Phone<[\s\S]{0,200}?href="\/claim\/acme-drayage-inc-107080">Add phone</);
     expect(html).toContain('mailto:dispatch%40acme.com'); // email still shown
+  });
+
+  it('a CLAIMED carrier with no phone/email gets a plain absence, never a claim CTA', () => {
+    const html = renderCarrierProfile({
+      carrier: carrier({ phone: null, email: null, claimedTenantId: 42, claimedAt: new Date('2026-09-01T00:00:00Z') }),
+    });
+    expect(html).not.toContain('href="/claim/');
+    expect(html).toContain('cp-cbox--empty');
+    expect(html).toContain('Not listed');
   });
 
   it('hides BOTH phone and email and shows a muted opt-out line when contactHidden', () => {
