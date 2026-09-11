@@ -94,7 +94,7 @@
 }
 .qf-share-status.warn {
   color: #f5a524;
-  background: rgba(13, 60, 252,.12);
+  background: rgba(51, 86, 238,.12);
 }
 .qf-share-flow {
   display: grid;

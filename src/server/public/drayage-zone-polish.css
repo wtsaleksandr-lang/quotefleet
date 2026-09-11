@@ -51,7 +51,7 @@
 .qf-zone-health-actions button.is-active {
   border-color: var(--accent);
   color: var(--ink);
-  background: rgba(13, 60, 252,.1);
+  background: rgba(51, 86, 238,.1);
 }
 .qf-zone-health-grid {
   display: grid;
@@ -92,12 +92,12 @@
 }
 .qf-zone-status.needs-price,
 .qf-zone-status.needs-radius,
-.qf-zone-status.missing-anchor { border-color: rgba(13, 60, 252,.45); color: var(--accent-2); }
+.qf-zone-status.missing-anchor { border-color: rgba(51, 86, 238,.45); color: var(--accent-2); }
 .qf-zone-status.disabled { opacity: .75; }
-.qf-zone-status.ready { border-color: rgba(13, 60, 252,.45); color: var(--accent); }
+.qf-zone-status.ready { border-color: rgba(51, 86, 238,.45); color: var(--accent); }
 tr.qf-zone-needs-price,
 tr.qf-zone-needs-radius,
-tr.qf-zone-missing-anchor { outline: 1px solid rgba(13, 60, 252,.35); outline-offset: -1px; }
+tr.qf-zone-missing-anchor { outline: 1px solid rgba(51, 86, 238,.35); outline-offset: -1px; }
 tr.qf-zone-hidden-by-filter { display: none; }
 .qf-zone-note {
   margin: 0 0 16px;

@@ -82,7 +82,7 @@ body.qf-wft .site-nav {
 
 body.qf-wft .site-nav a,
 body.qf-wft .site-actions .signin {
-  font-family: "JetBrains Mono", ui-monospace, monospace !important;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace !important;
   font-size: 12px !important;
   font-weight: 500 !important;
   text-transform: uppercase !important;
@@ -96,7 +96,7 @@ body.qf-wft .site-actions .signin {
 
 body.qf-wft .site-nav a:hover,
 body.qf-wft .site-actions .signin:hover {
-  color: #6E8BFF !important;
+  color: #8DA2F9 !important;
   background: transparent !important;
 }
 
@@ -150,7 +150,7 @@ body.qf-wft .hero-copy .eyebrow {
   /* Quiet, subtle label — muted grey (not the loud accent blue) + a notch
      smaller, so the eyebrow reads as a soft kicker, not a bright line. */
   color: var(--muted) !important;
-  font-family: "JetBrains Mono", ui-monospace, monospace !important;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace !important;
   font-size: 10px !important;
   font-weight: 600 !important;
   letter-spacing: 0.16em !important;
@@ -241,8 +241,8 @@ body.qf-wft .mini-actions {
 }
 
 body.qf-wft .how-section .container {
-  width: min(1440px, calc(100vw - 56px)) !important;
-  max-width: 1440px !important;
+  width: min(1328px, calc(100vw - 48px)) !important;
+  max-width: 1328px !important;
 }
 
 /* Desktop/tablet: 2×2 grid so each how-it-works screenshot renders large and
@@ -401,7 +401,7 @@ body.qf-wft .site-mobile-menu {
     box-shadow: var(--qf-shadow-md);
   }
   body.qf-wft .site-mobile-menu a {
-    font-family: "JetBrains Mono", ui-monospace, monospace;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
     font-size: 13px;
     font-weight: 500;
     text-transform: uppercase;
@@ -414,7 +414,7 @@ body.qf-wft .site-mobile-menu {
   }
   body.qf-wft .site-mobile-menu a:hover,
   body.qf-wft .site-mobile-menu a:focus-visible {
-    color: #6E8BFF;
+    color: #8DA2F9;
     background: rgba(255, 255, 255, 0.04);
   }
 }
@@ -609,8 +609,8 @@ body.qf-wft.landing-v2 .hiw-card .hiw-num {
   width: 32px !important;
   height: 32px !important;
   border-radius: 999px !important;
-  background: rgba(110, 139, 255, .14) !important;
-  border: 1px solid rgba(110, 139, 255, .42) !important;
+  background: rgba(141, 162, 249, .14) !important;
+  border: 1px solid rgba(141, 162, 249, .42) !important;
   color: var(--accent) !important;
   font-family: var(--font-mono) !important;
   font-size: 15px !important;

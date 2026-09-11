@@ -19,7 +19,7 @@
    Only the CURRENT scene's chip is visible (JS toggles `.is-on` on the video's
    `timeupdate`; see landing-hero-captions.js) so chips never stack/overlap.
 
-   Tokens only for theme colors; the periwinkle arrow (#6E8BFF) is the on-dark
+   Tokens only for theme colors; the periwinkle arrow (#8DA2F9) is the on-dark
    accent used across the hero (not a white/black literal, so the color guard is
    unaffected). Every spacing px lands on the 8px ramp; all positioning is % so
    the spacing guard stays green.
@@ -71,27 +71,27 @@ html body.qf-wft .qf-cap--down .qf-cap__tip {
   left: 16px; bottom: -8px;
   border-left: 8px solid transparent;
   border-right: 8px solid transparent;
-  border-top: 8px solid #6E8BFF;
+  border-top: 8px solid #8DA2F9;
 }
 html body.qf-wft .qf-cap--up .qf-cap__tip {
   left: 16px; top: -8px;
   border-left: 8px solid transparent;
   border-right: 8px solid transparent;
-  border-bottom: 8px solid #6E8BFF;
+  border-bottom: 8px solid #8DA2F9;
 }
 html body.qf-wft .qf-cap--left .qf-cap__tip {
   left: -8px; top: 50%;
   transform: translateY(-50%);
   border-top: 8px solid transparent;
   border-bottom: 8px solid transparent;
-  border-right: 8px solid #6E8BFF;
+  border-right: 8px solid #8DA2F9;
 }
 html body.qf-wft .qf-cap--right .qf-cap__tip {
   right: -8px; top: 50%;
   transform: translateY(-50%);
   border-top: 8px solid transparent;
   border-bottom: 8px solid transparent;
-  border-left: 8px solid #6E8BFF;
+  border-left: 8px solid #8DA2F9;
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════

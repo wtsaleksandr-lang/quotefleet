@@ -9,7 +9,7 @@
    widget-style.css.
 
    Restyled to the WeFixTrades (DOSS) design language: self-hosted
-   Satoshi, brand blue accent (#0D3CFC), hairline borders. Dark mode
+   Satoshi, brand blue accent (#3356EE), hairline borders. Dark mode
    retains the warm near-black canvas (#161616) with cream CTAs.
    ─────────────────────────────────────────────────────────────── */
 
@@ -23,70 +23,70 @@ html { scrollbar-width: thin; scrollbar-color: rgba(135, 138, 150, 0.38) transpa
 ::-webkit-scrollbar-thumb { background-color: rgba(135, 138, 150, 0.38); border-radius: 8px; }
 ::-webkit-scrollbar-thumb:hover { background-color: rgba(135, 138, 150, 0.6); }
 
-/* ── Self-hosted Satoshi (copied from the WeFixTrades repo, same-origin
-   under /fonts). font-display: swap keeps FOUT, never FOIT. */
+/* ── Self-hosted Inter (wave 2 — replaces Satoshi). Two variable-weight
+   subsets served same-origin from /fonts, so the whole 100–900 range costs
+   two requests instead of five static weights. font-display: swap keeps
+   FOUT, never FOIT. No @import — a render-blocking third-party font
+   request is exactly what self-hosting exists to avoid. */
 @font-face {
-  font-family: "Satoshi";
-  font-style: normal; font-weight: 300; font-display: swap;
-  src: url("/fonts/satoshi-300.woff2") format("woff2");
+  font-family: "Inter";
+  font-style: normal; font-weight: 100 900; font-display: swap;
+  src: url("/fonts/inter-latin.woff2") format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6,
+    U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122,
+    U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
 }
 @font-face {
-  font-family: "Satoshi";
-  font-style: normal; font-weight: 400; font-display: swap;
-  src: url("/fonts/satoshi-400.woff2") format("woff2");
+  font-family: "Inter";
+  font-style: normal; font-weight: 100 900; font-display: swap;
+  src: url("/fonts/inter-latin-ext.woff2") format("woff2");
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7,
+    U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F,
+    U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F,
+    U+A720-A7FF;
 }
-@font-face {
-  font-family: "Satoshi";
-  font-style: normal; font-weight: 500; font-display: swap;
-  src: url("/fonts/satoshi-500.woff2") format("woff2");
-}
-@font-face {
-  font-family: "Satoshi";
-  font-style: normal; font-weight: 700; font-display: swap;
-  src: url("/fonts/satoshi-700.woff2") format("woff2");
-}
-@font-face {
-  font-family: "Satoshi";
-  font-style: normal; font-weight: 900; font-display: swap;
-  src: url("/fonts/satoshi-900.woff2") format("woff2");
-}
+/* Mono is a PLATFORM stack, not a webfont. The reference design ships no
+   monospace at all, but the carrier directory renders USDOT/MC numbers in
+   mono across hundreds of thousands of pages where tabular figures genuinely
+   aid reading — so --font-mono keeps working without a font download.
+   See --font-mono in :root below. */
 
 :root {
-  /* Backgrounds — Maersk-clean light default (white surfaces, calm space). */
-  --bg:           #F6F8FA;
+  /* Surfaces — measured target palette (wave 2). White page, slate recess. */
+  --bg:           #F8FAFC;
   --surface:      #FFFFFF;
-  --surface-2:    #EFF3F7;
-  --surface-3:    #E3E9EF;
+  --surface-2:    #F2F4F7;
+  --surface-3:    #EAECF0;
 
-  /* Borders — cool hairlines. */
-  --border:        #E1E7ED;
-  --border-strong: #C7D0D9;
+  /* Borders — 1px hairline everywhere; 2px only for selection / focus. */
+  --border:        #E2E8F0;
+  --border-strong: #CAD5E2;
 
-  /* Text — deep-navy ink, never pure black. */
-  --ink:        #0A2540;
-  --ink-soft:   #223549;
-  --muted:      #5A6B7B;
-  --muted-soft: #8996A3;
+  /* Ink ramp — primary / secondary / muted / de-emphasis. */
+  --ink:        #020618;
+  --ink-soft:   #314158;
+  --muted:      #475467;
+  --muted-soft: #90A1B9;
 
-  /* Brand accent — blue. On light surfaces the brand blue reads as itself. */
-  --accent:        #0D3CFC;
-  --accent-strong: #0A30CC;
-  --accent-soft:   rgba(13, 60, 252, 0.08);
-  --accent-fill:   #0D3CFC;
+  /* THE accent — one blue, used sparingly (selection, focus, link hover). */
+  --accent:        #3356EE;
+  --accent-strong: #2440C4;
+  --accent-soft:   rgba(51, 86, 238, 0.08);
+  --accent-fill:   #3356EE;
   --accent-ink:    #FFFFFF;
 
-  /* Secondary accent — brand blue. */
-  --accent-2:      #0D3CFC;
-  --accent-2-soft: rgba(13, 60, 252, 0.08);
+  /* Secondary accent — same blue; the system has no second hue. */
+  --accent-2:      #3356EE;
+  --accent-2-soft: rgba(51, 86, 238, 0.08);
 
-  /* CTA — deep-navy fill with white text (Maersk-style). */
-  --cta-bg:              #0A2540;
-  --cta-bg-hover:        #071A2E;
+  /* CTA — dark surface fill with white text. */
+  --cta-bg:              #0C111D;
+  --cta-bg-hover:        #020618;
   --cta-text:            #FFFFFF;
-  --cta-sec-text:        #0A2540;
-  --cta-sec-border:      rgba(10, 37, 64, 0.18);
-  --cta-sec-border-hover:rgba(10, 37, 64, 0.34);
-  --cta-sec-bg-hover:    rgba(13, 60, 252, 0.06);
+  --cta-sec-text:        #020618;
+  --cta-sec-border:      #CAD5E2;
+  --cta-sec-border-hover:#90A1B9;
+  --cta-sec-bg-hover:    rgba(51, 86, 238, 0.06);
 
   /* Status (semantic; tuned for light backgrounds). */
   --success:    #059669;
@@ -96,16 +96,16 @@ html { scrollbar-width: thin; scrollbar-color: rgba(135, 138, 150, 0.38) transpa
   --error:      #B91C1C;
   --error-bg:   rgba(185, 28, 28, 0.10);
 
-  /* Effects */
+  /* Effects — exactly three shadows; radii are 6 / 8 / 12 (+ the pill). */
   --shadow-sm: var(--qf-shadow-sm);
   --shadow-md: var(--qf-shadow-md);
-  --shadow-lg: var(--qf-shadow-md);
-  --glow-cyan: 0 0 0 1px rgba(13, 60, 252, 0.18), var(--qf-shadow-lift);
+  --shadow-lg: var(--qf-shadow-lift);
+  --glow-cyan: 0 0 0 1px rgba(51, 86, 238, 0.18), var(--qf-shadow-lift);
   --radius:    12px;
-  --radius-lg: 16px;
-  --radius-xl: 20px;
-  --radius-btn: 10px;
-  --radius-pill: 999px;
+  --radius-lg: 12px;
+  --radius-xl: 12px;
+  --radius-btn: 8px;
+  --radius-pill: 9999px;
 
   /* ── Spacing ramp (8px grid) — canonical source: design-tokens/spacing.json.
      The ONLY allowed spacing values. New rules must reference these tokens, not
@@ -131,8 +131,8 @@ html { scrollbar-width: thin; scrollbar-color: rgba(135, 138, 150, 0.38) transpa
   --tap-target: 44px;
   --tap-gap: 8px;
   --label-gap: 8px;
-  --font-sans: 'Satoshi', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, system-ui, sans-serif;
-  --font-mono: 'DM Mono', 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, system-ui, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, monospace;
 }
 
 /* ── Light theme (explicit) — same values as the new light :root default.
@@ -142,35 +142,35 @@ html { scrollbar-width: thin; scrollbar-color: rgba(135, 138, 150, 0.38) transpa
    Only color tokens flip — radius / shadow / typography stay identical
    so layout is pixel-stable across themes.  */
 html[data-theme="light"] {
-  /* Maersk-clean: white surfaces, deep-navy ink, cool hairlines, calm space.
-     QuoteFleet blue stays the one confident accent (not Maersk cyan). */
-  --bg:           #F6F8FA;
+  /* Measured target palette (wave 2): white page, slate recess, one blue.
+     Mirrors :root exactly so the explicit toggle and the default agree. */
+  --bg:           #F8FAFC;
   --surface:      #FFFFFF;
-  --surface-2:    #EFF3F7;
-  --surface-3:    #E3E9EF;
-  --border:        #E1E7ED;
-  --border-strong: #C7D0D9;
-  --ink:        #0A2540;   /* deep navy */
-  --ink-soft:   #223549;
-  --muted:      #5A6B7B;
-  --muted-soft: #8996A3;
+  --surface-2:    #F2F4F7;
+  --surface-3:    #EAECF0;
+  --border:        #E2E8F0;
+  --border-strong: #CAD5E2;
+  --ink:        #020618;   /* near-black ink */
+  --ink-soft:   #314158;
+  --muted:      #475467;
+  --muted-soft: #90A1B9;
   /* On light surfaces the brand blue reads as itself (no lightened step). */
-  --accent:        #0D3CFC;
-  --accent-strong: #0A30CC;
-  --accent-soft:   rgba(13, 60, 252, 0.08);
-  --accent-fill:   #0D3CFC;
+  --accent:        #3356EE;
+  --accent-strong: #2440C4;
+  --accent-soft:   rgba(51, 86, 238, 0.08);
+  --accent-fill:   #3356EE;
   --accent-ink:    #FFFFFF;
-  --accent-2:      #0D3CFC;
-  --accent-2-soft: rgba(13, 60, 252, 0.08);
-  /* Light: primary CTA is a confident deep-navy fill with white text
-     (Maersk-style). Ghost secondary stays outlined in navy. */
-  --cta-bg:              #0A2540;
-  --cta-bg-hover:        #071A2E;
+  --accent-2:      #3356EE;
+  --accent-2-soft: rgba(51, 86, 238, 0.08);
+  /* Light: primary CTA is the dark surface with white text. Ghost secondary
+     stays outlined in the control border. */
+  --cta-bg:              #0C111D;
+  --cta-bg-hover:        #020618;
   --cta-text:            #FFFFFF;
-  --cta-sec-text:        #0A2540;
-  --cta-sec-border:      rgba(10, 37, 64, 0.18);
-  --cta-sec-border-hover:rgba(10, 37, 64, 0.34);
-  --cta-sec-bg-hover:    rgba(13, 60, 252, 0.06);
+  --cta-sec-text:        #020618;
+  --cta-sec-border:      #CAD5E2;
+  --cta-sec-border-hover:#90A1B9;
+  --cta-sec-bg-hover:    rgba(51, 86, 238, 0.06);
   --success:    #059669;
   --success-bg: rgba(5, 150, 105, 0.10);
   --warn:       #B45309;
@@ -179,37 +179,37 @@ html[data-theme="light"] {
   --error-bg:   rgba(185, 28, 28, 0.10);
   --shadow-sm: var(--qf-shadow-sm);
   --shadow-md: var(--qf-shadow-md);
-  --shadow-lg: var(--qf-shadow-md);
-  --glow-cyan: 0 0 0 1px rgba(13, 60, 252, 0.18), var(--qf-shadow-lift);
+  --shadow-lg: var(--qf-shadow-lift);
+  --glow-cyan: 0 0 0 1px rgba(51, 86, 238, 0.18), var(--qf-shadow-lift);
 }
 
 /* ── Dark theme — opted in explicitly or via OS preference.
    Explicit toggle wins; system-preference applies only when no explicit choice. */
 html[data-theme="dark"] {
-  --bg:           #161616;
-  --surface:      #1C1C1C;
-  --surface-2:    #22282A;
-  --surface-3:    #2E3638;
-  --border:        rgba(133, 128, 123, 0.18);
-  --border-strong: rgba(133, 128, 123, 0.32);
-  --ink:        #F9F9F9;
-  --ink-soft:   #E7E4E0;
-  --muted:      #A39E99;
-  --muted-soft: #78736E;
-  --accent:        #6E8BFF;
-  --accent-strong: #93A9FF;
-  --accent-soft:   rgba(13, 60, 252, 0.12);
-  --accent-fill:   #0D3CFC;
-  --accent-ink:    #1E1E1E;
-  --accent-2:      #0D3CFC;
-  --accent-2-soft: rgba(13, 60, 252, 0.10);
-  --cta-bg:              #E6E3E0;
-  --cta-bg-hover:        #D4CFC9;
-  --cta-text:            #1E1E1E;
-  --cta-sec-text:        #F9F9F9;
-  --cta-sec-border:      rgba(224, 220, 216, 0.5);
-  --cta-sec-border-hover:rgba(224, 220, 216, 0.9);
-  --cta-sec-bg-hover:    rgba(230, 227, 224, 0.06);
+  --bg:           #0C111D;
+  --surface:      #131A28;
+  --surface-2:    #1A2333;
+  --surface-3:    #232E42;
+  --border:        rgba(202, 213, 226, 0.14);
+  --border-strong: rgba(202, 213, 226, 0.28);
+  --ink:        #F8FAFC;
+  --ink-soft:   #E2E8F0;
+  --muted:      #90A1B9;
+  --muted-soft: #64748B;
+  --accent:        #8DA2F9;
+  --accent-strong: #B4C2FC;
+  --accent-soft:   rgba(51, 86, 238, 0.22);
+  --accent-fill:   #3356EE;
+  --accent-ink:    #FFFFFF;
+  --accent-2:      #8DA2F9;
+  --accent-2-soft: rgba(51, 86, 238, 0.18);
+  --cta-bg:              #F8FAFC;
+  --cta-bg-hover:        #E2E8F0;
+  --cta-text:            #0C111D;
+  --cta-sec-text:        #F8FAFC;
+  --cta-sec-border:      rgba(226, 232, 240, 0.34);
+  --cta-sec-border-hover:rgba(226, 232, 240, 0.62);
+  --cta-sec-bg-hover:    rgba(226, 232, 240, 0.08);
   --success:    #34D399;
   --success-bg: rgba(52, 211, 153, 0.12);
   --warn:       #F59E0B;
@@ -219,34 +219,34 @@ html[data-theme="dark"] {
   --shadow-sm: var(--qf-shadow-sm);
   --shadow-md: var(--qf-shadow-md);
   --shadow-lg: var(--qf-shadow-md);
-  --glow-cyan: 0 0 0 1px rgba(13, 60, 252, 0.28), var(--qf-shadow-lift);
+  --glow-cyan: 0 0 0 1px rgba(141, 162, 249, 0.28), var(--qf-shadow-lift);
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --bg:           #161616;
-    --surface:      #1C1C1C;
-    --surface-2:    #22282A;
-    --surface-3:    #2E3638;
-    --border:        rgba(133, 128, 123, 0.18);
-    --border-strong: rgba(133, 128, 123, 0.32);
-    --ink:        #F9F9F9;
-    --ink-soft:   #E7E4E0;
-    --muted:      #A39E99;
-    --muted-soft: #78736E;
-    --accent:        #6E8BFF;
-    --accent-strong: #93A9FF;
-    --accent-soft:   rgba(13, 60, 252, 0.12);
-    --accent-fill:   #0D3CFC;
-    --accent-ink:    #1E1E1E;
-    --accent-2:      #0D3CFC;
-    --accent-2-soft: rgba(13, 60, 252, 0.10);
-    --cta-bg:              #E6E3E0;
-    --cta-bg-hover:        #D4CFC9;
-    --cta-text:            #1E1E1E;
-    --cta-sec-text:        #F9F9F9;
-    --cta-sec-border:      rgba(224, 220, 216, 0.5);
-    --cta-sec-border-hover:rgba(224, 220, 216, 0.9);
-    --cta-sec-bg-hover:    rgba(230, 227, 224, 0.06);
+    --bg:           #0C111D;
+    --surface:      #131A28;
+    --surface-2:    #1A2333;
+    --surface-3:    #232E42;
+    --border:        rgba(202, 213, 226, 0.14);
+    --border-strong: rgba(202, 213, 226, 0.28);
+    --ink:        #F8FAFC;
+    --ink-soft:   #E2E8F0;
+    --muted:      #90A1B9;
+    --muted-soft: #64748B;
+    --accent:        #8DA2F9;
+    --accent-strong: #B4C2FC;
+    --accent-soft:   rgba(51, 86, 238, 0.22);
+    --accent-fill:   #3356EE;
+    --accent-ink:    #FFFFFF;
+    --accent-2:      #8DA2F9;
+    --accent-2-soft: rgba(51, 86, 238, 0.18);
+    --cta-bg:              #F8FAFC;
+    --cta-bg-hover:        #E2E8F0;
+    --cta-text:            #0C111D;
+    --cta-sec-text:        #F8FAFC;
+    --cta-sec-border:      rgba(226, 232, 240, 0.34);
+    --cta-sec-border-hover:rgba(226, 232, 240, 0.62);
+    --cta-sec-bg-hover:    rgba(226, 232, 240, 0.08);
     --success:    #34D399;
     --success-bg: rgba(52, 211, 153, 0.12);
     --warn:       #F59E0B;
@@ -256,7 +256,7 @@ html[data-theme="dark"] {
     --shadow-sm: var(--qf-shadow-sm);
     --shadow-md: var(--qf-shadow-md);
     --shadow-lg: var(--qf-shadow-md);
-    --glow-cyan: 0 0 0 1px rgba(13, 60, 252, 0.28), var(--qf-shadow-lift);
+    --glow-cyan: 0 0 0 1px rgba(141, 162, 249, 0.28), var(--qf-shadow-lift);
   }
 }
 
@@ -369,7 +369,7 @@ p { margin: 0; }
      Use: <span class="tag">[ Recognized as the best MVNE globally ]</span>
    ─────────────────────────────────────────────────────────────── */
 /* Eyebrow — WeFixTrades style: mono uppercase, letter-spaced, brand accent
-   on dark (#6E8BFF). No brackets (that was the old Effortel treatment). */
+   on dark (#8DA2F9). No brackets (that was the old Effortel treatment). */
 .tag {
   display: inline-block;
   font-family: var(--font-mono);
@@ -494,7 +494,7 @@ p { margin: 0; }
 .btn-primary:hover {
   background: var(--cta-bg-hover); border-color: var(--cta-bg-hover);
   transform: translateY(-1px);
-  box-shadow: inset 0 0 0 1.5px rgba(13, 60, 252, 0.45), var(--qf-shadow-lift), var(--qf-shadow-sm);
+  box-shadow: inset 0 0 0 1.5px rgba(51, 86, 238, 0.45), var(--qf-shadow-lift), var(--qf-shadow-sm);
 }
 .btn-primary:active { transform: translateY(0) scale(0.985); }
 .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; box-shadow: none; transform: none; }
@@ -546,7 +546,7 @@ p { margin: 0; }
 .card.elevated { box-shadow: var(--shadow-md); }
 .card.glow {
   box-shadow: var(--glow-cyan);
-  border-color: rgba(13, 60, 252, 0.30);
+  border-color: rgba(51, 86, 238, 0.30);
 }
 .card-title {
   font-size: 16px; font-weight: 700; margin: 0 0 4px 0;
@@ -840,7 +840,7 @@ html[data-theme="light"] .hero h1 .accent {
   transition: all .2s ease;
   overflow: hidden;
 }.feature-card:hover {
-  border-color: rgba(13, 60, 252, 0.35);
+  border-color: rgba(51, 86, 238, 0.35);
   box-shadow: var(--qf-shadow-lift);
 }
 .feature-card .icon {
@@ -973,7 +973,7 @@ html[data-theme="light"] .hero h1 .accent {
   position: relative;
 }
 .price-card.featured {
-  border-color: rgba(13, 60, 252, 0.40);
+  border-color: rgba(51, 86, 238, 0.40);
   box-shadow: var(--glow-cyan);
 }
 .price-card.featured::after {
@@ -1127,7 +1127,7 @@ html[data-theme="light"] .hero h1 .accent {
   padding: 12px 16px; border-radius: 10px;
   background: var(--accent-soft); color: var(--accent);
   font-size: 13.5px;
-  border: 1px solid rgba(13, 60, 252, 0.22);
+  border: 1px solid rgba(51, 86, 238, 0.22);
 }
 .notice.warn  { background: var(--warn-bg);  color: var(--warn);  border-color: rgba(245, 158, 11, 0.20); }
 .notice.error { background: var(--error-bg); color: var(--error); border-color: rgba(248, 113, 113, 0.20); }
@@ -1837,3 +1837,51 @@ html[data-theme="light"] .site-footer strong { color: var(--ink); }
   --qf-shadow-md: 0 8px 24px rgba(0, 0, 0, .04);
   --qf-shadow-lift: 0 4px 24px rgba(165, 176, 204, .20);
 }
+
+/* ── Wave 2 additions ─────────────────────────────────────────────────────
+   New tokens the measured target needs and the legacy set did not have.
+   Appended at EOF on purpose: the two CI guards key their baselines on
+   `file:line`, so inserting these into the :root block at the top of this
+   file would renumber every baselined entry below it (see
+   docs/design-refactor/baseline-protocol.md rule 1).
+   ───────────────────────────────────────────────────────────────────────── */
+:root {
+  /* Surfaces the legacy set had no name for. */
+  --surface-hero:  #EFF6FF;   /* the one blue wash, for hero bands only */
+  --surface-dark:  #0C111D;   /* the dark surface (CTA fills, dark bands) */
+
+  /* Focus. 2px is reserved for selection + focus; everything else is 1px. */
+  --border-focus:  var(--accent);
+  --focus-ring:    0 0 0 2px var(--accent-soft);
+
+  /* Badge / pill pair — quiet by default; the accent stays scarce. */
+  --badge-bg:      var(--surface-2);
+  --badge-ink:     var(--ink-soft);
+  --badge-border:  var(--border);
+
+  /* Radius ramp — 6 / 8 / 12 only, plus the pill idiom. */
+  --radius-sm:     6px;
+  --radius-md:     8px;
+
+  /* The three shadows, reachable by their semantic names. */
+  --shadow-lift:   var(--qf-shadow-lift);
+
+  /* Container: 1328 outer / 24 gutter / 1280 content. */
+  --container-max: 1328px;
+  --container-gutter: var(--space-3);
+
+  /* Motion — `all .3s ease` default, `.2s ease` for state changes. */
+  --motion:        all .3s ease;
+  --motion-state:  all .2s ease;
+}
+html[data-theme="dark"],
+:root:not([data-theme="light"]) {
+  --surface-hero: #131A28;    /* the blue wash has no legible dark twin */
+}
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]) { --surface-hero: #EFF6FF; }
+}
+
+/* Container — the measured 1328/24/1280 geometry. Declared here rather than
+   edited in place at .container so the baseline line keys stay stable. */
+.container { max-width: var(--container-max); padding: 0 var(--container-gutter); }

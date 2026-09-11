@@ -49,7 +49,6 @@ src/server/public/addons-panel.css:65	spacing	padding: 14px 16px
 src/server/public/addons-panel.css:79	spacing	gap: 6px
 src/server/public/addons-panel.css:86	spacing	gap: 6px
 src/server/public/addons-panel.css:94	line-height	line-height: 1
-src/server/public/addons-panel.css:97	radius	border-radius: 8px
 src/server/public/ai-import-polish.css:100	spacing	margin-bottom: 5px
 src/server/public/ai-import-polish.css:110	radius	border-radius: 15px
 src/server/public/ai-import-polish.css:111	spacing	padding: 12px 13px
@@ -196,11 +195,7 @@ src/server/public/callback-queue-search.css:6	spacing	margin: 0 0 14px
 src/server/public/callback-queue-search.css:68	spacing	padding: 12px 14px
 src/server/public/callback-queue-search.css:7	spacing	padding: 14px
 src/server/public/customize-panel.css:101	radius	border-radius: 5px
-src/server/public/customize-panel.css:1027	radius	border-radius: 8px
-src/server/public/customize-panel.css:1041	radius	border-radius: 8px
 src/server/public/customize-panel.css:105	radius	border-radius: 4px
-src/server/public/customize-panel.css:1075	radius	border-radius: 8px
-src/server/public/customize-panel.css:1116	radius	border-radius: 8px
 src/server/public/customize-panel.css:113	radius	border-radius: 999px
 src/server/public/customize-panel.css:113	spacing	padding: 8px 13px
 src/server/public/customize-panel.css:1132	radius	border-radius: 999px
@@ -213,7 +208,6 @@ src/server/public/customize-panel.css:165	spacing	padding: 6px 12px 6px 8px
 src/server/public/customize-panel.css:182	spacing	gap: 6px
 src/server/public/customize-panel.css:182	spacing	padding: 22px 16px
 src/server/public/customize-panel.css:190	spacing	margin-top: 6px
-src/server/public/customize-panel.css:193	radius	border-radius: 8px
 src/server/public/customize-panel.css:194	spacing	padding: 6px
 src/server/public/customize-panel.css:198	spacing	padding: 14px
 src/server/public/customize-panel.css:199	spacing	margin-bottom: 10px
@@ -230,17 +224,13 @@ src/server/public/customize-panel.css:52	spacing	gap: 6px
 src/server/public/customize-panel.css:53	spacing	margin-top: 10px
 src/server/public/customize-panel.css:55	spacing	margin-top: 2px
 src/server/public/customize-panel.css:60	spacing	gap: 10px
-src/server/public/customize-panel.css:73	radius	border-radius: 8px
-src/server/public/customize-panel.css:769	radius	border-radius: 8px
 src/server/public/customize-panel.css:77	radius	border-radius: 5px
 src/server/public/customize-panel.css:77	spacing	top: 14px
 src/server/public/customize-panel.css:783	radius	border-radius: 5px
 src/server/public/customize-panel.css:788	radius	border-radius: 4px
-src/server/public/customize-panel.css:797	radius	border-radius: 8px
 src/server/public/customize-panel.css:81	radius	border-radius: 5px
 src/server/public/customize-panel.css:81	spacing	bottom: 9px
 src/server/public/customize-panel.css:81	spacing	right: 9px
-src/server/public/customize-panel.css:89	radius	border-radius: 8px
 src/server/public/customize-panel.css:953	radius	border-radius: 30px
 src/server/public/customize-panel.css:96	spacing	gap: 7px
 src/server/public/customize-panel.css:973	radius	border-radius: 999px
@@ -341,7 +331,6 @@ src/server/public/dashboard-setup.css:88	radius	border-radius: 999px
 src/server/public/dashboard-setup.css:98	line-height	line-height: 1.35
 src/server/public/dashboard-setup.css:98	spacing	margin-top: 3px
 src/server/public/dashboard-setup.css:99	spacing	padding: 0 14px 16px
-src/server/public/demo.css:257	radius	border-radius: 8px
 src/server/public/dpa-wefixtrades.css:60	radius	border-radius: 4px
 src/server/public/dpa-wefixtrades.css:66	spacing	padding-inline: 18px
 src/server/public/drayage-zone-polish.css:105	spacing	padding: 12px 13px
@@ -402,7 +391,6 @@ src/server/public/landing-conversion.css:188	radius	border-radius: 14px
 src/server/public/landing-conversion.css:19	spacing	gap: 18px
 src/server/public/landing-conversion.css:192	spacing	gap: 9px
 src/server/public/landing-conversion.css:197	radius	border-radius: 999px
-src/server/public/landing-conversion.css:204	radius	border-radius: 8px
 src/server/public/landing-conversion.css:214	spacing	padding: 9px 10px
 src/server/public/landing-conversion.css:220	radius	border-radius: 14px
 src/server/public/landing-conversion.css:231	spacing	gap: 7px
@@ -465,7 +453,6 @@ src/server/public/landing-conversion.css:87	spacing	padding: 7px 10px
 src/server/public/landing-conversion.css:89	radius	border-radius: 999px
 src/server/public/landing-conversion.css:91	spacing	margin-bottom: 18px
 src/server/public/landing-final-cta.css:10	spacing	padding: clamp(40px, 5vw, 60px) clamp(24px, 4vw, 52px)
-src/server/public/landing-final-cta.css:109	radius	border-radius: 8px
 src/server/public/landing-final-cta.css:137	spacing	padding: 14px 16px
 src/server/public/landing-final-cta.css:139	radius	border-radius: 14px
 src/server/public/landing-final-cta.css:163	spacing	margin-left: -6px
@@ -485,7 +472,6 @@ src/server/public/landing-final-cta.css:85	spacing	gap: 9px
 src/server/public/landing-final-cta.css:86	spacing	padding: 11px 12px
 src/server/public/landing-footer-polish.css:169	radius	border-radius: 999px
 src/server/public/landing-footer-polish.css:194	radius	border-radius: 14px
-src/server/public/landing-footer-polish.css:223	radius	border-radius: 8px
 src/server/public/landing-hero-captions.css:110	radius	border-radius: 21px 21px 12px 12px
 src/server/public/landing-hero-captions.css:150	radius	border-radius: 21px 21px 14px 14px
 src/server/public/landing-hero-captions.css:56	radius	border-radius: 21px 21px 12px 12px
@@ -499,7 +485,6 @@ src/server/public/landing-hero-phone.css:166	spacing	padding: 34px 16px 26px
 src/server/public/landing-hero-phone.css:167	spacing	gap: 11px
 src/server/public/landing-hero-phone.css:174	spacing	left: 20px
 src/server/public/landing-hero-phone.css:175	spacing	right: 20px
-src/server/public/landing-hero-phone.css:195	radius	border-radius: 8px
 src/server/public/landing-hero-phone.css:213	spacing	margin-top: 3px
 src/server/public/landing-hero-phone.css:214	spacing	padding: 2px 7px
 src/server/public/landing-hero-phone.css:215	radius	border-radius: 100px
@@ -530,7 +515,6 @@ src/server/public/landing-hero-phone.css:451	spacing	gap: 5px
 src/server/public/landing-hero-phone.css:459	radius	border-radius: 100px
 src/server/public/landing-hero-phone.css:61	radius	border-radius: 26px
 src/server/public/landing-hero-phone.css:62	spacing	padding: 5px
-src/server/public/landing-hero-phone.css:73	radius	border-radius: 8px
 src/server/public/landing-hero-phone.css:79	radius	border-radius: 21px
 src/server/public/landing-hero-phone.css:99	radius	border-radius: 42px
 src/server/public/landing-home-fixes.css:106	spacing	gap: 14px
@@ -551,7 +535,6 @@ src/server/public/landing-home-fixes.css:397	radius	border-radius: 14px
 src/server/public/landing-home-fixes.css:410	spacing	padding: 12px 14px
 src/server/public/landing-home-fixes.css:42	spacing	gap: 9px
 src/server/public/landing-home-fixes.css:610	radius	border-radius: 999px
-src/server/public/landing-home-fixes.css:91	radius	border-radius: 8px
 src/server/public/landing-s-polish.css:105	radius	border-radius: 999px
 src/server/public/landing-s-polish.css:106	spacing	padding: 5px 8px
 src/server/public/landing-s-polish.css:119	spacing	padding: 10px
@@ -637,14 +620,12 @@ src/server/public/landing-wefixtrades.css:429	radius	border-radius: 13px
 src/server/public/landing-wefixtrades.css:43	spacing	padding: 0 14px
 src/server/public/landing-wefixtrades.css:439	radius	border-radius: 11px
 src/server/public/landing-wefixtrades.css:442	spacing	padding: 14px
-src/server/public/landing-wefixtrades.css:453	radius	border-radius: 8px
 src/server/public/landing-wefixtrades.css:455	spacing	padding: 10px
 src/server/public/landing-wefixtrades.css:461	radius	border-radius: 9px
 src/server/public/landing-wefixtrades.css:465	spacing	padding: 11px
 src/server/public/landing-wefixtrades.css:472	spacing	gap: 10px
 src/server/public/landing-wefixtrades.css:487	spacing	gap: 10px
 src/server/public/landing-wefixtrades.css:49	spacing	gap: 9px
-src/server/public/landing-wefixtrades.css:494	radius	border-radius: 8px
 src/server/public/landing-wefixtrades.css:502	spacing	gap: 10px
 src/server/public/landing-wefixtrades.css:503	spacing	margin-top: 14px
 src/server/public/landing-wefixtrades.css:516	spacing	gap: 28px
@@ -724,9 +705,7 @@ src/server/public/leads-list-focus.css:7	spacing	padding: 14px
 src/server/public/leads-list-focus.css:78	spacing	margin: 0 0 10px
 src/server/public/leads-list-focus.css:82	radius	border-radius: 999px
 src/server/public/leads-list-focus.css:85	spacing	padding: 7px 10px
-src/server/public/nav-unify.css:109	radius	border-radius: 8px
 src/server/public/nav-unify.css:134	radius	border-radius: 14px
-src/server/public/nav-unify.css:165	radius	border-radius: 8px
 src/server/public/nav-unify.css:18	spacing	padding: 12px 20px 0
 src/server/public/nav-unify.css:190	spacing	gap: 14px
 src/server/public/nav-unify.css:202	spacing	padding: 9px 18px
@@ -744,8 +723,6 @@ src/server/public/nav-unify.css:438	spacing	padding-top: 18px
 src/server/public/nav-unify.css:441	spacing	gap: 18px
 src/server/public/nav-unify.css:458	spacing	padding: 42px 18px 28px
 src/server/public/nav-unify.css:509	radius	border-radius: 14px
-src/server/public/nav-unify.css:82	radius	border-radius: 8px
-src/server/public/onboarding-wizard.css:792	radius	border-radius: 8px
 src/server/public/onboarding-wizard.css:810	radius	border-radius: 14px
 src/server/public/premium-saas-polish.css:10	spacing	padding: 18px
 src/server/public/premium-saas-polish.css:115	spacing	margin-top: 14px
@@ -770,11 +747,6 @@ src/server/public/premium-saas-polish.css:62	spacing	padding: 18px
 src/server/public/premium-saas-polish.css:69	radius	border-radius: 22px
 src/server/public/premium-saas-polish.css:73	spacing	padding: 20px
 src/server/public/public-auth-wefixtrades.css:132	radius	border-radius: 4px
-src/server/public/public-auth-wefixtrades.css:151	radius	border-radius: 8px
-src/server/public/public-auth-wefixtrades.css:194	radius	border-radius: 8px
-src/server/public/public-auth-wefixtrades.css:290	radius	border-radius: 8px
-src/server/public/public-auth-wefixtrades.css:45	radius	border-radius: 8px
-src/server/public/public-auth-wefixtrades.css:64	radius	border-radius: 8px
 src/server/public/public-calculator-app-style.css:163	spacing	padding: 14px 15px
 src/server/public/public-calculator-app-style.css:175	line-height	line-height: 1
 src/server/public/public-calculator-app-style.css:18	spacing	padding: 14px
@@ -832,11 +804,9 @@ src/server/public/public-calculator-mobile-cleanup.css:9	spacing	padding-inline:
 src/server/public/public-calculator-mobile-cleanup.css:90	spacing	margin-bottom: 9px
 src/server/public/public-calculator-no-gradients.css:1234	radius	border-radius: 999px
 src/server/public/public-calculator-no-gradients.css:170	spacing	padding: 14px 16px
-src/server/public/public-calculator-no-gradients.css:486	radius	border-radius: 8px
 src/server/public/public-calculator-no-gradients.css:670	radius	border-radius: 7px
 src/server/public/public-calculator-no-gradients.css:715	radius	border-radius: 999px
 src/server/public/public-calculator-no-gradients.css:721	radius	border-radius: 999px
-src/server/public/public-calculator-no-gradients.css:760	radius	border-radius: 8px 8px 0 0
 src/server/public/public-calculator-no-gradients.css:784	radius	border-radius: 999px
 src/server/public/public-calculator-ux.css:101	spacing	gap: 7px
 src/server/public/public-calculator-ux.css:102	spacing	margin-top: 10px
@@ -904,24 +874,20 @@ src/server/public/public-pages-wefixtrades.css:343	radius	border-radius: 18px
 src/server/public/public-pages-wefixtrades.css:355	radius	border-radius: 18px
 src/server/public/public-pages-wefixtrades.css:60	radius	border-radius: 4px
 src/server/public/public-pages-wefixtrades.css:68	radius	border-radius: 4px
-src/server/public/quote-interactive.css:119	radius	border-radius: 8px
 src/server/public/quote-interactive.css:123	line-height	line-height: 1
 src/server/public/quote-interactive.css:149	spacing	bottom: 64px
 src/server/public/quote-interactive.css:152	spacing	gap: 6px
-src/server/public/quote-interactive.css:158	radius	border-radius: 8px
 src/server/public/quote-interactive.css:162	line-height	line-height: 1
 src/server/public/quote-interactive.css:192	spacing	margin-left: 7px
 src/server/public/quote-interactive.css:195	radius	border-radius: 100px
 src/server/public/quote-interactive.css:207	spacing	margin: 6px 0 2px
 src/server/public/quote-interactive.css:208	spacing	padding: 8px 10px
-src/server/public/quote-interactive.css:209	radius	border-radius: 8px
 src/server/public/quote-interactive.css:21	spacing	margin-left: 6px
 src/server/public/quote-interactive.css:237	spacing	margin-top: 10px
 src/server/public/quote-interactive.css:238	spacing	padding-top: 10px
 src/server/public/quote-interactive.css:24	radius	border-radius: 100px
 src/server/public/quote-interactive.css:247	spacing	padding: 3px 0
 src/server/public/quote-interactive.css:37	spacing	padding: 10px 12px
-src/server/public/quote-interactive.css:40	radius	border-radius: 8px
 src/server/public/quote-interactive.css:51	spacing	right: 10px
 src/server/public/quote-interactive.css:52	spacing	bottom: 10px
 src/server/public/quote-interactive.css:55	spacing	gap: 6px
@@ -966,14 +932,12 @@ src/server/public/quote-premium.css:77	spacing	padding: 6px
 src/server/public/quote-premium.css:80	radius	border-radius: 14px
 src/server/public/quote-print.css:12	spacing	margin: 0 0 10px
 src/server/public/quote-print.css:13	spacing	padding: 8px 10px
-src/server/public/quote-print.css:15	radius	border-radius: 8px
 src/server/public/quote.css:1	line-height	line-height: 1
 src/server/public/quote.css:1	line-height	line-height: 1.15
 src/server/public/quote.css:1	line-height	line-height: 1.3
 src/server/public/quote.css:1	line-height	line-height: 1.35
 src/server/public/quote.css:1	radius	border-radius: 5px
 src/server/public/quote.css:1	radius	border-radius: 7px
-src/server/public/quote.css:1	radius	border-radius: 8px
 src/server/public/quote.css:1	radius	border-radius: 999px
 src/server/public/quote.css:1	radius	border-radius: 9px
 src/server/public/quote.css:1	spacing	gap: 11px
@@ -1013,7 +977,6 @@ src/server/public/quote.css:1	spacing	padding: 7px 9px
 src/server/public/quote.css:1	spacing	padding: 8px 10px
 src/server/public/quote.css:1	spacing	padding: 9px
 src/server/public/quote.css:1	spacing	top: 20px
-src/server/public/quote.css:10	radius	border-radius: 8px
 src/server/public/quotefleet-rates-globe.css:120	spacing	gap: 7px
 src/server/public/quotefleet-rates-globe.css:136	spacing	gap: clamp(20px, 4vw, 52px)
 src/server/public/quotefleet-rates-globe.css:138	spacing	margin: 28px auto 0
@@ -1113,16 +1076,13 @@ src/server/public/style.css:1122	spacing	padding: 14px
 src/server/public/style.css:1149	spacing	padding: 44px 28px 104px
 src/server/public/style.css:1152	spacing	margin-top: 72px
 src/server/public/style.css:1386	radius	border-radius: 999px
-src/server/public/style.css:23	radius	border-radius: 8px
 src/server/public/style.css:266	spacing	margin-top: 6px
-src/server/public/style.css:267	radius	border-radius: 8px
 src/server/public/style.css:303	tap	height: 16px
 src/server/public/style.css:303	tap	width: 16px
 src/server/public/style.css:631	spacing	padding: 6px 12px
 src/server/public/style.css:652	spacing	padding: 6px 10px
 src/server/public/style.css:660	spacing	margin: 14px 0 0 0
 src/server/public/style.css:665	spacing	padding: 8px 14px
-src/server/public/style.css:669	radius	border-radius: 8px 8px 0 0
 src/server/public/style.css:672	spacing	margin-bottom: -1px
 src/server/public/style.css:702	radius	border-radius: 999px
 src/server/public/style.css:736	spacing	padding-bottom: 1px
@@ -1133,31 +1093,22 @@ src/server/public/style.css:810	spacing	padding: 64px 22px 56px
 src/server/public/style.css:816	spacing	padding: 72px 0
 src/server/public/style.css:922	spacing	bottom: 86px
 src/server/public/style.css:984	radius	border-radius: 999px
-src/server/public/tools-marketplace-wefixtrades.css:115	radius	border-radius: 8px
-src/server/public/tools-marketplace-wefixtrades.css:121	radius	border-radius: 8px
 src/server/public/tools-marketplace-wefixtrades.css:3	spacing	padding: 58px 28px 34px
 src/server/public/tools-marketplace-wefixtrades.css:78	radius	border-radius: 999px
 src/server/public/vertical-pages-wefixtrades.css:33	spacing	padding: 42px 28px
 src/server/public/vertical-pages-wefixtrades.css:5	spacing	padding: 76px 28px 58px
-src/server/public/vertical-pages-wefixtrades.css:55	radius	border-radius: 8px
 src/server/public/vertical-pages-wefixtrades.css:80	radius	border-radius: 4px
-src/server/public/vertical-pages-wefixtrades.css:85	radius	border-radius: 8px
 src/server/public/widget-hazmat-pill.css:126	radius	border-radius: 999px
 src/server/public/widget-style.css:128	radius	border-radius: 7px
 src/server/public/widget-style.css:132	radius	border-radius: 999px
 src/server/public/widget-style.css:157	radius	border-radius: 999px
-src/server/public/widget-style.css:190	radius	border-radius: 8px
-src/server/public/widget-style.css:191	radius	border-radius: 8px
-src/server/public/widget-style.css:198	radius	border-radius: 8px
 src/server/public/widget-style.css:209	spacing	left: -9999px
 src/server/public/widget-style.css:221	radius	border-radius: 999px
-src/server/public/widget-style.css:224	radius	border-radius: 8px
 src/server/public/widget-style.css:226	spacing	top: -5px
 src/server/public/widget-style.css:231	radius	border-bottom-right-radius: 4px
 src/server/public/widget-style.css:232	radius	border-bottom-left-radius: 4px
 src/server/public/widget-style.css:261	radius	border-radius: 999px
 src/server/public/widget-style.css:319	radius	border-radius: 4px
-src/server/public/widget-style.css:342	radius	border-radius: 8px
 src/server/public/widget-style.css:365	radius	border-radius: 14px
 src/server/public/widget-style.css:367	radius	border-radius: 999px
 src/server/public/widget-style.css:375	radius	border-radius: 9px
@@ -1165,15 +1116,10 @@ src/server/public/widget-style.css:395	radius	border-radius: 999px
 src/server/public/widget-style.css:417	radius	border-radius: 999px
 src/server/public/widget-style.css:420	radius	border-radius: 999px
 src/server/public/widget-style.css:421	radius	border-radius: 999px
-src/server/public/widget-ux-fixes.css:1046	radius	border-radius: 8px
 src/server/public/widget-ux-fixes.css:1346	radius	border-radius: 999px
 src/server/public/widget-ux-fixes.css:162	radius	border-radius: 999px
-src/server/public/widget-ux-fixes.css:226	radius	border-radius: 8px
-src/server/public/widget-ux-fixes.css:401	radius	border-radius: 8px
 src/server/public/widget-ux-fixes.css:459	radius	border-radius: 7px
 src/server/public/widget-ux-fixes.css:476	radius	border-radius: 999px
-src/server/public/widget-ux-fixes.css:508	radius	border-radius: 8px
-src/server/public/widget-ux-fixes.css:610	radius	border-radius: 8px
 src/server/public/widget-ux-fixes.css:728	radius	border-radius: 4px
 src/server/public/widget-ux-fixes.css:877	radius	border-radius: 14px
 src/server/public/widget-ux-fixes.css:915	radius	border-radius: 999px

@@ -77,7 +77,7 @@
 .qf-vertical-wft code {
   color: #181D1F;
   background: #E4EDF1;
-  border: 1px solid rgba(13,60,252,.22);
+  border: 1px solid rgba(51, 86, 238,.22);
   border-radius: 4px;
   padding: 0 var(--space-0-5);
 }
@@ -124,5 +124,5 @@ html[data-theme="light"] .qf-vertical-wft .code,
 html[data-theme="light"] .qf-vertical-wft code {
   color: var(--accent);
   background: var(--accent-soft);
-  border-color: rgba(13, 60, 252, .20);
+  border-color: rgba(51, 86, 238, .20);
 }

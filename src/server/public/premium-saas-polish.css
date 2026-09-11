@@ -19,7 +19,7 @@
   width: 100%;
   border-radius: 999px;
   margin-bottom: 14px;
-  background: rgba(13, 60, 252,.16);
+  background: rgba(51, 86, 238,.16);
   background-size: 220% 100%;
   animation: qf-skeleton 1.3s ease-in-out infinite;
 }

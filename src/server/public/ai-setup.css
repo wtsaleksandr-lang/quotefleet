@@ -119,8 +119,8 @@
 }
 .qf-ai-bubble.customer {
   margin-left: auto;
-  background: rgba(13, 60, 252,.08);
-  border-color: rgba(13, 60, 252,.22);
+  background: rgba(51, 86, 238,.08);
+  border-color: rgba(51, 86, 238,.22);
 }
 .qf-ai-bubble.agent {
   margin-right: auto;

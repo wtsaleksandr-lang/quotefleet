@@ -2,21 +2,21 @@
 
 /* Phase BW: remove teal/cyan leftovers from auth pages. */
 body.qf-auth-wft {
-  --accent: #6E8BFF !important; /* on-dark TEXT/glyph accent (accentOnDark); was cobalt #0D3CFC → failed WCAG (~2.2:1) on dark card. Solid cobalt button fills below stay hardcoded. */
+  --accent: #8DA2F9 !important; /* on-dark TEXT/glyph accent (accentOnDark); the #3356EE fill is 3.07:1 on this dark card (AA-large only), so text uses the lightened step (7.19:1). Solid fills below stay the accent. */
   --accent-ink: #FFFFFF !important;
-  --accent-soft: rgba(13,60,252,.14) !important;
-  --primary: #0D3CFC !important;
-  --surface: #22282A !important;
-  --surface-2: #E4EDF1 !important;
-  --ink: #FFFFFF !important;
-  --ink-soft: #FFFFFF !important;
-  --muted: #B1C5CE !important;
-  --border: rgba(255,255,255,.12) !important;
-  --border-strong: rgba(255,255,255,.20) !important;
-  --radius: 8px !important;
-  --radius-lg: 8px !important;
-  --radius-xl: 8px !important;
-  --radius-btn: 4px !important;
+  --accent-soft: rgba(51,86,238,.22) !important;
+  --primary: #3356EE !important;
+  --surface: #131A28 !important;
+  --surface-2: #1A2333 !important;
+  --ink: #F8FAFC !important;
+  --ink-soft: #E2E8F0 !important;
+  --muted: #90A1B9 !important;
+  --border: rgba(202,213,226,.14) !important;
+  --border-strong: rgba(202,213,226,.28) !important;
+  --radius: 12px !important;
+  --radius-lg: 12px !important;
+  --radius-xl: 12px !important;
+  --radius-btn: 8px !important;
   background: #181D1F !important;
   color: #FFFFFF !important;
 }
@@ -59,8 +59,8 @@ body.qf-auth-wft .field-label {
 }
 
 body.qf-auth-wft .notice {
-  background: rgba(13,60,252,.14) !important;
-  border: 1px solid rgba(13,60,252,.40) !important;
+  background: rgba(51, 86, 238,.14) !important;
+  border: 1px solid rgba(51, 86, 238,.40) !important;
   color: #FFFFFF !important;
   border-radius: 8px !important;
 }
@@ -80,15 +80,15 @@ body.qf-auth-wft .input,
 body.qf-auth-wft .select,
 body.qf-auth-wft .url-builder-preview {
   background: #E4EDF1 !important;
-  border-color: rgba(13,60,252,.22) !important;
+  border-color: rgba(51, 86, 238,.22) !important;
   color: #181D1F !important;
   border-radius: 6px !important;
 }
 
 body.qf-auth-wft .input:focus,
 body.qf-auth-wft .select:focus {
-  border-color: #0D3CFC !important;
-  box-shadow: 0 0 0 3px rgba(13,60,252,.22) !important;
+  border-color: #3356EE !important;
+  box-shadow: 0 0 0 3px rgba(51, 86, 238,.22) !important;
 }
 
 body.qf-auth-wft a {
@@ -96,7 +96,7 @@ body.qf-auth-wft a {
 }
 /* Slug preview sits on the LIGHT #E4EDF1 chip — must NOT be white. */
 body.qf-auth-wft .url-builder-preview .live {
-  color: #0D3CFC !important;
+  color: #3356EE !important;
 }
 
 body.qf-auth-wft .tabs {
@@ -121,14 +121,14 @@ body.qf-auth-wft .tab {
 }
 
 body.qf-auth-wft .tab.active {
-  background: #0D3CFC !important;
+  background: #3356EE !important;
   color: #FFFFFF !important;
 }
 
 body.qf-auth-wft .btn-primary,
 body.qf-auth-wft .btn-primary:disabled {
-  background: #0D3CFC !important;
-  border: 1px solid #0D3CFC !important;
+  background: #3356EE !important;
+  border: 1px solid #3356EE !important;
   color: #FFFFFF !important;
   border-radius: 4px !important;
   box-shadow: none !important;
@@ -156,7 +156,7 @@ body.qf-auth-wft .plan-opt .muted { color: #B1C5CE !important; }
 
 body.qf-auth-wft .qf-mc-bubble,
 body.qf-auth-wft .qf-mc-send {
-  background: #0D3CFC !important;
+  background: #3356EE !important;
   color: #FFFFFF !important;
 }
 
@@ -349,17 +349,17 @@ body.qf-auth-wft .qf-oauth-or::after {
    The .qf-oauth "Continue with…" chips stay light in both themes (correct).
    ───────────────────────────────────────────────────────────────── */
 html[data-theme="light"] body.qf-auth-wft {
-  --accent: #0D3CFC !important;
-  --accent-soft: rgba(13, 60, 252, .08) !important;
+  --accent: #3356EE !important;
+  --accent-soft: rgba(51, 86, 238, .08) !important;
   --surface: #FFFFFF !important;
-  --surface-2: #EFF3F7 !important;
-  --ink: #0A2540 !important;
-  --ink-soft: #223549 !important;
-  --muted: #5A6B7B !important;
-  --border: #E1E7ED !important;
-  --border-strong: #C7D0D9 !important;
-  background: #F6F8FA !important;
-  color: #0A2540 !important;
+  --surface-2: #F2F4F7 !important;
+  --ink: #020618 !important;
+  --ink-soft: #314158 !important;
+  --muted: #475467 !important;
+  --border: #E2E8F0 !important;
+  --border-strong: #CAD5E2 !important;
+  background: #F8FAFC !important;
+  color: #020618 !important;
 }
 html[data-theme="light"] body.qf-auth-wft .topnav {
   background: var(--surface) !important;
@@ -495,13 +495,13 @@ body.qf-auth-wft .tab {
   transition: all .2s ease !important;
 }
 body.qf-auth-wft .tab:hover:not(.active) {
-  background: rgba(13, 60, 252, .10) !important;
+  background: rgba(51, 86, 238, .10) !important;
 }
 body.qf-auth-wft .tab.active:hover {
   box-shadow: var(--qf-shadow-lift) !important;
 }
 html[data-theme="light"] body.qf-auth-wft .tab:hover:not(.active) {
-  background: rgba(13, 60, 252, .08) !important;
+  background: rgba(51, 86, 238, .08) !important;
 }
 
 /* Submit buttons ("Email me a link" / "Sign in"): keep the existing white
@@ -572,7 +572,7 @@ body.qf-auth-wft .plan-opt {
 }
 body.qf-auth-wft .plan-opt:hover {
   box-shadow: var(--qf-shadow-md) !important;
-  border-color: rgba(110, 139, 255, 0.55) !important;
+  border-color: rgba(141, 162, 249, 0.55) !important;
 }
 
 /* LIGHT — frosted white glass shell + tiles. */
@@ -588,7 +588,7 @@ html[data-theme="light"] body.qf-auth-wft .plan-opt {
 }
 html[data-theme="light"] body.qf-auth-wft .plan-opt:hover {
   box-shadow: var(--qf-shadow-md) !important;
-  border-color: rgba(13, 60, 252, 0.50) !important;
+  border-color: rgba(51, 86, 238, 0.50) !important;
 }
 
 /* Re-assert selected-plan OUTLINE over the glass tile (both themes). The

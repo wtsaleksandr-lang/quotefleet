@@ -693,7 +693,7 @@ html body.qf-wft .qf-aud-panel[data-aud-panel="carriers"] .qf-hero-media {
   padding: 8px 12px;
   box-shadow: var(--qf-shadow-md);
 }
-.qf-scenecap__arrow { flex: none; color: #6E8BFF; }
+.qf-scenecap__arrow { flex: none; color: #8DA2F9; }
 .qf-scenecap--r .qf-scenecap__arrow { transform: scaleX(-1); }
 
 /* Desktop: captions live in the LEFT + RIGHT gutters beside the centered phone,
@@ -759,8 +759,8 @@ html body.qf-wft .qf-aud-panel[data-aud-panel="carriers"] .qf-hero-media {
   line-height: 1.4;
   color: var(--ink);
 }
-.qf-proof-rank b { color: #6E8BFF; font-weight: 800; }
-.qf-proof-ico { width: 16px; height: 16px; flex: none; color: #6E8BFF; }
+.qf-proof-rank b { color: #8DA2F9; font-weight: 800; }
+.qf-proof-ico { width: 16px; height: 16px; flex: none; color: #8DA2F9; }
 .qf-proof-reviews {
   display: inline-flex;
   align-items: center;
@@ -771,7 +771,7 @@ html body.qf-wft .qf-aud-panel[data-aud-panel="carriers"] .qf-hero-media {
   color: var(--muted);
 }
 .qf-proof-reviews b { color: var(--ink); font-weight: 700; font-size: 14px; }
-.qf-proof-stars { color: #6E8BFF; letter-spacing: 0.08em; font-size: 13px; }
+.qf-proof-stars { color: #8DA2F9; letter-spacing: 0.08em; font-size: 13px; }
 .qf-hero-proof__stats {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));

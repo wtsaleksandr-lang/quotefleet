@@ -2081,9 +2081,6 @@ export function layout({ title, description, canonicalPath, bodyHtml, jsonLd, re
   ${robots ? `<meta name="robots" content="${esc(robots)}">` : ''}
   ${relPrev ? `<link rel="prev" href="${esc(relPrev)}">` : ''}
   ${relNext ? `<link rel="next" href="${esc(relNext)}">` : ''}
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/style.css">
   <link rel="stylesheet" href="/nav-unify.css">
   <link rel="stylesheet" href="${DIRECTORY_CSS_HREF}">

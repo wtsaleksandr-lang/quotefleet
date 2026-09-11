@@ -107,19 +107,19 @@ html[data-theme="light"] body, body:has(.qf-widget) { /* guarded: see EOF note â
 .qf-chat-toggle button {
   background: #eaf8ff;
   color: #111827;
-  border-color: rgba(110, 139, 255, 0.28);
+  border-color: rgba(141, 162, 249, 0.28);
   box-shadow: none;
 }
 
 .qf-result {
-  border-color: rgba(110, 139, 255, 0.55);
+  border-color: rgba(141, 162, 249, 0.55);
   background: #f7fdff;
 }
 
 .qf-customer-note,
 .qf-result-guide,
 .qf-followup-choice-panel {
-  border-color: rgba(110, 139, 255, 0.48);
+  border-color: rgba(141, 162, 249, 0.48);
   /* rgb() not #ffffff: the flattened gradient must not add a NEW raw-colour
      entry to the hardcoded-color baseline. Same colour, guard-clean. */
   background: rgb(255, 255, 255);

@@ -3,7 +3,7 @@
    Big-number tiles + period deltas + inline-SVG trend + CSS lane/equipment
    bars + latest-lane map card. Theme-aware via tokens only (no raw colors);
    spacing snapped to the 8px ramp {0,4,8,12,16,24,32,48,60,80,120}. On dark,
-   --accent resolves to periwinkle (#6E8BFF); on light to brand cobalt.
+   --accent resolves to periwinkle (#8DA2F9); on light to brand cobalt.
    ========================================================================== */
 
 .qf-kpi-section {

@@ -1,11 +1,11 @@
 /* Phase BV: clean, spacious WeFixTrades-style public homepage. */
 body.qf-wft {
-  --accent: #0d3cfc !important;
+  --accent: #3356EE !important;
   --accent-ink: #ffffff !important;
-  --accent-soft: rgba(13,60,252,.14) !important;
-  --primary: #0d3cfc !important;
-  --qf-wft-blue: #0d3cfc !important;
-  --qf-wft-blue-2: #2456ff !important;
+  --accent-soft: rgba(51,86,238,.14) !important;
+  --primary: #3356EE !important;
+  --qf-wft-blue: #3356EE !important;
+  --qf-wft-blue-2: #2440C4 !important;
   --qf-wft-bg: #1f2628 !important;
   --qf-wft-panel: #151a1c !important;
   --qf-wft-panel-2: #0e1314 !important;
@@ -65,8 +65,8 @@ body.qf-wft .demo-link:hover {
 body.qf-wft .btn-primary,
 body.qf-wft .btn-lg.btn-primary,
 body.qf-wft .final-actions .btn-primary {
-  background: #0d3cfc !important;
-  border-color: #0d3cfc !important;
+  background: #3356EE !important;
+  border-color: #3356EE !important;
   color: #ffffff !important;
   box-shadow: none !important;
 }
@@ -88,9 +88,9 @@ body.qf-wft .section-kicker,
 body.qf-wft .tag,
 body.qf-wft .flow-label,
 body.qf-wft .use-badge {
-  color: #9aaeff !important;
-  background: rgba(13,60,252,.13) !important;
-  border-color: rgba(13,60,252,.30) !important;
+  color: #B4C2FC !important;
+  background: rgba(51, 86, 238,.13) !important;
+  border-color: rgba(51, 86, 238,.30) !important;
 }
 
 body.qf-wft .hero {
@@ -232,12 +232,12 @@ body.qf-wft .flow-customer {
 }
 
 body.qf-wft .flow-icon {
-  background: rgba(13,60,252,.16) !important;
-  color: #9aaeff !important;
+  background: rgba(51, 86, 238,.16) !important;
+  color: #B4C2FC !important;
 }
 
 body.qf-wft .flow-rates .flow-icon {
-  background: #0d3cfc !important;
+  background: #3356EE !important;
   color: #ffffff !important;
 }
 
@@ -268,16 +268,16 @@ body.qf-wft .mini-result {
 }
 
 body.qf-wft .mini-browser button {
-  background: #0d3cfc !important;
-  border-color: #0d3cfc !important;
+  background: #3356EE !important;
+  border-color: #3356EE !important;
   color: #ffffff !important;
 }
 
 body.qf-wft .mini-rate-table b,
 body.qf-wft .mini-actions span {
   color: #ffffff !important;
-  background: rgba(13,60,252,.20) !important;
-  border-color: rgba(13,60,252,.34) !important;
+  background: rgba(51, 86, 238,.20) !important;
+  border-color: rgba(51, 86, 238,.34) !important;
 }
 
 body.qf-wft .use-section,
@@ -392,7 +392,7 @@ body.qf-wft .sheet-art span,
 body.qf-wft .scheduler-dot,
 body.qf-wft .chat-head span,
 body.qf-wft .typing i {
-  background: #0d3cfc !important;
+  background: #3356EE !important;
   color: #ffffff !important;
 }
 
@@ -416,8 +416,8 @@ body.qf-wft .final-cta-card p {
 
 body.qf-wft .pdf-card button,
 body.qf-wft .final-actions .btn-primary {
-  background: #0d3cfc !important;
-  border-color: #0d3cfc !important;
+  background: #3356EE !important;
+  border-color: #3356EE !important;
   color: #ffffff !important;
 }
 
@@ -430,7 +430,7 @@ body.qf-wft .premium-footer {
 
 body.qf-wft [style*="color: var(--accent)"],
 body.qf-wft [style*="color:var(--accent)"] {
-  color: #0d3cfc !important;
+  color: #3356EE !important;
 }
 
 @media (max-width: 980px) {
@@ -515,8 +515,8 @@ body.qf-wft .qf-trust-ico {
   width: 40px !important;
   height: 40px !important;
   border-radius: 11px !important;
-  background: rgba(13,60,252,.16) !important;
-  color: #9aaeff !important;
+  background: rgba(51, 86, 238,.16) !important;
+  color: #B4C2FC !important;
 }
 
 body.qf-wft .qf-trust-ico svg {
@@ -769,7 +769,7 @@ body.qf-wft .qf-setup-num {
   display: inline-flex !important;
   align-items: center !important;
   justify-content: center !important;
-  background: var(--accent, #0d3cfc) !important;
+  background: var(--accent, #3356EE) !important;
   color: #f5fcff !important;
   font-weight: 800 !important;
   font-size: 15px !important;
@@ -815,7 +815,7 @@ body.qf-wft .qf-ba-card {
 }
 body.qf-wft .qf-ba-before { background: rgba(255, 255, 255, .02) !important; }
 body.qf-wft .qf-ba-after {
-  background: rgba(13, 60, 252, .06) !important;
+  background: rgba(51, 86, 238, .06) !important;
   border-color: rgba(52, 211, 153, .34) !important;
 }
 body.qf-wft .qf-ba-head {
@@ -858,7 +858,7 @@ body.qf-wft .qf-ba-out-good::before { content: "\2713  "; }
    pre-launch with zero customer data, so these are framed explicitly as
    external industry research. Sits between the section head and the two
    timeline cards to frame WHY speed wins. Big numbers use the brand's
-   documented on-dark blue (#6E8BFF) — cobalt #0d3cfc is unreadable on the
+   documented on-dark blue (#8DA2F9) — cobalt #0d3cfc is unreadable on the
    #12161d section-alt surface (~1.9:1); #6E8BFF clears AA-large (~4.9:1). */
 body.qf-wft .qf-ba-subhead {
   margin: 12px auto 0 !important;
@@ -894,15 +894,15 @@ body.qf-wft .qf-ba-stat {
   padding: clamp(16px, 2.5vw, 24px) 16px !important;
   border-radius: 16px !important;
   border: 1px solid rgba(148, 163, 184, .16) !important;
-  background: rgba(13, 60, 252, .07) !important;
+  background: rgba(51, 86, 238, .07) !important;
 }
 body.qf-wft .qf-ba-stat b {
-  font-family: var(--font-sans, 'Satoshi', sans-serif) !important;
+  font-family: var(--font-sans, 'Inter', sans-serif) !important;
   font-size: clamp(34px, 5.2vw, 48px) !important;
   font-weight: 800 !important;
   line-height: 1 !important;
   letter-spacing: -0.02em !important;
-  color: #6e8bff !important;
+  color: #8DA2F9 !important;
 }
 body.qf-wft .qf-ba-stat span {
   font-size: clamp(13px, 1.4vw, 14px) !important;
@@ -1001,9 +1001,9 @@ body.qf-wft .qf-included-tag {
   align-items: center !important;
   padding: 4px 12px !important;
   border-radius: 999px !important;
-  background: rgba(13,60,252,.16) !important;
-  border: 1px solid rgba(13,60,252,.32) !important;
-  color: #9aaeff !important;
+  background: rgba(51, 86, 238,.16) !important;
+  border: 1px solid rgba(51, 86, 238,.32) !important;
+  color: #B4C2FC !important;
   font-size: 12px !important;
   font-weight: 600 !important;
   letter-spacing: .01em !important;
@@ -1192,7 +1192,7 @@ html[data-theme="light"] body.qf-wft .qf-trust-ico {
   background: var(--accent-soft) !important;
   color: var(--accent) !important;
 }
-/* Big proof stats (#6e8bff on dark) → brand blue on white. */
+/* Big proof stats (#8DA2F9 on dark) → brand blue on white. */
 html[data-theme="light"] body.qf-wft .qf-ba-stat b {
   color: var(--accent) !important;
 }

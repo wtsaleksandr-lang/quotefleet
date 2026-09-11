@@ -123,7 +123,7 @@
 .qf-brand-page-chip {
   align-self: center;
   color: var(--accent);
-  border: 1px solid rgba(13, 60, 252,.28);
+  border: 1px solid rgba(51, 86, 238,.28);
   border-radius: 999px;
   padding: 5px 8px;
   font: 700 10px var(--font-mono);

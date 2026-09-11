@@ -18,9 +18,9 @@
   --pz-line: #e7edf5;
   --pz-chip: #eef2f8;
   --pz-chip-edge: #e0e7f1;
-  --pz-accent: #0d3cfc;
-  --pz-accent-soft: rgba(13, 60, 252, 0.10);
-  --pz-accent-edge: rgba(13, 60, 252, 0.22);
+  --pz-accent: #3356EE;
+  --pz-accent-soft: rgba(51, 86, 238, 0.10);
+  --pz-accent-edge: rgba(51, 86, 238, 0.22);
   --pz-card: #ffffff;
   --pz-card-edge: #edf1f7;
   display: none; /* desktop: hidden (composite shows). Mobile MQ turns it on. */

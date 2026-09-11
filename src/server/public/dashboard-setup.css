@@ -79,8 +79,8 @@
   transition: all .2s ease;
 }
 .qf-setup-step:hover {
-  border-color: rgba(13, 60, 252, .36);
-  background: rgba(13, 60, 252, .055);
+  border-color: rgba(51, 86, 238, .36);
+  background: rgba(51, 86, 238, .055);
 }
 .qf-setup-step.is-done { border-color: rgba(54, 201, 139, .28); }
 .qf-setup-dot {
@@ -222,7 +222,7 @@ html[data-theme="light"] .qf-onboarding-question { border-color: rgba(184,207,24
 }
 .qf-setup-bar {
   height: 10px;
-  background: rgba(13, 60, 252, 0.16);
+  background: rgba(51, 86, 238, 0.16);
 }
 .qf-setup-step.is-current {
   border-color: var(--accent);

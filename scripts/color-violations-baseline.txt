@@ -96,7 +96,7 @@ src/server/public/quote.css:1:9033	background:#fff
 src/server/public/quote.css:1:9762	background:#fff
 src/server/public/quote.css:1:10324	background:#fff
 src/server/public/quote.css:1:10340	color:#000
-src/server/public/tools.html:65:28	color: #fff
+src/server/public/tools.html:62:28	color: #fff
 src/server/public/vertical-pages-wefixtrades.css:18:3	color: #FFFFFF
 src/server/public/vertical-pages-wefixtrades.css:21:3	color: #FFFFFF
 src/server/public/vertical-pages-wefixtrades.css:43:3	color: #FFFFFF

@@ -8,9 +8,9 @@
    ============================================================ */
 
 body.qf-wft .qf-wins-section {
-  --wins-accent: #6E8BFF;            /* light periwinkle — 6:1 on the page bg */
-  --wins-accent-soft: rgba(110, 139, 255, 0.12);
-  --wins-accent-line: rgba(110, 139, 255, 0.55);
+  --wins-accent: #8DA2F9;            /* light periwinkle — 6:1 on the page bg */
+  --wins-accent-soft: rgba(141, 162, 249, 0.12);
+  --wins-accent-line: rgba(141, 162, 249, 0.55);
 }
 
 /* ── Head ──────────────────────────────────────────────────── */
@@ -37,7 +37,7 @@ body.qf-wft .qf-wins-section {
   border-left: 2px solid var(--wins-accent-line);
 }
 .qf-wins-hero {
-  font-family: 'Satoshi', 'Inter', system-ui, sans-serif;
+  font-family: 'Inter', system-ui, sans-serif;
   font-size: clamp(52px, 5.4vw, 68px);
   font-weight: 700;
   letter-spacing: -0.02em;
@@ -85,7 +85,7 @@ body.qf-wft .qf-wins-section {
 /* ── Row 2: "with QuoteFleet" KPI cards ───────────────────── */
 .qf-wins-cards-title {
   margin: 60px 0 0;
-  font-family: 'Satoshi', 'Inter', system-ui, sans-serif;
+  font-family: 'Inter', system-ui, sans-serif;
   font-size: 22px;
   font-weight: 600;
   letter-spacing: -0.01em;
@@ -115,7 +115,7 @@ body.qf-wft .qf-wins-section {
   padding: 4px 12px;
   border-radius: 999px;
   background: var(--wins-accent-soft);
-  border: 1px solid rgba(110, 139, 255, 0.30);
+  border: 1px solid rgba(141, 162, 249, 0.30);
   color: var(--wins-accent);
   font-size: 12.5px;
   font-weight: 600;
@@ -123,7 +123,7 @@ body.qf-wft .qf-wins-section {
 }
 .qf-wins-card h4 {
   margin: 0;
-  font-family: 'Satoshi', 'Inter', system-ui, sans-serif;
+  font-family: 'Inter', system-ui, sans-serif;
   font-size: 18px;
   font-weight: 600;
   color: var(--ink);
@@ -140,16 +140,16 @@ body.qf-wft .qf-wins-section {
 /* ── SVG marks (graphics may use brand color; text stays light) */
 .qf-wins-svg .w-grid { stroke: rgba(143, 159, 178, 0.20); stroke-width: 1; }
 .qf-wins-svg .w-line {
-  stroke: rgba(110, 139, 255, 0.45);
+  stroke: rgba(141, 162, 249, 0.45);
   stroke-width: 2;
   fill: none;
   stroke-linecap: round;
   stroke-linejoin: round;
 }
 .qf-wins-svg .w-line-hot { stroke: var(--wins-accent); }
-.qf-wins-svg .w-wash { fill: rgba(110, 139, 255, 0.10); }
+.qf-wins-svg .w-wash { fill: rgba(141, 162, 249, 0.10); }
 .qf-wins-svg .w-dot { fill: var(--wins-accent); stroke: var(--surface); stroke-width: 2; }
-.qf-wins-svg .w-dot-soft { fill: rgba(110, 139, 255, 0.45); stroke: var(--surface); stroke-width: 2; }
+.qf-wins-svg .w-dot-soft { fill: rgba(141, 162, 249, 0.45); stroke: var(--surface); stroke-width: 2; }
 .qf-wins-svg .w-bar-a { fill: var(--wins-accent); }
 .qf-wins-svg .w-bar-b { fill: rgba(143, 159, 178, 0.28); }
 .qf-wins-svg .w-txt {

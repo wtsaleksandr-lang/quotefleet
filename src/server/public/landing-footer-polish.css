@@ -255,7 +255,7 @@ body.qf-wft .premium-footer .qf-footer-wordmark:hover {
     min-height: 44px;
     list-style: none;
     cursor: pointer;
-    font-family: "JetBrains Mono", ui-monospace, monospace;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
     font-size: 11px;
     letter-spacing: 0.14em;
     text-transform: uppercase;

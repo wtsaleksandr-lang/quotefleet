@@ -1,17 +1,17 @@
 /* Phase BY: global Maersk-style radius system.
    Reference: restrained radius, squared-off cards/buttons, pill shape only for true tags. */
 :root {
-  --radius: 8px;
-  --radius-lg: 8px;
-  --radius-xl: 8px;
-  --radius-btn: 4px;
-  --radius-control: 6px;
-  --radius-card: 8px;
-  --radius-panel: 8px;
-  --radius-pill: 999px;
-  --qf-maersk-radius-card: 8px;
-  --qf-maersk-radius-control: 6px;
-  --qf-maersk-radius-button: 4px;
+  --radius: 12px;
+  --radius-lg: 12px;
+  --radius-xl: 12px;
+  --radius-btn: 8px;
+  --radius-control: 8px;
+  --radius-card: 12px;
+  --radius-panel: 12px;
+  --radius-pill: 9999px;
+  --qf-maersk-radius-card: 12px;
+  --qf-maersk-radius-control: 8px;
+  --qf-maersk-radius-button: 8px;
 }
 
 /* Wave 4 — widget theme structural tokens re-map the CALCULATOR's radius scale.

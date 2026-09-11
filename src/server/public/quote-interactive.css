@@ -4,12 +4,12 @@
    cobalt fallbacks so they match each carrier's theme. */
 
 :root {
-  --qfi-primary: var(--qdoc-primary, #0d3cfc);
+  --qfi-primary: var(--qdoc-primary, #3356EE);
   --qfi-white: #fff;
   --qfi-ink: #0b1220;
   --qfi-muted: #5a6b84;
   --qfi-line: #e7edf5;
-  --qfi-soft: rgba(13, 60, 252, 0.08);
+  --qfi-soft: rgba(51, 86, 238, 0.08);
 }
 
 /* ── 1. Transit info + note ── */

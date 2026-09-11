@@ -49,7 +49,7 @@
 
 .qf-accessorial-search-count {
   justify-self: end;
-  border: 1px solid rgba(13, 60, 252, 0.28);
+  border: 1px solid rgba(51, 86, 238, 0.28);
   border-radius: 999px;
   background: var(--accent-soft);
   color: var(--accent);
@@ -97,7 +97,7 @@
 }
 
 .qf-acc-rule {
-  border: 1px solid rgba(13, 60, 252, 0.28);
+  border: 1px solid rgba(51, 86, 238, 0.28);
   border-radius: 999px;
   background: var(--accent-soft);
   color: var(--accent);
@@ -156,7 +156,7 @@
 .qf-acc-filters button:hover,
 .qf-acc-filters button.active {
   border-color: var(--accent);
-  background: rgba(13, 60, 252, 0.1);
+  background: rgba(51, 86, 238, 0.1);
   color: var(--ink);
 }
 

@@ -9,24 +9,24 @@ async function file(name: string) {
 }
 
 describe('QuoteFleet global font system', () => {
-  it('defines Satoshi as the global sans font with the required fallback stack', async () => {
+  it('defines Inter as the global sans font with the required fallback stack', async () => {
     const css = await file('quotefleet-font-system.css');
 
     expect(css).toContain('Phase CA');
-    expect(css).toContain("font-family: 'Satoshi'");
-    // Satoshi is loaded from the discrete weight files that actually exist on
-    // disk (satoshi-300..900.woff2) — the old Satoshi-Variable/EtNono/DNMono
-    // references 404'd and dropped the dashboard to system fonts.
-    expect(css).toContain('/fonts/satoshi-400.woff2');
-    expect(css).toContain('/fonts/satoshi-700.woff2');
-    expect(css).not.toContain('Satoshi-Variable.woff2');
-    expect(css).not.toContain('EtNono');
-    expect(css).not.toContain('DNMono');
-    expect(css).toContain("--font-sans: 'Satoshi', 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, Arial, sans-serif");
-    expect(css).toContain("--font-mono: 'DM Mono', 'JetBrains Mono'");
+    // Wave 2: Inter replaces Satoshi. style.css owns the @font-face rules
+    // (it is render-blocking on every surface), so this sheet must NOT declare
+    // its own copy — a second declaration only duplicates the download.
+    expect(css).not.toContain('Satoshi');
+    expect(css).not.toContain('@font-face {');
+    expect(css).toContain("--font-sans: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, Arial, sans-serif");
+    // Mono is a PLATFORM stack, never a webfont: the reference design ships no
+    // monospace, but the directory renders USDOT/MC numerals in mono.
+    expect(css).toContain('--font-mono: ui-monospace, SFMono-Regular, Menlo, monospace');
+    expect(css).not.toContain('DM Mono');
+    expect(css).not.toContain('JetBrains Mono');
   });
 
-  it('forces the entire homepage to the Satoshi stack', async () => {
+  it('forces the entire homepage to the Inter stack', async () => {
     const css = await file('quotefleet-font-system.css');
 
     expect(css).toContain('body.qf-wft {');
@@ -41,7 +41,7 @@ describe('QuoteFleet global font system', () => {
     expect(css).toContain('font-family: var(--qf-font-sans) !important;');
   });
 
-  it('forces homepage hero and section headings to the Satoshi stack', async () => {
+  it('forces homepage hero and section headings to the Inter stack', async () => {
     const css = await file('quotefleet-font-system.css');
 
     expect(css).toContain('body.qf-wft .hero h1');
@@ -50,7 +50,7 @@ describe('QuoteFleet global font system', () => {
     expect(css).toContain('font-family: var(--qf-font-sans) !important;');
   });
 
-  it('uses Et Nono / DN Mono for accent text and keeps the quote widget on Inter fallback', async () => {
+  it('uses the platform mono for accent text and keeps the quote widget on Inter fallback', async () => {
     const css = await file('quotefleet-font-system.css');
     const widget = await file('widget-style.css');
     const colorSystem = await file('quotefleet-color-system.css');
