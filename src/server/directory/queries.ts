@@ -300,6 +300,21 @@ export interface DirectorySummary {
   states: number;
   byState: { state: string; count: number }[];
   byPort: { code: string; name: string; city: string; state: string; count: number }[];
+  /**
+   * The DIRECTORY-WIDE FMCSA data vintage: `max(updated_at)` as an ISO string.
+   *
+   * This is a DATA VINTAGE, not a rebuild stamp. `updated_at` advances only on a
+   * genuine field change (CARRIER_UPDATED_AT_SQL), so this is the same value the
+   * carrier profile renders as "FMCSA data as of …" — just taken across the
+   * whole table. `computedAt` on the cache row is the opposite kind of number
+   * (when WE last recomputed) and must never be substituted for it.
+   *
+   * It lives on the summary so marketing surfaces can state the real freshness
+   * from the singleton PK lookup instead of hard-coding a cadence word that
+   * drifts from the cron. Optional: persisted JSONB rows written before this
+   * field existed simply lack it, and the caller falls back to cadence copy.
+   */
+  dataAsOf?: string | null;
 }
 
 /**
@@ -862,7 +877,7 @@ async function getDirectorySummaryUnsafe(budgetMs?: number): Promise<DirectorySu
   // keep-stale / serve-empty error paths. Folding stays pure JS below. The
   // REQUEST path passes no budget (unchanged 8s-per-statement ceiling); the
   // OFF-path recompute passes a total budget so the whole transaction is bounded.
-  const { byStateRows, byPortRows, intermodalRow } = await withAggregateTimeout(async (tx) => {
+  const { byStateRows, byPortRows, intermodalRow, asOfRow } = await withAggregateTimeout(async (tx) => {
     const byStateRows = await tx
       .select({ state: carrierDirectory.state, n: sql<number>`count(*)::int` })
       .from(carrierDirectory)
@@ -878,7 +893,14 @@ async function getDirectorySummaryUnsafe(budgetMs?: number): Promise<DirectorySu
       .from(carrierDirectory)
       .where(eq(carrierDirectory.intermodal, true));
 
-    return { byStateRows, byPortRows, intermodalRow };
+    // The directory-wide FMCSA data vintage, computed inside the SAME
+    // already-scanning transaction so the marketing surfaces get a real
+    // timestamp for free rather than an extra request-path query.
+    const asOfRow = await tx
+      .select({ at: sql<string | null>`max(${carrierDirectory.updatedAt})` })
+      .from(carrierDirectory);
+
+    return { byStateRows, byPortRows, intermodalRow, asOfRow };
   }, budgetMs);
 
   const byState = byStateRows
@@ -903,13 +925,39 @@ async function getDirectorySummaryUnsafe(budgetMs?: number): Promise<DirectorySu
 
   const total = byState.reduce((s, r) => s + r.count, 0);
 
+  const rawAsOf = asOfRow[0]?.at ?? null;
+  const asOfDate = rawAsOf ? new Date(rawAsOf) : null;
   return {
     total,
     intermodalTotal: intermodalRow[0]?.n ?? 0,
     states: byState.length,
     byState,
     byPort,
+    dataAsOf: asOfDate && !Number.isNaN(asOfDate.getTime()) ? asOfDate.toISOString() : null,
   };
+}
+
+/**
+ * The FMCSA data vintage for MARKETING surfaces, read from the persisted
+ * singleton only.
+ *
+ * PERSISTED-ONLY BY DESIGN. `getDirectorySummary()` falls through to the live
+ * 330k-row scan on a cold miss; the homepage must never be able to trigger that,
+ * so this deliberately stops at the PK lookup and answers `null` instead. A
+ * `null` is not an error — the caller renders truthful cadence copy instead of a
+ * date. Never throws.
+ */
+export async function getPersistedCarrierDataAsOf(): Promise<Date | null> {
+  try {
+    const persisted = await loadPersistedAggregates();
+    const iso = persisted?.summary?.dataAsOf;
+    if (!iso) return null;
+    const d = new Date(iso);
+    return Number.isNaN(d.getTime()) ? null : d;
+  } catch (err) {
+    console.warn('[directory] getPersistedCarrierDataAsOf failed (non-fatal):', err);
+    return null;
+  }
 }
 
 // ─── Faceted filter model ─────────────────────────────────────────────────

@@ -42,6 +42,7 @@ import {
   titleCaseCity,
 } from './queries.js';
 import { createHash } from 'node:crypto';
+import { formatFmcsaAsOf } from './fmcsaFreshness.js';
 import { US_STATES, stateByCode, type UsState } from './usStates.js';
 import {
   CONTAINER_PORTS,
@@ -616,16 +617,14 @@ const CARGO_CLASS_SPECIALTIES: Array<[keyof VisibleCarrier, string]> = [
   ['buildingMaterials', 'Building materials'],
 ];
 
-/** FMCSA record freshness → "Aug 21, 2026". Formatted from UTC parts so the
- *  rendered date is deterministic regardless of the server's timezone. Returns
- *  '' when the timestamp is missing/invalid so the caller omits the line. */
-function fmtDataAsOf(d?: Date | null): string {
-  if (!d) return '';
-  const dt = d instanceof Date ? d : new Date(d);
-  if (Number.isNaN(dt.getTime())) return '';
-  const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-  return `${MONTHS[dt.getUTCMonth()]} ${dt.getUTCDate()}, ${dt.getUTCFullYear()}`;
-}
+/** FMCSA record freshness → "Aug 21, 2026".
+ *
+ *  Delegates to the ONE formatter in fmcsaFreshness.ts, which the homepage's
+ *  directory-wide vintage also goes through — the homepage used to hard-code a
+ *  cadence word ("Synced daily") that had drifted away from both the cron and
+ *  this very line, so the two surfaces now share a single renderer and cannot
+ *  disagree on format. */
+const fmtDataAsOf = formatFmcsaAsOf;
 
 // ─── Shared page shell ────────────────────────────────────────────────────
 /** Exported so routes/directory.ts can serve it as ONE cacheable, content-hashed
