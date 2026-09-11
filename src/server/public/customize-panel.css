@@ -368,7 +368,10 @@
   border-top-left-radius: var(--radius-lg);
   border-top-right-radius: var(--radius-lg);
   box-shadow: var(--shadow-lg);
-  transition: all .3s ease;
+  /* Property-specific on purpose: the sheet resizes by HEIGHT, never by
+     transform, or the page jumps under it. `all` would animate transform too,
+     so this one keeps an explicit property (customizePanel.test.ts RULE). */
+  transition: height 0.3s ease;
   overflow: hidden;
   padding-bottom: env(safe-area-inset-bottom);
 }
