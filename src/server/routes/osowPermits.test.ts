@@ -475,8 +475,11 @@ describe('the Free Tools group carries the new tool on every surface', () => {
     const dirFooter = DIRECTORY_PAGES.match(/<nav class="dirfoot"[\s\S]*?<\/nav>/)?.[0] ?? '';
     expect((dirFooter.match(new RegExp(HREF, 'g')) ?? []).length).toBe(1);
     // The rendered homepage carries the nav, the drawer and the footer —
-    // injected from the same constants, so the count is the same three.
-    expect((LANDING.match(new RegExp(HREF, 'g')) ?? []).length).toBe(3);
+    // injected from the same constants, so that is three. The fourth is a
+    // deliberate BODY link: the homepage tool bento grid lists this tool as one
+    // of its cards. The rule this test protects is "no duplicate copy inside
+    // one chrome surface", which the three per-surface counts above still pin.
+    expect((LANDING.match(new RegExp(HREF, 'g')) ?? []).length).toBe(4);
   });
 
   it('files it under Free Tools, not under an audience menu', () => {
