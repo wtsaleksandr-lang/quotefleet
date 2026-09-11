@@ -55,6 +55,18 @@ import { carrierProfileUrls, purgeEdgeUrls } from './edgePurge.js';
 export type ClaimMethod = 'email_otp' | 'domain_match' | 'manual';
 export type ClaimStatus = 'pending' | 'verified' | 'rejected' | 'expired';
 
+/**
+ * WHY a claim landed on the manual path. The two cases read very differently
+ * to the carrier, so the page must not use one sentence for both:
+ *   no_email        — FMCSA has no email on this record at all.
+ *   delivery_failed — there IS an email on file, but we could not deliver a
+ *                     code to it (provider refused / none configured / the send
+ *                     was suppressed outside production).
+ * Saying "we couldn't find an email on your FMCSA record" to a carrier who can
+ * see their own email on the profile reads as a bug and costs us the claim.
+ */
+export type ManualReason = 'no_email' | 'delivery_failed';
+
 /** Ownership code lifetime. */
 export const CLAIM_OTP_TTL_MS = 15 * 60 * 1000;
 /** Wrong-code submissions before the pending claim locks (a new code must be requested). */
@@ -246,7 +258,7 @@ export type StartClaimResult =
   | { kind: 'already_claimed' }
   | { kind: 'verified'; method: 'domain_match'; claimId: number; slug: string }
   | { kind: 'otp_sent'; claimId: number; maskedEmail: string; expiresAt: Date }
-  | { kind: 'needs_manual'; claimId: number };
+  | { kind: 'needs_manual'; claimId: number; reason: ManualReason };
 
 /**
  * Begin (or restart) a claim by `tenantId` on `usdot`. Picks the proof method,
@@ -308,14 +320,29 @@ export async function startClaim(
       // A code nobody received proves nothing — and a code that only reached a
       // log file must never be honoured. Drop the hash and hand the claim to
       // support instead of reporting a send that did not happen.
-      await store.updateClaim(claim.id, { method: 'manual', otpHash: null, otpExpiresAt: null, attempts: 0 });
-      return { kind: 'needs_manual', claimId: claim.id };
+      await store.updateClaim(claim.id, {
+        method: 'manual',
+        otpHash: null,
+        otpExpiresAt: null,
+        attempts: 0,
+        // Recorded so support sees WHY this is on their desk, and so a reload
+        // renders the matching copy (the record does have an email).
+        note: `${note} reason:delivery_failed`,
+      });
+      return { kind: 'needs_manual', claimId: claim.id, reason: 'delivery_failed' };
     }
     return { kind: 'otp_sent', claimId: claim.id, maskedEmail: maskEmail(carrier.email as string), expiresAt: otpExpiresAt };
   }
 
-  const claim = await upsertPending({ method, otpHash: null, otpExpiresAt: null });
-  return { kind: 'needs_manual', claimId: claim.id };
+  const claim = await upsertPending({ method, otpHash: null, otpExpiresAt: null, note: `${note} reason:no_email` });
+  return { kind: 'needs_manual', claimId: claim.id, reason: 'no_email' };
+}
+
+/** Read back the manual sub-reason a claim was filed under (see ManualReason).
+ *  Defaults to `no_email`, which is the only reason the original manual path
+ *  produced before the delivery-failure degrade existed. */
+export function manualReasonOf(claim: Pick<CarrierClaimRow, 'note'>): ManualReason {
+  return /reason:delivery_failed/.test(claim.note ?? '') ? 'delivery_failed' : 'no_email';
 }
 
 export type VerifyClaimResult =

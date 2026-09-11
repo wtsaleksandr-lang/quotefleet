@@ -21,6 +21,7 @@ import {
   hashOtp,
   isFreemailDomain,
   isNeutralClaimSlug,
+  manualReasonOf,
   maskEmail,
   neutralClaimSlug,
   otpMatches,
@@ -124,6 +125,10 @@ describe('startClaim → email_otp → verifyClaimCode', () => {
     store.emailDeliverable = false;
     const r = await startClaim(store, { usdot: '107080', tenantId: 42, actor, claimantVerified: false, now });
     expect(r.kind).toBe('needs_manual');
+    // The record HAS an email — the copy must say we could not DELIVER, not
+    // that we could not find one.
+    expect(r.kind === 'needs_manual' && r.reason).toBe('delivery_failed');
+    expect(manualReasonOf(store.claims[0])).toBe('delivery_failed');
     expect(store.sentCodes).toHaveLength(0);
     expect(store.claims[0]).toMatchObject({ method: 'manual', status: 'pending', otpHash: null, otpExpiresAt: null });
     // No code exists to verify against.
@@ -261,8 +266,11 @@ describe('manual path', () => {
   it('a record with no email creates a pending manual claim and sends nothing', async () => {
     const r = await startClaim(store, { usdot: '107080', tenantId: 42, actor, claimantVerified: true, now });
     expect(r.kind).toBe('needs_manual');
+    expect(r.kind === 'needs_manual' && r.reason).toBe('no_email');
+    expect(manualReasonOf(store.claims[0])).toBe('no_email');
     expect(store.sentCodes).toHaveLength(0);
-    expect(store.claims[0]).toMatchObject({ method: 'manual', status: 'pending', otpHash: null, note: 'claimant:owner@acme.com' });
+    expect(store.claims[0]).toMatchObject({ method: 'manual', status: 'pending', otpHash: null });
+    expect(store.claims[0].note).toContain('claimant:owner@acme.com');
     expect(store.claimedMarks).toHaveLength(0);
   });
 
