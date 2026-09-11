@@ -1,6 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { renderStaticPage } from './siteChrome.js';
 
 const publicDir = resolve(process.cwd(), 'src/server/public');
 
@@ -20,8 +21,9 @@ describe('homepage final cleanup styles', () => {
     expect(html).toContain('/landing-home-fixes.css');
   });
 
-  it('uses the brand mark image and keeps a non-duplicate header CTA', async () => {
-    const html = await file('landing.html');
+  it('uses the brand mark image and keeps a non-duplicate header CTA', () => {
+    // The header + footer are injected now, so assert on the rendered page.
+    const html = renderStaticPage('landing.html');
 
     expect(html).toContain('/brand/mark-keys-ondark.png');
     expect(html).toContain('View demo <span class="arr">→</span>');

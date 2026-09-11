@@ -21,10 +21,10 @@ import {
   renderProfilePage,
 } from './pilotCars.js';
 import { parseFilters, toPublicOperator, type OperatorRow } from '../pilotCars/model.js';
-import { SITE_NAV_HTML, SITE_MOBILE_MENU_HTML, PREMIUM_FOOTER } from '../siteChrome.js';
+import { SITE_NAV_HTML, SITE_MOBILE_MENU_HTML, PREMIUM_FOOTER, renderStaticPage } from '../siteChrome.js';
 
 const read = (p: string) => readFileSync(resolve(process.cwd(), p), 'utf8');
-const LANDING_HTML = read('src/server/public/landing.html');
+const LANDING_HTML = renderStaticPage('landing.html');
 const DIRECTORY_PAGES_TS = read('src/server/directory/pages.ts');
 const SITEMAP_TS = read('src/server/directory/sitemapCache.ts');
 
@@ -330,7 +330,7 @@ describe('wired into the site the same way every other public surface is', () =>
     expect(DIRECTORY_PAGES_TS).toContain('href="/pilot-cars"');
   });
 
-  it('the homepage carries the same links, since it ships its own copy of the chrome', () => {
+  it('the homepage carries the same links, since it takes the same injected chrome', () => {
     expect(LANDING_HTML).toContain('href="/pilot-cars"');
   });
 

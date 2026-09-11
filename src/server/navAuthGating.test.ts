@@ -27,15 +27,17 @@ import {
   SITE_MOBILE_MENU_HTML,
   FULL_SITE_HEADER,
   HEADER_SCRIPTS,
+  renderStaticPage,
 } from './siteChrome.js';
 
 const read = (p: string) => readFileSync(resolve(process.cwd(), p), 'utf8');
 const NAV_AUTH_JS = read('src/server/public/nav-auth.js');
 const NAV_UNIFY_CSS = read('src/server/public/nav-unify.css');
-const LANDING_HTML = read('src/server/public/landing.html');
+const LANDING_HTML = renderStaticPage('landing.html');
 
 /** Every nav surface that must obey the rule: the shared constants AND the
- *  static homepage, which carries a verbatim copy of the same markup. */
+ *  homepage AS SERVED — it declares a chrome slot and the constants are
+ *  substituted into it, so the rendered page is the thing worth checking. */
 const NAV_SURFACES: ReadonlyArray<readonly [string, string]> = [
   ['SITE_NAV_HTML', SITE_NAV_HTML],
   ['SITE_MOBILE_MENU_HTML', SITE_MOBILE_MENU_HTML],

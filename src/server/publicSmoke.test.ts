@@ -1,6 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { renderStaticPage } from './siteChrome.js';
 
 const publicDir = resolve(process.cwd(), 'src/server/public');
 
@@ -10,7 +11,7 @@ async function file(name: string) {
 
 describe('public static page smoke checks', () => {
   it('landing page has simple visual-first positioning and no placeholder links', async () => {
-    const html = await file('landing.html');
+    const html = renderStaticPage('landing.html');
     expect(html).toContain('See your own freight quote calculator &mdash; live in seconds.');
     expect(html).toContain('Stop losing loads to slow, manual quoting.');
     expect(html).toContain('For carriers, brokers &amp; forwarders');
@@ -174,7 +175,7 @@ describe('public static page smoke checks', () => {
   });
 
   it('landing page no longer mounts the rates-database globe (removed on request 2026-08-01)', async () => {
-    const html = await file('landing.html');
+    const html = renderStaticPage('landing.html');
     // The interactive rate-intelligence globe section was intentionally removed
     // from the homepage. Assert only on the actual mount artifacts — the canvas
     // element and the self-hosted script/vendor paths — since a documentation
@@ -206,14 +207,14 @@ describe('public static page smoke checks', () => {
   });
 
   it('landing page includes social metadata', async () => {
-    const html = await file('landing.html');
+    const html = renderStaticPage('landing.html');
     expect(html).toContain('property="og:title"');
     expect(html).toContain('name="twitter:card"');
     expect(html).toContain('/brand/og-image-1200x630.png');
   });
 
   it('landing page wires the brand favicon + manifest', async () => {
-    const html = await file('landing.html');
+    const html = renderStaticPage('landing.html');
     expect(html).toContain('rel="icon" href="/favicon.ico"');
     expect(html).toContain('/brand/favicon-32.png');
     expect(html).toContain('rel="apple-touch-icon"');
@@ -317,7 +318,7 @@ describe('public static page smoke checks', () => {
 
 describe('"Find your company" carrier finder', () => {
   it('landing carrier hero renders the finder input + accessible listbox + microcopy', async () => {
-    const html = await file('landing.html');
+    const html = renderStaticPage('landing.html');
     // Input, placeholder, combobox/listbox wiring, and the FMCSA microcopy.
     expect(html).toContain('data-carrier-finder');
     expect(html).toContain('id="qf-finder-input"');

@@ -40,6 +40,7 @@ import {
   HEADER_OOG_CTA,
   FOOTER_OOG_CTA,
   OOG_QUOTE_HREF,
+  renderStaticPage,
 } from '../siteChrome.js';
 
 /**
@@ -555,16 +556,17 @@ describe('the page', () => {
 
   it('ships the CTA on every chrome surface, with one styling rule each', () => {
     const read = (f: string) => readFileSync(resolve(process.cwd(), f), 'utf8');
-    const landing = read('src/server/public/landing.html');
+    const landing = renderStaticPage('landing.html');
     const directory = read('src/server/directory/pages.ts');
-    // landing.html inlines its own copy of the chrome; the directory subsite
+    // The homepage takes the injected chrome and the directory subsite
     // imports the constants. Both must carry the link or the site drifts.
     expect(landing).toContain('class="site-oog"');
     expect(landing).toContain('class="qf-foot-oog"');
     expect(directory).toContain('HEADER_OOG_CTA');
     expect(directory).toContain('FOOTER_OOG_CTA');
-    // Styling: nav-unify for every chrome page, landing-conversion for the
-    // homepage, which does not load nav-unify.
+    // Styling: nav-unify is the canonical chrome sheet and the homepage loads
+    // it too now; landing-conversion keeps its own copy of the rule because the
+    // homepage bundle still outranks nav-unify on `body.qf-wft` selectors.
     for (const sheet of ['src/server/public/nav-unify.css', 'src/server/public/landing-conversion.css']) {
       const css = read(sheet);
       expect(css, sheet).toContain('.site-actions .site-oog');
