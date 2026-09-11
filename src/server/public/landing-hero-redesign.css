@@ -38,7 +38,7 @@ body.qf-wft .hero-copy .eyebrow {
    `body.qf-wft .hero h1 { font-size: clamp(...84px) !important }`, which
    landing-motion.js injects AFTER this sheet's static <link>. ── */
 html body.qf-wft .hero h1 {
-  font-family: 'Satoshi', system-ui, -apple-system, 'Segoe UI', sans-serif !important;
+  font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif !important;
   font-weight: 900 !important;
   font-size: clamp(44px, 5.2vw, 68px) !important;
   font-optical-sizing: auto;

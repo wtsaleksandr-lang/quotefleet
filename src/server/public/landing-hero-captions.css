@@ -68,7 +68,7 @@ body.qf-wft .qf-hero-cap__kicker {
   font-weight: 600 !important;
   letter-spacing: 0.16em !important;
   text-transform: uppercase !important;
-  color: #6E8BFF !important;
+  color: #8DA2F9 !important;
   white-space: nowrap;
 }
 body.qf-wft .qf-hero-cap__kicker::before {
@@ -76,10 +76,10 @@ body.qf-wft .qf-hero-cap__kicker::before {
   display: inline-block !important;
   flex: none;
   border-radius: 2px;
-  background: #6E8BFF !important;
+  background: #8DA2F9 !important;
 }
 body.qf-wft .qf-hero-cap__title {
-  font-family: "Satoshi", "Inter", system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif !important;
+  font-family: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif !important;
   font-weight: 800 !important;
   letter-spacing: -0.02em !important;
   color: #EEF2FF !important;

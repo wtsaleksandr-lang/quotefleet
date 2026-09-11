@@ -67,7 +67,7 @@
     const ini = carrierInitials(name);
     const svg = "<svg xmlns='http://www.w3.org/2000/svg' width='96' height='96' viewBox='0 0 96 96'>" +
       "<rect width='96' height='96' rx='22' fill='#0D3CFC'/>" +
-      "<text x='48' y='48' dy='.35em' text-anchor='middle' font-family='Satoshi,Inter,system-ui,sans-serif' font-size='40' font-weight='800' fill='#ffffff'>" +
+      "<text x='48' y='48' dy='.35em' text-anchor='middle' font-family='Inter,system-ui,sans-serif' font-size='40' font-weight='800' fill='#ffffff'>" +
       ini + "</text></svg>";
     return 'data:image/svg+xml;utf8,' + encodeURIComponent(svg);
   }
