@@ -71,7 +71,7 @@ import { registerOutreachUnsubscribeRoutes } from './routes/outreachUnsubscribe.
 import { registerInboundReviewRoutes } from './routes/inboundReview.js';
 import { registerInboundWebhookRoutes } from './routes/inboundWebhook.js';
 import { hostInfoMiddleware } from './hostInfo.js';
-import { applyFullSiteHeader } from './siteChrome.js';
+import { applyAuthChrome, applyFullSiteHeader, verifySiteChromeSlots } from './siteChrome.js';
 import { registerPartnersRoutes } from './routes/partners.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -420,20 +420,27 @@ export function createApp(): express.Express {
 
   app.get('/dpa', (_req, res, next) => {
     readFile(resolve(publicDir, 'dpa.html'), 'utf8')
-      .then((html) => res.type('html').send(applyFullSiteHeader(applyDpaPageSkin(html))))
+      .then((html) => res.type('html').send(applyFullSiteHeader(applyDpaPageSkin(html), 'dpa.html')))
       .catch(next);
   });
   app.get(['/tools', '/tools/'], (_req, res, next) => {
     readFile(resolve(publicDir, 'tools.html'), 'utf8')
-      .then((html) => res.type('html').send(applyFullSiteHeader(applyToolsMarketplaceSkin(html))))
+      .then((html) => res.type('html').send(applyFullSiteHeader(applyToolsMarketplaceSkin(html), 'tools.html')))
       .catch(next);
   });
-  // Marketing + legal static pages: replace their stripped `.topnav` header and
-  // reduced footer with the SAME full header (Solutions dropdown, mobile
-  // hamburger) + premium footer as the homepage. These routes MUST precede the
-  // static file handler below (which would otherwise serve the raw file via its
-  // `extensions: ['html']` option). Auth pages (login/signup) and the directory
-  // pages keep their own chrome and are intentionally excluded.
+  // Marketing + legal static pages: each declares `<!--qf:site-header-->` and
+  // `<!--qf:site-footer-->` and the canonical chrome (Solutions dropdown, mobile
+  // hamburger, premium footer) is substituted into those slots — see
+  // siteChrome.ts. These routes MUST precede the static file handler below
+  // (which would otherwise serve the slot-only file via its
+  // `extensions: ['html']` option, i.e. a page with no chrome at all).
+  //
+  // THE HOMEPAGE IS ON THIS LIST NOW, and that is the bug this wave removed:
+  // landing.html used to be `res.sendFile`d, so no injector ever ran on it and
+  // the copy of the chrome it carried was free to drift from the constants
+  // every other page rendered. It did drift. It has no local copy to drift with
+  // any more. The remaining `res.sendFile` pages (app/admin/widget/chat/quote)
+  // are product surfaces with their own shells, not marketing chrome.
   const fullHeaderPages: Array<[string | string[], string]> = [
     ['/pricing', 'pricing.html'],
     ['/compare', 'compare.html'],
@@ -446,14 +453,46 @@ export function createApp(): express.Express {
     [['/for/brokers', '/for/brokers/'], 'for-brokers.html'],
     [['/for/ltl', '/for/ltl/'], 'for-ltl.html'],
     [['/for/forwarders', '/for/forwarders/'], 'for-forwarders.html'],
+    // The retired marketplace PAGES. /marketplace and /marketplace/carrier/*
+    // 301 to /directory (registerMarketplaceRedirects, just below), but the
+    // files themselves stayed reachable at their `.html` URLs through the
+    // static handler and so kept a duplicated copy of the chrome alive. Same
+    // URLs, same content, chrome from the one source.
+    ['/marketplace.html', 'marketplace.html'],
+    ['/marketplace-carrier.html', 'marketplace-carrier.html'],
   ];
   for (const [route, file] of fullHeaderPages) {
     app.get(route, (_req, res, next) => {
       readFile(resolve(publicDir, file), 'utf8')
-        .then((html) => res.type('html').send(applyFullSiteHeader(html)))
+        .then((html) => res.type('html').send(applyFullSiteHeader(html, file)))
         .catch(next);
     });
   }
+  // Auth pages take the compact brand bar and no footer — a deliberate product
+  // decision (see authSiteHeader). What was wrong was the three pasted copies,
+  // so the bar is built once and each route supplies only its trailing link.
+  const authChromePages: Array<[string, string, { href: string; label: string }]> = [
+    ['/login', 'login.html', { href: '/signup', label: 'New here?' }],
+    ['/signup', 'signup.html', { href: '/login', label: 'Already have an account?' }],
+    ['/reset-password', 'reset-password.html', { href: '/login', label: 'Back to sign in' }],
+  ];
+  for (const [route, file, authLink] of authChromePages) {
+    app.get(route, (_req, res, next) => {
+      readFile(resolve(publicDir, file), 'utf8')
+        .then((html) => res.type('html').send(applyAuthChrome(html, authLink, file)))
+        .catch(next);
+    });
+  }
+  // Audit every one of them NOW rather than on first request: a legal page
+  // nobody opens for a week would otherwise sit broken for a week. Throws a
+  // single aggregated SiteChromeError naming each offender.
+  verifySiteChromeSlots(publicDir, [
+    { file: 'landing.html', variant: 'full' as const },
+    { file: 'dpa.html', variant: 'full' as const },
+    { file: 'tools.html', variant: 'full' as const },
+    ...fullHeaderPages.map(([, file]) => ({ file, variant: 'full' as const })),
+    ...authChromePages.map(([, file]) => ({ file, variant: 'auth' as const })),
+  ]);
   // The standalone /marketplace page has been retired in favour of the richer,
   // faceted /directory (same carriers, filters, RFQ + export). See
   // registerMarketplaceRedirects — only the PAGE is retired; the marketplace
@@ -497,19 +536,25 @@ export function createApp(): express.Express {
     if (req.tenantSubdomain) {
       return void serveWidgetPage(req, res, next, req.tenantSubdomain, false);
     }
-    return res.sendFile('landing.html', { root: publicDir });
+    // THE HOMEPAGE GOES THROUGH THE SAME INJECTOR AS EVERY OTHER STATIC PAGE.
+    // It used to be `res.sendFile`d, which is why it was the one page whose
+    // chrome the shared constants did not actually govern.
+    return void readFile(resolve(publicDir, 'landing.html'), 'utf8')
+      .then((html) => res.type('html').send(applyFullSiteHeader(html, 'landing.html')))
+      .catch(next);
   });
 
-  app.get('/login', (_req, res) => res.sendFile('login.html', { root: publicDir }));
-  app.get('/signup', (_req, res) => res.sendFile('signup.html', { root: publicDir }));
-  // Forgot-password: one page, two modes. No ?token → "request a reset link"
-  // form (POST /api/auth/password/forgot). With ?token → "set a new password"
-  // form (POST /api/auth/password/reset). Static page; the token is read from
-  // the URL client-side and never rendered by the server.
-  app.get('/reset-password', (_req, res) => res.sendFile('reset-password.html', { root: publicDir }));
-  // /pricing, /compare, /support, /security are served with the full site
-  // header + premium footer earlier (see fullHeaderPages, before the static
-  // handler); no plain sendFile fallbacks here.
+  // /login, /signup and /reset-password are served with the compact auth bar
+  // earlier (see authChromePages); /pricing, /compare, /support, /security and
+  // the legal pages with the full header + premium footer (see
+  // fullHeaderPages). Both lists are registered before the static handler so
+  // the injected HTML wins over the raw, slot-only file. No plain sendFile
+  // fallbacks here — one would serve a page with no chrome at all.
+  //
+  // Forgot-password is one page in two modes: no ?token → "request a reset
+  // link" (POST /api/auth/password/forgot), with ?token → "set a new password"
+  // (POST /api/auth/password/reset). The token is read from the URL
+  // client-side and never rendered by the server.
   app.get('/.well-known/security.txt', (_req, res) => {
     res.type('text/plain').send([
       'Contact: mailto:security@quotefleet.net',
