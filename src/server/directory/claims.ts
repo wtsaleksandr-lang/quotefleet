@@ -43,6 +43,7 @@ import {
   type NewCarrierClaimRow,
 } from '../../db/schema.js';
 import { loadEnv } from '../../config.js';
+import { deployEnvironment, isProductionEnvironment } from '../cronSafety.js';
 import { sendEmail, wasSentByAProvider } from '../../email/send.js';
 import { claimCodeEmail } from '../../email/templates.js';
 import { CLAIM_OWNER_TRIAL_DAYS } from '../plans.js';
@@ -459,6 +460,33 @@ function emailProviderConfigured(): boolean {
   return !!env.RESEND_API_KEY || !!(env.SMTP_HOST && env.SMTP_USER && env.SMTP_PASS);
 }
 
+/** Env var that re-enables real ownership-code sends from a non-production
+ *  config, for deliberate end-to-end testing against a mailbox you own. */
+export const CLAIM_REAL_OTP_OPT_IN = 'CLAIM_ALLOW_REAL_OTP';
+
+/**
+ * May this process email an ownership code to a carrier's FMCSA census address?
+ *
+ * THE RECIPIENT IS A THIRD PARTY WE DO NOT CONTROL. The census address belongs
+ * to a real trucking company that never asked to hear from us, so a code sent
+ * from the wrong environment is unrecallable mail to a stranger — and
+ * `quotefleet/dev` carries a LIVE `RESEND_API_KEY`, so a dev boot is fully
+ * capable of sending it.
+ *
+ * NOT gated on NODE_ENV: `.replit` pins that to "production" in the workspace
+ * as well as the deployment, and the `dev` Doppler config sets it too, so it is
+ * the one variable guaranteed to be useless here (the same trap documented in
+ * cronSafety.ts and externalPullGuard.ts). The signal is Doppler's injected
+ * config name, and the gate FAILS CLOSED: only a positively-identified
+ * production config sends. Unknown/absent → suppressed, and the claim degrades
+ * to the manual review path, which is a slower claim rather than a stranger's
+ * inbox. `CLAIM_ALLOW_REAL_OTP=1` is the deliberate opt-in.
+ */
+export function realOtpSendAllowed(): boolean {
+  if (process.env[CLAIM_REAL_OTP_OPT_IN] === '1') return true;
+  return isProductionEnvironment(deployEnvironment());
+}
+
 export const dbClaimStore: ClaimStore = {
   async carrierByUsdot(usdot) {
     const r = (
@@ -549,6 +577,17 @@ export const dbClaimStore: ClaimStore = {
     if (r.status !== 200) console.warn('[claims] public email override failed:', r.json);
   },
   async sendOtpEmail(to, opts) {
+    // FIRST gate, before any provider work: never mail a third party's
+    // FMCSA-listed address from a non-production process. The code is NEVER
+    // logged — a log line carrying it would hand anyone with log access the
+    // proof of ownership the whole flow exists to protect.
+    if (!realOtpSendAllowed()) {
+      console.warn(
+        `[claim] OTP suppressed in ${deployEnvironment()} — refusing to email a carrier's FMCSA address ` +
+          `outside production; falling back to manual review. Set ${CLAIM_REAL_OTP_OPT_IN}=1 to override.`,
+      );
+      return false;
+    }
     if (!emailProviderConfigured()) {
       console.warn('[claims] no email provider configured — ownership code NOT sent; falling back to manual review');
       return false;

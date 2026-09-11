@@ -121,6 +121,24 @@ export function isNonProductionEnvironment(name: string): boolean {
   return NON_PRODUCTION_NAMES.some((n) => name === n || name.startsWith(`${n}_`));
 }
 
+/** Doppler config names that ARE production. */
+const PRODUCTION_NAMES = ['prd', 'prod', 'production'];
+
+/**
+ * True only when the environment is POSITIVELY known to be production.
+ *
+ * The OPPOSITE POLARITY to `isNonProductionEnvironment` above, and deliberately
+ * so: that one fails OPEN because suppressing a real outage alert is the worse
+ * failure. This one fails CLOSED, for the decisions where acting in the wrong
+ * environment reaches a THIRD PARTY and cannot be taken back — emailing a
+ * carrier's FMCSA-listed mailbox from a dev container, say. An unrecognised or
+ * absent config name is not production here, so the risky path stays shut.
+ */
+export function isProductionEnvironment(name: string = deployEnvironment()): boolean {
+  if (!name || name === 'unknown') return false;
+  return PRODUCTION_NAMES.some((n) => name === n || name.startsWith(`${n}_`));
+}
+
 /**
  * Send an admin alert email for a failed/slow cron. Best-effort: if no
  * SUPER_ADMIN_EMAIL is configured, or the send fails, it only logs — an alert
