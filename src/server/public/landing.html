@@ -139,8 +139,12 @@
         </div>
       </div>
       <div class="qf-aud-panel" data-aud-panel="carriers" id="qf-aud-panel-carriers" role="tabpanel" aria-labelledby="qf-aud-tab-carriers">
+        <!-- NO EYEBROW. The Carriers / Shippers toggle sits directly above this
+             block and already states the audience; an eyebrow reading "FOR
+             CARRIERS, BROKERS & FORWARDERS" under it said the same thing again
+             in smaller type, and cost a line of the stack above the action
+             cards (which sit below the fold). Both panels dropped theirs. -->
         <div class="qf-hhero__head">
-          <div class="eyebrow">For carriers, brokers &amp; forwarders</div>
           <h1>See your own freight quote calculator &mdash; live in seconds.</h1>
           <p class="lead qf-hhero__lead">A branded quote page your customers fill out themselves &mdash; no email tag, no callbacks.</p>
           <!-- PRIMARY CONVERSION HOOK — unchanged wiring. Type a company name,
@@ -153,11 +157,9 @@
                 <input id="qf-finder-input" class="qf-dir-name qf-finder__input" type="text" role="combobox" aria-expanded="false" aria-autocomplete="list" aria-controls="qf-finder-listbox" aria-label="Find your company by name" placeholder="Enter your company name" autocomplete="off" enterkeyhint="search" minlength="2" maxlength="100" spellcheck="false">
                 <ul class="qf-finder__listbox" id="qf-finder-listbox" role="listbox" aria-label="Matching carriers" hidden></ul>
               </div>
-              <p class="micro-copy qf-finder__micro">No sign-up. We pull your details from public FMCSA records.</p>
               <span class="qf-finder__status" data-finder-status role="status" aria-live="polite"></span>
             </div>
             <div class="hero-cta"><a class="btn btn-secondary" href="/signup">Start free <span class="arr">→</span></a></div>
-            <p class="micro-copy hero-trust-line">Set up in ~5 minutes · sourced from FMCSA public data.</p>
           </div>
         </div>
 
@@ -170,7 +172,7 @@
               <p class="qf-toolcard__sub">Open the calculator your customers will see.</p>
             </div>
             <div class="qf-toolcard__actions">
-              <a class="qf-toolbtn qf-toolbtn--primary" href="/w/demo">See a live demo <span class="qf-toolbtn__arr" aria-hidden="true">&rarr;</span></a>
+              <a class="qf-toolbtn qf-toolbtn--primary" href="/w/demo">Live demo <span class="qf-toolbtn__arr" aria-hidden="true">&rarr;</span></a>
               <a class="qf-toolbtn qf-toolbtn--secondary" href="/pricing">Pricing <span class="qf-toolbtn__arr" aria-hidden="true">&rarr;</span></a>
             </div>
           </li>
@@ -181,7 +183,7 @@
               <p class="qf-toolcard__sub">330,000+ FMCSA-registered carriers, free to search.</p>
             </div>
             <div class="qf-toolcard__actions">
-              <a class="qf-toolbtn qf-toolbtn--primary" href="/directory">Search carriers <span class="qf-toolbtn__arr" aria-hidden="true">&rarr;</span></a>
+              <a class="qf-toolbtn qf-toolbtn--primary" href="/directory">Find carriers <span class="qf-toolbtn__arr" aria-hidden="true">&rarr;</span></a>
               <a class="qf-toolbtn qf-toolbtn--secondary" href="/compliance">Compliance <span class="qf-toolbtn__arr" aria-hidden="true">&rarr;</span></a>
             </div>
           </li>
@@ -192,7 +194,7 @@
               <p class="qf-toolcard__sub">Rates, permits, bridge formula, axle weights.</p>
             </div>
             <div class="qf-toolcard__actions">
-              <a class="qf-toolbtn qf-toolbtn--primary" href="/tools">Open the tools <span class="qf-toolbtn__arr" aria-hidden="true">&rarr;</span></a>
+              <a class="qf-toolbtn qf-toolbtn--primary" href="/tools">All tools <span class="qf-toolbtn__arr" aria-hidden="true">&rarr;</span></a>
               <a class="qf-toolbtn qf-toolbtn--secondary" href="/glossary">Glossary <span class="qf-toolbtn__arr" aria-hidden="true">&rarr;</span></a>
             </div>
           </li>
@@ -201,7 +203,6 @@
       <div class="qf-aud-panel" data-aud-panel="shippers" id="qf-aud-panel-shippers" role="tabpanel" aria-labelledby="qf-aud-tab-shippers" hidden>
         <div class="qf-shipper-hero">
           <div class="qf-shipper-copy">
-          <div class="eyebrow">For shippers &amp; BCOs</div>
           <h1>The freight carrier directory for North America.</h1>
           <p class="qf-shipper-lead">Search <strong>330,000+ FMCSA-registered carriers</strong> by port, equipment, and safety rating &mdash; drayage, dry van, reefer, flatbed and more, mapped to every major US &amp; Canadian gateway and inland hub. <span data-qf-fmcsa-asof>Refreshed weekly from FMCSA data.</span></p>
           <form class="qf-dir-search" action="/directory" method="get" role="search" aria-label="Search the carrier directory">
@@ -356,8 +357,8 @@
               <p class="qf-toolcard__sub">Per-state OS/OW thresholds, permit fees and escort rules for the load you describe.</p>
             </div>
             <div class="qf-toolcard__actions">
-              <a class="qf-toolbtn qf-toolbtn--primary" href="/tools/oversize-permits">Permit calculator <span class="qf-toolbtn__arr" aria-hidden="true">&rarr;</span></a>
-              <a class="qf-toolbtn qf-toolbtn--secondary" href="/oversize">Permit guide <span class="qf-toolbtn__arr" aria-hidden="true">&rarr;</span></a>
+              <a class="qf-toolbtn qf-toolbtn--primary" href="/tools/oversize-permits">Calculator <span class="qf-toolbtn__arr" aria-hidden="true">&rarr;</span></a>
+              <a class="qf-toolbtn qf-toolbtn--secondary" href="/oversize">Guide <span class="qf-toolbtn__arr" aria-hidden="true">&rarr;</span></a>
             </div>
           </li>
           <li class="qf-toolcard">
@@ -388,7 +389,7 @@
               <p class="qf-toolcard__sub">Frost-law and spring-thaw postings by state, with the dates each one applies.</p>
             </div>
             <div class="qf-toolcard__actions">
-              <a class="qf-toolbtn qf-toolbtn--primary" href="/tools/seasonal-weight-restrictions">Frost-law restrictions <span class="qf-toolbtn__arr" aria-hidden="true">&rarr;</span></a>
+              <a class="qf-toolbtn qf-toolbtn--primary" href="/tools/seasonal-weight-restrictions">Frost-law rules <span class="qf-toolbtn__arr" aria-hidden="true">&rarr;</span></a>
             </div>
           </li>
           <li class="qf-toolcard">
@@ -419,7 +420,7 @@
               <p class="qf-toolcard__sub">Look up a USDOT or MC number and read its authority, insurance filings and safety data.</p>
             </div>
             <div class="qf-toolcard__actions">
-              <a class="qf-toolbtn qf-toolbtn--primary" href="/compliance">Compliance tools <span class="qf-toolbtn__arr" aria-hidden="true">&rarr;</span></a>
+              <a class="qf-toolbtn qf-toolbtn--primary" href="/compliance">Compliance <span class="qf-toolbtn__arr" aria-hidden="true">&rarr;</span></a>
               <a class="qf-toolbtn qf-toolbtn--secondary" href="/directory/rfq?sort=featured">Request quotes <span class="qf-toolbtn__arr" aria-hidden="true">&rarr;</span></a>
             </div>
           </li>
@@ -460,8 +461,8 @@
               <p class="qf-toolcard__sub">Plain-English definitions for the accessorials, documents and terms on a rate sheet.</p>
             </div>
             <div class="qf-toolcard__actions">
-              <a class="qf-toolbtn qf-toolbtn--primary" href="/glossary">Freight glossary <span class="qf-toolbtn__arr" aria-hidden="true">&rarr;</span></a>
-              <a class="qf-toolbtn qf-toolbtn--secondary" href="/guides">Market guides <span class="qf-toolbtn__arr" aria-hidden="true">&rarr;</span></a>
+              <a class="qf-toolbtn qf-toolbtn--primary" href="/glossary">Glossary <span class="qf-toolbtn__arr" aria-hidden="true">&rarr;</span></a>
+              <a class="qf-toolbtn qf-toolbtn--secondary" href="/guides">Guides <span class="qf-toolbtn__arr" aria-hidden="true">&rarr;</span></a>
             </div>
           </li>
           <li class="qf-toolcard">
@@ -566,7 +567,7 @@
       <p class="qf-trust-operator">QuoteFleet is operated by <strong>MR Holdings &amp; Trade LLC</strong>.</p>
     </div></section>
 
-    <section class="section final-section" data-reveal><div class="container"><div class="final-cta-card qf-final-cta"><h2>Launch your branded quote tool in 5 minutes.</h2><p class="qf-cta-sub">Free for 14 days, every feature unlocked. Stop losing loads to slow, manual quoting.</p><div class="final-actions"><a class="btn btn-primary btn-lg" href="/signup">Start free <span class="arr">→</span></a><a class="btn btn-lg qf-cta-secondary" href="/w/demo">See a live demo <span class="arr">→</span></a></div>
+    <section class="section final-section" data-reveal><div class="container"><div class="final-cta-card qf-final-cta"><h2>Launch your branded quote tool in 5 minutes.</h2><p class="qf-cta-sub">Free for 14 days, every feature unlocked. Stop losing loads to slow, manual quoting.</p><div class="final-actions"><a class="btn btn-primary btn-lg" href="/signup">Start free <span class="arr">→</span></a><a class="btn btn-lg qf-cta-secondary" href="/w/demo">Live demo <span class="arr">→</span></a></div>
       <ul class="qf-trust-badges" role="list">
         <li class="qf-badge"><button type="button" class="qf-badge-tile" aria-expanded="false"><span class="qf-badge-ico" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/><path d="m9 12 2 2 4-4"/></svg></span><span class="qf-badge-label">14-day free trial</span></button><div class="qf-badge-pop" role="tooltip"><p>Full access to everything for 14 days. We only keep a card on file so there's no interruption if you stay — cancel before it ends and you pay nothing.</p></div></li>
         <li class="qf-badge"><button type="button" class="qf-badge-tile" aria-expanded="false"><span class="qf-badge-ico" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 9.9-1"/></svg></span><span class="qf-badge-label">Cancel anytime</span></button><div class="qf-badge-pop" role="tooltip"><p>No lock-in and no contracts. Leave whenever you want — and keep every quote and lead you've already made.</p></div></li>
