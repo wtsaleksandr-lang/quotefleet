@@ -1,0 +1,503 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   HOMEPAGE HERO CARD + TOOL BENTO GRID
+   ---------------------------------------------------------------------------
+   Replaces the animated looped-video hero (`.hero.visual-hero` +
+   `.qf-hero-composite` laptop/phone clips) with the measured reference
+   structure: a TINTED ROUNDED CARD holding the headline, the company-name
+   conversion field and a 3-up action grid, followed by a second section that
+   lists our free tools as a 2-up bento grid.
+
+   WHY A NEW FILE, AND WHY NEW CLASS NAMES.  The homepage stacks ~20 sheets and
+   seven of them re-declare `.hero`, `.hero-copy`, `.hero-grid`, `h1` and
+   `.lead` with `!important`; four of those are injected by landing-motion.js
+   AFTER first paint, so they out-cascade anything linked in <head>. Rather
+   than fight that, the carrier hero drops `.hero`/`.visual-hero`/`.hero-copy`
+   entirely and is rebuilt under `.qf-hhero`, which nothing else in the bundle
+   knows about. A brand-new file also means the two CI guards' `file:line`
+   baselines do not renumber (docs/design-refactor/baseline-protocol.md, r1).
+
+   DESIGN LAW.  Tokens only; zero gradients, zero backdrop-filter, zero
+   keyframes; three shadows; radii 6/8/12; motion `all .3s ease` on controls
+   only. Spacing sits on the house ramp {0,4,8,12,16,24,32,48,60,80,120}, so
+   the reference's 20px grid gap is rendered as 24px, its 76px hero padding as
+   80px, and its 40px mobile hero padding as 32px.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ── 1 · The hero card ───────────────────────────────────────────────────── */
+
+.qf-hhero {
+  display: block;
+  margin: 0;
+  padding: 0;
+}
+
+/* The card itself: flat tint (NO gradient, no raster), 12px radius, a ~14px
+   page rail down both sides, flush under the sticky header. */
+.qf-hhero__card {
+  background: var(--surface-hero);
+  border-radius: var(--radius);
+  max-width: 98%;
+  margin: 0 auto;
+  padding: 80px 0;
+}
+
+/* Content column inside the card — the 1328/24/1280 container geometry. */
+.qf-hhero__inner {
+  width: 100%;
+  max-width: var(--container-max);
+  margin: 0 auto;
+  padding: 0 var(--container-gutter);
+}
+
+/* Audience segmented control sits at the top of the card. `.hero-grid` on the
+   row is kept (navInformationArchitecture pins that markup) but its two-column
+   hero layout is neutralised here — inside the card the row is just a centred
+   flex line. Specificity (0,3,2) + !important beats the injected sheets. */
+html body.qf-wft .qf-hhero .qf-aud-togglerow {
+  display: flex !important;
+  grid-template-columns: none !important;
+  justify-content: center !important;
+  align-items: center !important;
+  gap: 0 !important;
+  width: 100% !important;
+  max-width: none !important;
+  margin: 0 0 32px 0 !important;
+  padding: 0 !important;
+}
+html body.qf-wft .qf-hhero .qf-aud-togglerow > .qf-aud-toggle {
+  justify-self: center !important;
+  margin: 0 !important;
+}
+
+/* ── 2 · Headline block ──────────────────────────────────────────────────── */
+
+.qf-hhero__head {
+  max-width: 780px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  text-align: center;
+}
+
+/* The shared `.eyebrow` ships as a tinted pill in a mono face (it was designed
+   for a left-flush kicker). In this hero it is a plain uppercase label, so the
+   pill chrome is stripped back to nothing. */
+html body.qf-wft .qf-hhero__head .eyebrow {
+  display: block;
+  width: auto;
+  margin: 0;
+  padding: 0;
+  background: transparent !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  font-family: var(--font-sans) !important;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.5;
+  letter-spacing: 2.1px;
+  text-transform: uppercase;
+  color: var(--muted) !important;
+  text-align: center;
+  white-space: normal;
+}
+/* The shared eyebrow ships a decorative leading rule that only reads when the
+   eyebrow is flush left. Centred, it hangs off the side — drop it here. */
+html body.qf-wft .qf-hhero__head .eyebrow::before,
+html body.qf-wft .qf-hhero__head .eyebrow::after {
+  content: none;
+}
+
+html body.qf-wft .qf-hhero__head h1 {
+  margin: 0;
+  padding: 0;
+  max-width: 780px;
+  font-family: var(--font-sans);
+  font-size: 54px;
+  font-weight: 500;
+  line-height: 1.2;
+  letter-spacing: -2.16px;
+  color: var(--ink);
+  text-align: center;
+  text-wrap: balance;
+}
+
+html body.qf-wft .qf-hhero__lead {
+  margin: 0;
+  padding: 0;
+  max-width: 726px;
+  font-family: var(--font-sans);
+  font-size: 18px;
+  font-weight: 400;
+  line-height: 1.4;
+  letter-spacing: -0.18px;
+  color: var(--muted);
+  text-align: center;
+}
+
+/* ── 3 · The conversion hook: company-name finder ────────────────────────── */
+/* This is the site's primary CTA — type your company, we pull your FMCSA
+   record and open the demo calculator branded as YOU. Same markup, same ids,
+   same handler (landing-carrier-finder.js); only the shell is restyled from a
+   glass card to a plain field on the tint. Specificity (0,3,2)+!important is
+   required to beat landing-glass.css, which is injected after this sheet. */
+.qf-hhero__action {
+  width: 100%;
+  max-width: 520px;
+  margin: 12px auto 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+/* The legacy hero stacked these three in a flex column and hand-ordered them
+   (`.qf-finder{order:4}`, `.hero-cta{display:contents}`, trust line at
+   `margin-top:18px`). Inside the new card the DOM order IS the visual order, so
+   every inherited order/offset is zeroed here in one place. */
+html body.qf-wft .qf-hhero__action > * {
+  order: 0 !important;
+  margin-top: 0 !important;
+  margin-bottom: 0 !important;
+  width: 100%;
+}
+
+html body.qf-wft .qf-hhero .qf-finder {
+  width: 100%;
+  max-width: 520px;
+  margin: 0 !important;
+  padding: 0 !important;
+  background: transparent !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  text-align: left;
+}
+html body.qf-wft .qf-hhero .qf-finder:hover {
+  box-shadow: none !important;
+  transform: none !important;
+}
+html body.qf-wft .qf-hhero .qf-finder__input {
+  width: 100%;
+  min-height: 56px;
+  padding: 8px 16px;
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-md);
+  font-family: var(--font-sans);
+  font-size: 16px;
+  font-weight: 400;
+  line-height: 1.5;
+  color: var(--ink);
+  transition: var(--motion-state);
+}
+html body.qf-wft .qf-hhero .qf-finder__input::placeholder { color: var(--muted); }
+html body.qf-wft .qf-hhero .qf-finder__input:focus {
+  outline: none;
+  border-color: var(--border-focus);
+  box-shadow: var(--focus-ring);
+}
+html body.qf-wft .qf-hhero .qf-finder__micro {
+  margin: 8px 0 0 0 !important;
+  font-size: 14px;
+  line-height: 1.4;
+  color: var(--muted);
+  text-align: center;
+}
+
+html body.qf-wft .qf-hhero .hero-cta {
+  display: flex !important;
+  justify-content: center !important;
+  margin: 0 !important;
+  padding: 0;
+}
+html body.qf-wft .qf-hhero .hero-trust-line {
+  margin: 0 !important;
+  font-size: 14px;
+  line-height: 1.4;
+  color: var(--muted);
+  text-align: center;
+}
+
+/* ── 4 · The 3-up action grid, INSIDE the hero card ──────────────────────── */
+
+.qf-hhero__cards {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 24px;
+  margin: 48px 0 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.qf-hcard {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 24px;
+  min-height: 224px;
+  padding: 24px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-md);
+  overflow: clip;
+  text-align: left;
+}
+
+/* DARK THEME — `--surface-hero` and `--surface` resolve to the same #131A28 in
+   dark, so the hero's action cards sat invisibly on the hero card's own ground.
+   Push the cards one step up the surface ramp; light is untouched. */
+html[data-theme="dark"] .qf-hcard,
+:root:not([data-theme="light"]) .qf-hcard {
+  background: var(--surface-2);
+}
+
+/* ── 5 · The tool bento section ──────────────────────────────────────────── */
+
+/* `.section` carries a horizontal gutter of its own in three sheets that load
+   after this one; the inner container owns the gutter here, so it is zeroed at
+   the section so the tool grid lines up with the hero card's content column. */
+html body.qf-wft.landing-v2 .qf-toolgrid-section {
+  padding: 80px 0 60px !important;
+}
+
+.qf-toolgrid-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 24px;
+  margin: 0 0 32px 0;
+}
+html body.qf-wft .qf-toolgrid-head h2 {
+  margin: 0;
+  padding: 0;
+  font-family: var(--font-sans);
+  font-size: 32px;
+  font-weight: 500;
+  line-height: 1.25;
+  letter-spacing: -1.28px;
+  color: var(--ink);
+  text-align: left;
+}
+/* The category noun is de-emphasised so the sentence, not the label, leads. */
+html body.qf-wft .qf-toolgrid-head h2 .qf-toolgrid-head__soft { color: var(--muted-soft); }
+
+.qf-toolgrid-head__all {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-family: var(--font-sans);
+  font-size: 16px;
+  font-weight: 500;
+  line-height: 1.5;
+  color: var(--accent);
+  text-decoration: none;
+  white-space: nowrap;
+  transition: var(--motion);
+}
+html body.qf-wft .qf-toolgrid-head__all { color: var(--ink) !important; }
+html body.qf-wft .qf-toolgrid-head__all:hover { color: var(--accent) !important; }
+.qf-toolgrid-head__all:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
+.qf-toolgrid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 24px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* Recessed variant — border matches the ground so the 1px is reserved and
+   nothing shifts, and NO shadow (the raised hero card carries the elevation). */
+.qf-toolcard {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 24px;
+  min-height: 224px;
+  padding: 24px;
+  background: var(--surface-2);
+  border: 1px solid var(--surface-2);
+  border-radius: var(--radius);
+  box-shadow: none;
+  overflow: clip;
+  text-align: left;
+}
+
+/* ── 6 · Card internals — shared by both grids ───────────────────────────── */
+
+/* The icon carries its own shadow: no wrapper div, no fill, no border. A line
+   glyph gets a `drop-shadow` (which follows the strokes) rather than a
+   box-shadow (which would paint a floating rectangle behind a transparent
+   element). Same 0 2px 6px elevation-1 geometry. */
+.qf-toolcard__ico {
+  flex: 0 0 auto;
+  display: block;
+  width: 46px;
+  height: 46px;
+  color: var(--ink);
+  filter: drop-shadow(0 2px 6px rgba(2, 6, 24, 0.10));
+}
+
+.qf-toolcard__body {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 16px;
+  width: 100%;
+}
+html body.qf-wft .qf-toolcard__body h3 {
+  margin: 0;
+  padding: 0;
+  font-family: var(--font-sans);
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 1.2;
+  color: var(--ink);
+  text-align: left;
+}
+html body.qf-wft .qf-toolcard__sub {
+  margin: 0;
+  padding: 0;
+  font-family: var(--font-sans);
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 1.4;
+  color: var(--ink-soft) !important;
+  text-align: left;
+}
+
+/* Action bar — 1-2 buttons, each a distinct destination. `margin-top:auto`
+   pins it to the card floor so every card's buttons sit on one line. */
+.qf-toolcard__actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin: auto 0 0 0;
+  padding: 0;
+}
+
+.qf-toolbtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 44px;
+  padding: 8px 12px 8px 16px;
+  border-radius: var(--radius-md);
+  border: 1px solid transparent;
+  font-family: var(--font-sans);
+  font-size: 16px;
+  font-weight: 500;
+  line-height: 1.5;
+  text-decoration: none;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: var(--motion);
+}
+.qf-toolbtn__arr { font-size: 16px; }
+
+/* !important on the label colours only: the landing bundle repaints every <a>
+   in the brand accent, which left the primary label blue on near-black in light
+   and white on near-white in dark (unreadable). The token pair is theme-aware
+   and AA in both. */
+html body.qf-wft .qf-toolbtn--primary {
+  background: var(--cta-bg);
+  border-color: var(--cta-bg);
+  color: var(--cta-text) !important;
+}
+html body.qf-wft .qf-toolbtn--primary:hover {
+  background: var(--cta-bg-hover);
+  border-color: var(--cta-bg-hover);
+}
+html body.qf-wft .qf-toolbtn--secondary {
+  background: var(--surface);
+  border-color: var(--cta-sec-border);
+  color: var(--cta-sec-text) !important;
+}
+html body.qf-wft .qf-toolbtn--secondary:hover {
+  border-color: var(--cta-sec-border-hover);
+  background: var(--cta-sec-bg-hover);
+}
+.qf-toolbtn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* Cards themselves never move on hover — only the buttons react. */
+
+/* LIGHT THEME — landing-wefixtrades-cleanup.css repaints, with !important at
+   (0,3,2): every `.eyebrow` as an accent-tinted pill, and every non-.btn link
+   in the accent. Both land on this hero, so they are answered here at (0,4,2).
+   Nothing is re-invented — the same tokens as the theme-neutral rules above. */
+html[data-theme="light"] body.qf-wft .qf-hhero__head .eyebrow {
+  color: var(--muted) !important;
+  background: transparent !important;
+  border-color: transparent !important;
+}
+/* That sheet's light-theme link rule is
+     html[data-theme="light"] body.qf-wft a:not(.btn):not(.nav-link):not(.signin):not(.demo-link)
+   — specificity (0,6,3) with !important, because each :not() argument counts.
+   Beating it takes one more class than it carries, so the chain below repeats
+   its exclusions and adds the button's own class: (0,7,3). Tagging these
+   anchors `.btn` instead would drag in the entire legacy button skin, and
+   `.demo-link` is explicitly banned from this page by publicSmoke. */
+html[data-theme="light"] body.qf-wft a.qf-toolbtn--primary:not(.btn):not(.nav-link):not(.signin):not(.demo-link) {
+  color: var(--cta-text) !important;
+}
+html[data-theme="light"] body.qf-wft a.qf-toolbtn--secondary:not(.btn):not(.nav-link):not(.signin):not(.demo-link) {
+  color: var(--cta-sec-text) !important;
+}
+html[data-theme="light"] body.qf-wft a.qf-toolgrid-head__all:not(.btn):not(.nav-link):not(.signin):not(.demo-link) {
+  color: var(--ink) !important;
+}
+html[data-theme="light"] body.qf-wft a.qf-toolgrid-head__all:not(.btn):not(.nav-link):not(.signin):not(.demo-link):hover {
+  color: var(--accent) !important;
+}
+
+/* ── 7 · Breakpoints ─────────────────────────────────────────────────────── */
+
+/* The 3-up stays 3-up at tablet (narrower cards); the bento stays 2-up. */
+@media (max-width: 1100px) {
+  html body.qf-wft .qf-hhero__head h1 { font-size: 44px; letter-spacing: -1.76px; }
+  .qf-toolbtn { font-size: 14px; }
+}
+
+@media (max-width: 860px) {
+  .qf-toolgrid-head { flex-direction: column; align-items: flex-start; gap: 12px; }
+}
+
+@media (max-width: 700px) {
+  .qf-hhero__cards { grid-template-columns: 1fr; }
+  .qf-toolgrid { grid-template-columns: 1fr; }
+  .qf-hcard,
+  .qf-toolcard { min-height: 0; }
+}
+
+@media (max-width: 640px) {
+  .qf-hhero__card { padding: 32px 0; }
+  .qf-hhero__inner { padding: 0 16px; }
+  .qf-hhero__head { align-items: flex-start; text-align: left; }
+  html body.qf-wft .qf-hhero__head .eyebrow,
+  html body.qf-wft .qf-hhero__head h1,
+  html body.qf-wft .qf-hhero__lead,
+  html body.qf-wft .qf-hhero .qf-finder__micro,
+  html body.qf-wft .qf-hhero .hero-trust-line { text-align: left; }
+  html body.qf-wft .qf-hhero__head h1 { font-size: 36px; letter-spacing: -1.44px; }
+  html body.qf-wft .qf-hhero__lead { font-size: 16px; }
+  .qf-hhero__action { align-items: stretch; margin: 12px 0 0 0; }
+  html body.qf-wft .qf-hhero .hero-cta { justify-content: flex-start; }
+  .qf-hhero__cards { margin: 32px 0 0 0; }
+  html body.qf-wft.landing-v2 .qf-toolgrid-section { padding: 48px 0 32px !important; }
+  html body.qf-wft .qf-toolgrid-head h2 { font-size: 28px; letter-spacing: -1.12px; }
+  .qf-toolcard__actions { width: 100%; }
+  .qf-toolbtn { flex: 1 1 auto; justify-content: center; }
+}
