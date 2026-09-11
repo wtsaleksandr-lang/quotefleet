@@ -1,9 +1,8 @@
 /* ═══════════════════════════════════════════════════════════════════════════
-   HOMEPAGE — THE PARTNER LOGO MARQUEE
+   HOMEPAGE — THE CARRIER LOGO MARQUEE
    ---------------------------------------------------------------------------
-   A left-aligned two-tone heading (the carrier count in ink, the descriptor in
-   the muted tone) above a horizontal strip of soft off-white tiles that scrolls
-   continuously.
+   A left-aligned two-tone heading sitting directly on top of a horizontal strip
+   of soft off-white tiles, one mark per tile, scrolling continuously.
 
    THIS SHEET IS LOADED CONDITIONALLY.  src/server/home/homeSections.ts injects
    the <link> into the homepage's <head> only when HOME_PARTNER_LOGOS is
@@ -26,12 +25,33 @@
      4. `prefers-reduced-motion: reduce` turns it off entirely and the strip
         becomes a manually scrollable row (see the block at the foot).
 
-   ── HOW THE LOOP IS SEAMLESS ─────────────────────────────────────────────
+   ── HOW THE LOOP IS SEAMLESS, AND WHY IT IS A PERCENTAGE ─────────────────
    The track holds TWO identical rows laid end to end and slides the pair left
    by exactly half its own width. At the end of the cycle row B occupies the
-   pixels row A started in, so the reset is invisible; no measurement, no JS,
-   no bounce. `linear` timing is what keeps the speed constant — an eased
-   marquee visibly stutters at the loop point. 60s is slow on purpose.
+   pixels row A started in, so the reset is invisible.
+
+   `-50%` resolves against the track's OWN border-box width, which is whatever
+   the browser actually laid out. That is the property worth keeping: the shift
+   cannot disagree with the content, so the loop stays seamless if a carrier is
+   added, if a tile wraps differently, or if a breakpoint changes the tile size
+   mid-animation. A hand-computed pixel advance would have to be kept in sync
+   with all three, and the failure mode is a visible jump once per cycle.
+
+   The arithmetic is exact rather than merely self-consistent, because every
+   term is a whole number of pixels: a row is `n·222 + (n-1)·24` wide with a
+   trailing `24` margin, so half the track is `n·246` — integral, no sub-pixel
+   residue to accumulate. The two rows are separated by the SAME 24px the tiles
+   inside a row are, or the join would read as a wide gap once per cycle.
+
+   ── AND WHY THE DURATION IS NOT A CONSTANT ───────────────────────────────
+   A fixed duration makes SPEED a function of list length: the eleven-tile strip
+   this section shipped with ran at ~75px/s, and the same 60s over twenty-six
+   tiles would have been ~106px/s — the same CSS, visibly more frantic, for the
+   sole reason that the registry grew. So the duration is
+   `tiles × --qf-marquee-tile-secs`, with the tile count handed in by the
+   renderer, and px/s stays put however long the list gets. `linear` timing is
+   what keeps the speed constant WITHIN a cycle — an eased marquee visibly
+   stutters at the loop point.
 
    DESIGN LAW OTHERWISE UNCHANGED.  Tokens only; zero gradients; zero
    backdrop-filter; radii 6/8/12; spacing on {0,4,8,12,16,24,32,48,60,80,120};
@@ -43,9 +63,16 @@ html body.qf-wft.landing-v2 .qf-marquee-section {
 }
 
 /* Left-aligned, per the house rule that page and card headers are never
-   centred. Two-tone: count in ink, descriptor muted. */
+   centred, and metrically identical to `.qf-toolgrid-head h2` above it and
+   `.qf-partner-title` between them — one heading size on this band, no eyebrow.
+   Two-tone: the lead phrase in ink, the audience in the muted tone.
+
+   24px, not 32px, to the strip. The heading and the tiles are ONE object here
+   (the heading names what the wall is), so it sits directly on top of the row
+   rather than floating a full step above it the way a heading does over a grid
+   of separate cards. */
 html body.qf-wft h2.qf-marquee-head {
-  margin: 0 0 32px 0;
+  margin: 0 0 24px 0;
   padding: 0;
   font-family: var(--font-sans);
   font-size: 32px;
@@ -55,13 +82,39 @@ html body.qf-wft h2.qf-marquee-head {
   color: var(--ink);
   text-align: left;
 }
-html body.qf-wft .qf-marquee-head .qf-marquee-head__n { color: var(--ink); }
+html body.qf-wft .qf-marquee-head .qf-marquee-head__lead { color: var(--ink); }
 html body.qf-wft .qf-marquee-head .qf-marquee-head__soft { color: var(--muted-soft); }
 
 /* The viewport. `overflow: clip` rather than `hidden` — `hidden` makes this an
    ancestor scroll container, which breaks `position: sticky` on the page's
-   header in embedded contexts. */
+   header in embedded contexts.
+
+   ── THE TILE SURFACE IS PINNED LIGHT IN BOTH THEMES, ON PURPOSE ──────────
+   Everything else on this page flips with `--surface-2`. This does not, and the
+   reason is that the tiles hold OTHER COMPANIES' ARTWORK. Those marks are
+   full-colour lockups drawn for a light ground and we are not entitled to
+   recolour, invert or filter them; a carrier's mark is its property and has to
+   render as its owner drew it. Flipping the tile to the dark `--surface-2`
+   (#1A2333) therefore does not adapt the wall, it erases half of it — measured
+   on the shipped set, Werner's navy wordmark and TCI's black lockup were
+   effectively invisible, while the rest were unaffected. A wall where the
+   outcome depends on which company's brand colour happens to be dark is not a
+   theme, it is a lottery.
+
+   So the tile carries the LIGHT theme's own two values, pinned: these are
+   `--surface-2`, `--border` and `--muted` as `:root` defines them in style.css,
+   copied rather than referenced precisely because referencing them is what
+   makes them flip. They are the ONLY literals in this sheet; the heading and
+   every other tone still resolve through the theme. */
 .qf-marquee {
+  --qf-logo-tile-bg: #F2F4F7;
+  --qf-logo-tile-border: #E2E8F0;
+  --qf-logo-tile-ink: #475467;
+  /* Seconds of travel per tile. Multiplied by the rendered tile count to get
+     the cycle length, so this is really "pace", not "duration": at the 246px
+     desktop advance it works out at ~72px/s, which is slow enough to read a
+     mark as it passes and slow enough that nothing about it reads as urgent. */
+  --qf-marquee-tile-secs: 3.4s;
   overflow: clip;
   width: 100%;
 }
@@ -69,7 +122,10 @@ html body.qf-wft .qf-marquee-head .qf-marquee-head__soft { color: var(--muted-so
 .qf-marquee__track {
   display: flex;
   width: max-content;
-  animation: qf-logo-marquee-scroll 60s linear infinite;
+  /* `--qf-marquee-tiles` is set inline by renderLogoMarquee. The fallback is
+     the renderer's own MIN_TILES_PER_ROW, so a strip that somehow ships without
+     the variable still runs at a sane pace rather than instantly. */
+  animation: qf-logo-marquee-scroll calc(var(--qf-marquee-tiles, 12) * var(--qf-marquee-tile-secs)) linear infinite;
   /* Paused until the strip is actually on screen (see rule 2 in the header). A
      visitor with JS off never gets `.is-inview`, so they get a STATIC strip
      rather than a broken one — the tiles are all still there to read. */
@@ -97,18 +153,32 @@ html body.qf-wft .qf-marquee-head .qf-marquee-head__soft { color: var(--muted-so
   list-style: none;
 }
 
-/* A tile: soft off-white card, 12px radius, reserved 1px border so nothing
-   shifts. No shadow and no hover lift — the strip is a backdrop, not a menu. */
+/* A tile: soft off-white card, 12px radius, 1px hairline.  No shadow and no
+   hover lift — the strip is a backdrop, not a menu.
+
+   222×98 IS THE ARTWORK'S OWN CANVAS PLUS ITS HAIRLINE, NOT A ROUND NUMBER.
+   Every mark is normalised onto a 220×96 sheet with its optical weight matched
+   to the rest (scripts/normalise-carrier-logos.mjs); `box-sizing: border-box`
+   means the 1px rim eats into that, so the tile is the canvas + 2px in each
+   axis and the CONTENT box comes out at exactly 220×96.
+
+   The tile used to be 180×96 with 24px of horizontal padding, which left a
+   130×62 content box — so the browser resampled every mark down to ~59% and
+   the whole wall rendered small and soft inside tiles that were mostly empty.
+   Sizing the content box to the canvas and dropping the padding paints each
+   mark 1:1 at the weight it was normalised to; the breathing room is already
+   inside the file (the art is capped at 216×92). */
 .qf-logo-tile {
+  box-sizing: border-box;
   flex: 0 0 auto;
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 180px;
-  height: 96px;
-  padding: 16px 24px;
-  background: var(--surface-2);
-  border: 1px solid var(--border);
+  width: 222px;
+  height: 98px;
+  padding: 0;
+  background: var(--qf-logo-tile-bg);
+  border: 1px solid var(--qf-logo-tile-border);
   border-radius: var(--radius);
 }
 
@@ -131,14 +201,18 @@ html body.qf-wft .qf-marquee-head .qf-marquee-head__soft { color: var(--muted-so
 }
 
 /* The no-artwork fallback: the company's own initials, exactly as a carrier
-   profile renders them when it has no logo (directory/pages.ts). */
+   profile renders them when it has no logo (directory/pages.ts).
+
+   `--muted` resolves against the THEME, and this tile is pinned light, so it is
+   overridden to the light-theme ink below rather than left to flip to a tone
+   chosen for a dark ground. */
 .qf-logo-tile__mono {
   font-family: var(--font-sans);
   font-size: 24px;
   font-weight: 600;
   line-height: 1.5;
   letter-spacing: 1px;
-  color: var(--muted);
+  color: var(--qf-logo-tile-ink);
 }
 
 /* `.visually-hidden` has NO global definition in this bundle — the only other
@@ -160,6 +234,11 @@ html body.qf-wft .qf-marquee-head .qf-marquee-head__soft { color: var(--muted-so
 }
 
 /* ── Breakpoints ─────────────────────────────────────────────────────────── */
+/* The tile shrinks but its ASPECT stays close to the canvas's 2.29:1, so the
+   marks scale down evenly instead of one breakpoint cropping wordmarks harder
+   than another. The pace token is left alone: the advance gets shorter at each
+   step, so the strip slows as the viewport narrows, which is what a smaller
+   window wants. */
 
 @media (max-width: 1100px) {
   html body.qf-wft h2.qf-marquee-head { font-size: 28px; letter-spacing: -1.12px; }
@@ -167,13 +246,13 @@ html body.qf-wft .qf-marquee-head .qf-marquee-head__soft { color: var(--muted-so
 
 @media (max-width: 860px) {
   html body.qf-wft h2.qf-marquee-head { font-size: 24px; letter-spacing: -0.96px; margin-bottom: 24px; }
-  .qf-logo-tile { width: 148px; height: 80px; padding: 16px; }
+  .qf-logo-tile { width: 176px; height: 80px; }
 }
 
 @media (max-width: 560px) {
   html body.qf-wft.landing-v2 .qf-marquee-section { padding: 0 0 48px !important; }
   html body.qf-wft h2.qf-marquee-head { font-size: 22px; letter-spacing: -0.66px; }
-  .qf-logo-tile { width: 132px; height: 72px; }
+  .qf-logo-tile { width: 152px; height: 72px; }
   .qf-marquee__row { gap: 16px; margin-right: 16px; }
 }
 

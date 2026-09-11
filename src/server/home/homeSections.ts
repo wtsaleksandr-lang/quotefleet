@@ -1,7 +1,7 @@
 /**
  * THE HOMEPAGE BELOW-THE-BENTO-GRID BAND.
  *
- * Three things live here, and they are together because they are one decision:
+ * Two things live here, and they are together because they are one decision:
  * on 2026-09-11 everything the homepage rendered after the freight-tool bento
  * grid was taken off the live page and replaced by a partner / embed banner and
  * a logo marquee.
@@ -17,28 +17,23 @@
  *   2. THE LOGO MARQUEE, WHOSE DATA IS DERIVED.  HOME_PARTNER_LOGOS is built
  *      from the curated carrier-logo registry (directory/carrierLogos.ts) —
  *      the same list the directory's own logo slot reads — so the strip and a
- *      carrier profile can never disagree about whose mark is whose. What the
- *      tiles claim is what the heading says: these carriers are LISTED IN the
- *      directory. They are not customers, partners or endorsers. An empty
- *      registry still means NOTHING ships: not the section, not its
- *      stylesheet, not its script.
+ *      carrier profile can never disagree about whose mark is whose. These
+ *      carriers are LISTED IN the FMCSA-derived directory. They are not
+ *      customers, partners or endorsers, and the heading above them says only
+ *      who QuoteFleet is FOR. An empty registry still means NOTHING ships: not
+ *      the section, not its stylesheet, not its script.
  *
- *   3. THE ONE NUMBER ON THE PAGE, TAKEN FROM THE DATA.  The marquee heading
- *      states the size of the carrier directory, and it is read from the
- *      persisted directory summary rather than typed into the HTML — the same
- *      discipline (and the same reason) as directory/fmcsaFreshness.ts: a
- *      hard-coded count is a claim with no source that is true exactly once.
- *      A cold cache renders the heading with NO number instead of a guess.
- *
- * COST ON THE REQUEST PATH: ZERO DB WORK. `homeCarrierTotalNow()` is
- * SYNCHRONOUS, answers from a process-local cache, and kicks a background
- * read when that cache is stale. The homepage acquires no DB dependency.
+ * THE BAND IS NOW ENTIRELY STATIC. It reads no database and holds no cache:
+ * `renderLogoMarquee` is a pure function of a committed array. The carrier
+ * COUNT that used to headline the marquee — and the cached, background-refreshed
+ * read behind it — went with the copy change (see `renderHeading`), which is
+ * why `applyHomeSections` no longer takes a total and this module no longer
+ * imports from directory/queries.
  */
 import { readFileSync } from 'node:fs';
 import { resolve as resolvePath } from 'node:path';
 import { esc, monogramInitials } from '../directory/pages.js';
 import { CURATED_CARRIER_LOGOS, carrierLogoPaths } from '../directory/carrierLogos.js';
-import { getPersistedCarrierTotal } from '../directory/queries.js';
 
 // ─── 1 · The hidden legacy sections ───────────────────────────────────────
 
@@ -169,10 +164,22 @@ function repeatToFill<T>(items: readonly T[]): T[] {
   return out;
 }
 
+/**
+ * NOT `loading="lazy"`, and that is the one non-obvious line in this function.
+ *
+ * A lazy image loads when it INTERSECTS the viewport, and every tile on this
+ * strip is moved by a CSS transform inside an `overflow: clip` box. Tiles well
+ * to the right of the cut therefore sit outside the viewport until the moment
+ * the animation carries them in — which is exactly when a blank tile would be
+ * most visible, and the loop's seam is the worst place for one to appear. The
+ * whole set is ~130KB of 2-9KB WebP served with a 7-day TTL, and the duplicate
+ * row re-requests nothing, so eager is cheap. `fetchpriority="low"` keeps it
+ * behind everything above the fold.
+ */
 function renderTile(logo: PartnerLogo): string {
   const label = esc(logo.name);
   const inner = logo.src
-    ? `<img class="qf-logo-tile__img" src="${esc(logo.src)}" alt="${label}" loading="lazy" decoding="async">`
+    ? `<img class="qf-logo-tile__img" src="${esc(logo.src)}" alt="${label}" decoding="async" fetchpriority="low">`
     : `<span class="qf-logo-tile__mono" aria-hidden="true">${esc(monogramInitials(logo.name))}</span><span class="visually-hidden">${label}</span>`;
   const body = logo.href
     ? `<a class="qf-logo-tile__link" href="${esc(logo.href)}">${inner}</a>`
@@ -181,21 +188,31 @@ function renderTile(logo: PartnerLogo): string {
 }
 
 /**
- * The marquee heading — two-tone, left-aligned, and its number comes from the
- * directory rather than from this file.
+ * THE HEADING — TWO-TONE, LEFT-ALIGNED, AND IT MAKES NO CLAIM ABOUT ANYONE.
  *
- * `total === null` (cold cache, no database, an aggregate that has never been
- * computed) drops the number entirely instead of guessing one. The remaining
- * sentence is still true, which is the only bar a marketing line has to clear.
+ * "Built for drivers, brokers and importers" describes WHO THE PRODUCT IS FOR.
+ * That is a statement about QuoteFleet, and it is the only kind of statement
+ * this section is allowed to make, because the tiles below it are marks of
+ * companies that have no relationship with QuoteFleet. "Trusted by", "our
+ * customers", "partners", or ANY count of users next to a wall of other
+ * people's logos reads as an endorsement none of them has given.
+ *
+ * It also carries no number at all, which is a deliberate reversal. The
+ * previous heading stated the directory's carrier count, read from the
+ * persisted aggregate so it could not go stale. That number was honest but it
+ * was the wrong sentence for a logo wall — a figure sitting above a row of
+ * marks invites the reader to bind the two — so the count went and with it
+ * every line of plumbing that fetched it. The directory still publishes its own
+ * size on its own page, where the number is about the page it is on.
+ *
+ * Two tones, one size, no eyebrow: the lead phrase in `--ink`, the audience in
+ * the muted tone — the same idiom as `.qf-toolgrid-head__soft` on the bento
+ * grid above and `.qf-partner-title__soft` on the banner between them.
  */
-function renderHeading(total: number | null): string {
-  if (total === null) {
-    return `<h2 class="qf-marquee-head"><span class="qf-marquee-head__soft">Carriers listed in the QuoteFleet directory</span></h2>`;
-  }
-  const n = total.toLocaleString('en-US');
+function renderHeading(): string {
   return (
-    `<h2 class="qf-marquee-head"><span class="qf-marquee-head__n">${esc(n)} carriers</span> ` +
-    `<span class="qf-marquee-head__soft">listed in the QuoteFleet directory</span></h2>`
+    `<h2 class="qf-marquee-head"><span class="qf-marquee-head__lead">Built for</span> ` +
+    `<span class="qf-marquee-head__soft">drivers, brokers and importers</span></h2>`
   );
 }
 
@@ -204,18 +221,24 @@ function renderHeading(total: number | null): string {
  *
  * Pure and exported so the "empty means absent" contract is unit-testable
  * without a server or a database.
+ *
+ * `--qf-marquee-tiles` is the ONE piece of data the stylesheet cannot work out
+ * for itself, and it buys a constant scroll SPEED. The animation's duration is
+ * `tiles × seconds-per-tile`, so adding a carrier to the registry lengthens the
+ * cycle instead of speeding the strip up: eleven tiles and twenty-six tiles
+ * both travel at the same px/s. It is advisory only — the loop's own geometry
+ * is a `-50%` translate of the track, which is self-correcting and stays
+ * seamless whatever this number says (see landing-logo-marquee.css).
  */
-export function renderLogoMarquee(
-  logos: readonly PartnerLogo[] = HOME_PARTNER_LOGOS,
-  total: number | null = null,
-): string {
+export function renderLogoMarquee(logos: readonly PartnerLogo[] = HOME_PARTNER_LOGOS): string {
   if (logos.length === 0) return '';
-  const tiles = repeatToFill(logos).map(renderTile).join('');
+  const row = repeatToFill(logos);
+  const tiles = row.map(renderTile).join('');
   return (
     `<section class="section qf-marquee-section" data-reveal>` +
     `<div class="qf-hhero__inner">` +
-    renderHeading(total) +
-    `<div class="qf-marquee" data-qf-marquee>` +
+    renderHeading() +
+    `<div class="qf-marquee" data-qf-marquee style="--qf-marquee-tiles: ${row.length}">` +
     `<div class="qf-marquee__track">` +
     `<ul class="qf-marquee__row" role="list">${tiles}</ul>` +
     `<ul class="qf-marquee__row" role="list" aria-hidden="true">${tiles}</ul>` +
@@ -224,52 +247,7 @@ export function renderLogoMarquee(
   );
 }
 
-// ─── 3 · The carrier total, cached off the request path ───────────────────
-
-/** How long a read total is served before a background refresh is kicked. The
- *  underlying number moves at most once a week, so this is generous. */
-export const HOME_CARRIER_TOTAL_TTL_MS = 30 * 60 * 1000;
-
-let totalCache: { at: number; val: number | null } | null = null;
-let totalInflight: Promise<void> | null = null;
-
-/** Background, single-flighted, never-throwing refresh of the cached total. */
-function kickTotalRefresh(): void {
-  if (totalInflight) return;
-  totalInflight = getPersistedCarrierTotal()
-    .then((val) => {
-      totalCache = { at: Date.now(), val };
-    })
-    .catch(() => {
-      // getPersistedCarrierTotal already swallows; belt-and-braces so a
-      // rejection can never surface as an unhandled promise rejection.
-      totalCache = { at: Date.now(), val: totalCache?.val ?? null };
-    })
-    .finally(() => {
-      totalInflight = null;
-    });
-}
-
-/**
- * The current directory carrier total, or `null` when it is not known yet.
- *
- * SYNCHRONOUS ON PURPOSE — see the module header. A cold cache answers `null`,
- * the heading renders without a number, and the real count takes over on the
- * next request once the background read lands.
- */
-export function homeCarrierTotalNow(): number | null {
-  const c = totalCache;
-  if (!c || Date.now() - c.at >= HOME_CARRIER_TOTAL_TTL_MS) kickTotalRefresh();
-  return c?.val ?? null;
-}
-
-/** Test seam: drop the cached total (and any pending read's claim on it). */
-export function resetHomeCarrierTotalCacheForTests(): void {
-  totalCache = null;
-  totalInflight = null;
-}
-
-// ─── 4 · Markup substitution ──────────────────────────────────────────────
+// ─── 3 · Markup substitution ──────────────────────────────────────────────
 
 class HomeSectionSlotError extends Error {
   constructor(message: string) {
@@ -299,15 +277,13 @@ export function applyHomeSections(
   opts: {
     legacyEnabled?: boolean;
     logos?: readonly PartnerLogo[];
-    carrierTotal?: number | null;
   } = {},
 ): string {
   const legacyEnabled = opts.legacyEnabled ?? HOME_LEGACY_SECTIONS_ENABLED;
   const logos = opts.logos ?? HOME_PARTNER_LOGOS;
-  const total = opts.carrierTotal === undefined ? homeCarrierTotalNow() : opts.carrierTotal;
 
   let out = fillSlot(html, LEGACY_SECTIONS_SLOT, legacyEnabled ? legacySectionsHtml() : '', 'home legacy sections');
-  const marquee = renderLogoMarquee(logos, total);
+  const marquee = renderLogoMarquee(logos);
   out = fillSlot(out, LOGO_MARQUEE_SLOT, marquee, 'home logo marquee');
   // The marquee's stylesheet rides with the marquee. Linking it unconditionally
   // would be a render-blocking download for a section that is not on the page.

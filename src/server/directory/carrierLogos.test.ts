@@ -17,7 +17,7 @@
  *      deliberately kept for the ~331,000 carriers we have no mark for, and
  *      for curated carriers whose artwork we could not obtain.
  */
-import { readFileSync, statSync } from 'node:fs';
+import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
@@ -80,6 +80,37 @@ describe('the curated carrier-logo registry', () => {
         expect(head.subarray(8, 12).toString('ascii')).toBe('WEBP');
       }
     }
+  });
+
+  it('gives every carrier its OWN slug, so no two can share one mark', () => {
+    // `logo` is the join between a row and a pair of files. Two rows pointing
+    // at one slug is a misidentification with a single-character diff: both
+    // carriers render the same mark and the registry still looks plausible.
+    const slugs = CURATED_CARRIER_LOGOS.map((c) => c.logo).filter((s): s is string => s !== null);
+    expect(new Set(slugs).size, 'two carriers share a logo slug').toBe(slugs.length);
+  });
+
+  it('commits no orphaned artwork — every file on disk belongs to a row', () => {
+    // The failure this catches is a DROPPED row whose files stayed behind: a
+    // carrier removed from the registry (a takedown, a mark that turned out not
+    // to be theirs) is only really removed once its artwork is gone too, and a
+    // stale pair is otherwise invisible because nothing renders it.
+    const referenced = new Set(CURATED_CARRIER_LOGOS.map((c) => c.logo).filter(Boolean));
+    for (const dir of ['carrier-logos', 'carrier-logos/square']) {
+      for (const f of readdirSync(resolve(publicDir, dir))) {
+        if (!f.endsWith('.webp')) continue;
+        expect(referenced.has(f.replace(/\.webp$/, '')), `${dir}/${f} is not referenced by any registry row`).toBe(true);
+      }
+    }
+  });
+
+  it('holds enough marks for a continuous strip to read as a wall', () => {
+    // A marquee this short repeats visibly: the renderer pads any list under
+    // MIN_TILES_PER_ROW back up to twelve tiles by REPEATING it, so a viewer
+    // sees the same handful of companies cycle past inside one screen. Twenty
+    // is the floor at which a desktop row stops looking like a loop.
+    const withArt = CURATED_CARRIER_LOGOS.filter((c) => c.logo !== null);
+    expect(withArt.length, 'the strip needs at least 20 real marks').toBeGreaterThanOrEqual(20);
   });
 
   it('resolves a USDOT however it is spelled, and refuses anything that is not one', () => {
