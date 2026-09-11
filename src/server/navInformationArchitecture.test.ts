@@ -282,7 +282,10 @@ describe('the audience toggle rides the hero column', () => {
 describe('Alex banned the word "pitch" from user-facing copy', () => {
   it('is gone from the homepage', () => {
     expect(LANDING_HTML).not.toMatch(/pitch/i);
-    expect(LANDING_HTML).toContain('Importers Directory &rarr;');
+    // The importers promo moved from an inline-styled hero link to a card in
+    // the homepage tool bento grid, where the arrow is a `.qf-toolbtn__arr`
+    // span rather than a text entity — so pin the label, not the glyph.
+    expect(LANDING_HTML).toContain('Importers Directory');
   });
 
   it('is gone from every chrome constant', () => {

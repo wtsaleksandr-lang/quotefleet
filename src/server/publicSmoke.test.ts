@@ -288,15 +288,29 @@ describe('public static page smoke checks', () => {
     expect(css).toContain('inset 0 0 0 1px var(--accent)');
   });
 
-  it('hero device pair rests phone-front with both videos looping', async () => {
-    const js = await file('landing-hero-swap.js');
-    // Resting composition is pinned to stage-phone (phone sharp, laptop blurred
-    // behind) — no swap-back to a lone laptop; both clips keep looping.
-    expect(js).toContain("wrap.classList.add('stage-phone')");
-    expect(js).not.toContain("stage('laptop')");
-    expect(js).toContain('lapV.loop = true; phV.loop = true;');
-    // Player API stays exposed for landing-video-controls.js.
-    expect(js).toContain('window.qfHeroSwap');
+  // (RETIRED) 'hero device pair rests phone-front with both videos looping'
+  // pinned landing-hero-swap.js, which drove the looped laptop/phone video
+  // composite in the old hero. That hero is gone — the homepage now opens on a
+  // tinted hero card with a 3-up action grid — and the script was deleted with
+  // it, so the assertion guarded a file that no longer exists.
+  it('the homepage hero is a tinted card, not the retired video composite', async () => {
+    const html = renderStaticPage('landing.html');
+    // The card + its 3-up action grid, and the tool bento grid below it.
+    expect(html).toContain('class="qf-hhero__card"');
+    expect(html).toContain('class="qf-hhero__cards"');
+    expect(html).toContain('class="qf-toolgrid"');
+    expect(html).toContain('/landing-home-grid.css');
+    // The video hero and everything that served it are gone, not just hidden.
+    expect(html).not.toContain('qf-hero-composite');
+    expect(html).not.toContain('/marketing/qf-hero-laptop');
+    expect(html).not.toContain('/marketing/qf-hero-phone');
+    expect(html).not.toContain('/landing-hero-swap.js');
+    expect(html).not.toContain('/landing-hero-captions.js');
+    expect(html).not.toContain('/landing-hero-composite.css');
+    expect(html).not.toContain('/landing-hero-devices.css');
+    expect(html).not.toContain('/landing-hero-phone.css');
+    expect(html).not.toContain('/landing-hero-captions.css');
+    expect(html).not.toContain('/landing-hero-polish.css');
   });
 
   it('widget loads required scripts and controls', async () => {
