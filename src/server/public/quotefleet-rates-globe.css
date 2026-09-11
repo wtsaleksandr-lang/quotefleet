@@ -215,7 +215,6 @@
 .qfg-circle.active::after {
   inset: -4px;
   border-color: rgba(110, 139, 255, 0.3);
-  animation: qfg-ping 2s ease-out infinite;
 }
 
 /* Hub (database) marker — always emphasised */
@@ -228,17 +227,11 @@
 }
 .qfg-marker--hub .qfg-circle::after {
   border-color: rgba(110, 139, 255, 0.35);
-  animation: qfg-ping 2.4s ease-out infinite;
 }
 .qfg-marker--hub .qfg-circle svg {
   width: 18px;
   height: 18px;
   opacity: 1;
-}
-
-@keyframes qfg-ping {
-  0% { transform: scale(1); opacity: 1; }
-  100% { transform: scale(1.8); opacity: 0; }
 }
 
 /* Floating card above the marker */
@@ -314,5 +307,4 @@
   #qf-globe-canvas { transition: none; opacity: 1; }
   .qfg-circle.active::after,
   .qfg-marker--hub .qfg-circle::after { animation: none; }
-  @keyframes qfg-ping { 0%, 100% { transform: none; opacity: 1; } }
 }

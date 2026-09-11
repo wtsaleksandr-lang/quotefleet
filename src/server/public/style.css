@@ -949,7 +949,7 @@ html[data-theme="light"] .hero h1 .accent {
   box-shadow: var(--shadow-lg);
   display: none;
 }
-.dock-tray.open { display: block; animation: trayUp 0.22s ease-out; }
+.dock-tray.open { display: block; }
 .dock-tray-grid {
   display: grid; gap: var(--space-2);
   grid-template-columns: 1fr 1fr;
@@ -974,11 +974,6 @@ html[data-theme="light"] .hero h1 .accent {
   margin: 0 0 4px 0; font-size: 15.5px; font-weight: 700; color: var(--ink);
 }
 .dock-tray-card p { margin: 0; font-size: 13px; color: var(--muted); line-height: 1.5; }
-
-@keyframes trayUp {
-  from { opacity: 0; transform: translateX(-50%) translateY(8px); }
-  to   { opacity: 1; transform: translateX(-50%) translateY(0); }
-}
 
 @media (max-width: 720px) {
   .dock { gap: 0; padding: 4px; }
@@ -1254,11 +1249,6 @@ html[data-theme="light"] .hero h1 .accent {
 .qf-copilot-pending {
   border-color: var(--accent) !important;
   box-shadow: 0 0 0 3px var(--accent-soft);
-  animation: qf-fill-pulse 1.1s ease-out 1;
-}
-@keyframes qf-fill-pulse {
-  0%   { box-shadow: 0 0 0 6px var(--accent-soft); }
-  100% { box-shadow: 0 0 0 3px var(--accent-soft); }
 }
 
 .qf-fill-review {

@@ -481,40 +481,13 @@ html body.qf-wft .visual-flow.qf-hero-media > .qf-phone { display: none; }
 html.js .qf-slide .qf-reveal { opacity: 0; }
 
 html.js .qf-slide.is-playing .qf-reveal {
-  animation: qfp-rise 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
   animation-delay: var(--d, 0s);
 }
 
 /* rate + calc choreography */
 html.js .qf-slide .qf-slide__rate { opacity: 0; }
 html.js .qf-slide.is-playing .qf-slide__rate {
-  animation: qfp-pop 0.45s cubic-bezier(0.22, 1, 0.36, 1) both;
   animation-delay: 1.15s;
-}
-html.js .qf-slide.is-playing .qf-slide__calc {
-  animation: qfp-calc 1.15s ease both;
-}
-html.js .qf-slide.is-playing .qf-slide__calc .qf-calc-bar {
-  animation: qfp-shimmer 0.9s linear infinite;
-}
-
-@keyframes qfp-rise {
-  from { opacity: 0; transform: translateY(9px); }
-  to   { opacity: 1; transform: translateY(0); }
-}
-@keyframes qfp-pop {
-  0%   { opacity: 0; transform: scale(0.92); }
-  60%  { opacity: 1; transform: scale(1.02); }
-  100% { opacity: 1; transform: scale(1); }
-}
-@keyframes qfp-calc {
-  0%   { opacity: 1; }
-  82%  { opacity: 1; }
-  100% { opacity: 0; }
-}
-@keyframes qfp-shimmer {
-  from { background-position: 200% 0; }
-  to   { background-position: -200% 0; }
 }
 
 /* Reduced motion — no auto-motion; every element shows its resting state. */

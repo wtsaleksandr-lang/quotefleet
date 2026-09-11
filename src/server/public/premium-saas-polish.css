@@ -42,7 +42,6 @@
   padding: 12px 13px;
   transform: translateY(8px);
   opacity: 0;
-  animation: qf-toast-in .18s ease forwards;
 }
 .qf-toast strong {
   display: block;
@@ -129,9 +128,6 @@
 @keyframes qf-skeleton {
   0% { background-position: 0% 50%; }
   100% { background-position: -220% 50%; }
-}
-@keyframes qf-toast-in {
-  to { transform: translateY(0); opacity: 1; }
 }
 @media (max-width: 700px) {
   .qf-toast-stack { left: 14px; right: 14px; bottom: 14px; }
@@ -342,24 +338,8 @@
   background: color-mix(in srgb, var(--surface);
   background-size: 45% 100%;
   background-repeat: no-repeat;
-  animation: qf-ingest-sheen 1.4s ease-in-out infinite;
-}
-@keyframes qf-ingest-sheen {
-  0% { background-position: -45% 0; }
-  100% { background-position: 145% 0; }
-}
-
-/* ── AI import: animated review reveal ──────────────────────────────── */
-.qf-reveal-in {
-  animation: qf-review-reveal .42s cubic-bezier(.22, .61, .36, 1) both;
-}
-.qf-reveal-row {
+}.qf-reveal-row {
   opacity: 0;
-  animation: qf-review-reveal .4s cubic-bezier(.22, .61, .36, 1) both;
-}
-@keyframes qf-review-reveal {
-  from { opacity: 0; transform: translateY(10px); }
-  to { opacity: 1; transform: translateY(0); }
 }
 
 /* ── AI import: self-drawing confidence checkmark ───────────────────── */
@@ -373,14 +353,10 @@
 .qf-check-draw.is-animating .qf-check-circle {
   stroke-dasharray: 64;
   stroke-dashoffset: 64;
-  animation: qf-check-circle .4s ease-out forwards;
 }
 .qf-check-draw.is-animating .qf-check-path {
   stroke-dashoffset: 24;
-  animation: qf-check-path .35s .28s ease-out forwards;
 }
-@keyframes qf-check-circle { to { stroke-dashoffset: 0; } }
-@keyframes qf-check-path { to { stroke-dashoffset: 0; } }
 
 /* ── AI import: Recent-uploads table — no clip/wrap at 375px ─────────── */
 .qf-table-scroll {

@@ -53,13 +53,7 @@
 
 /* ── Panels + cross-fade ───────────────────────────────────────────────── */
 .qf-aud-panel { display: block; }
-.qf-aud-panel[hidden] { display: none; }
-.qf-aud-panel.is-entering { animation: qfAudFade 0.28s ease both; }
-@keyframes qfAudFade {
-  from { opacity: 0; transform: translateY(8px); }
-  to   { opacity: 1; transform: translateY(0); }
-}
-@media (prefers-reduced-motion: reduce) {
+.qf-aud-panel[hidden] { display: none; }@media (prefers-reduced-motion: reduce) {
   .qf-aud-panel.is-entering { animation: none; }
   .qf-aud-seg { transition: none; }
 }

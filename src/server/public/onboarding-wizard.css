@@ -340,16 +340,7 @@ html.qf-ob-open body {
 @media (prefers-reduced-motion: reduce) {
   .qf-ob-card { transition: border-color 0.15s ease, background 0.15s ease; }
   .qf-ob-card:hover { transform: none; }
-}
-
-/* Check-mark pop when a card is picked (JS adds .is-pop to the just-picked one). */
-@keyframes qf-ob-check-pop {
-  0%   { transform: scale(0.6); }
-  60%  { transform: scale(1.12); }
-  100% { transform: scale(1); }
-}
-.qf-ob-check.is-pop { animation: qf-ob-check-pop 0.22s cubic-bezier(0.2, 0.8, 0.2, 1); }
-@media (prefers-reduced-motion: reduce) {
+}@media (prefers-reduced-motion: reduce) {
   .qf-ob-check.is-pop { animation: none; }
 }
 
