@@ -950,21 +950,30 @@ describe('the FAQ is reachable from the footer again', () => {
     // ROOT-RELATIVE is what makes an in-page anchor legal in a footer that is
     // byte-identical on every page: a bare "#faq" resolves against /pricing or
     // a carrier profile, where no such element exists, and does nothing.
+    //
+    // The DESTINATION moved on 2026-09-11: the homepage's FAQ block came off
+    // the live page with the rest of the below-the-bento-grid band, so the
+    // link follows the answers to /pricing, which is where the site's one
+    // visible FAQ (and its FAQPage graph) lives. Path-first either way — that
+    // is the invariant this test is really about.
     for (const [name, html] of [
       ['PREMIUM_FOOTER', PREMIUM_FOOTER],
       ['landing.html', LANDING_HTML],
       ['.dirfoot', DIRECTORY_PAGES_TS],
     ] as const) {
-      expect(html, name).toContain('<a href="/#faq">FAQ</a>');
+      expect(html, name).toContain('<a href="/pricing#faq">FAQ</a>');
       expect(html, name).not.toMatch(/href="#faq"/);
     }
   });
 
   it('still has a target to reach, and one filing decision for it', () => {
-    expect(LANDING_HTML).toMatch(/<section[^>]*id="faq"/);
+    // /pricing carries the anchor now; the homepage deliberately does not, and
+    // must not silently grow a second one.
+    expect(PRICING_HTML).toMatch(/<section[^>]*id="faq"/);
+    expect(LANDING_HTML).not.toMatch(/<section[^>]*id="faq"/);
     const columnOf = (html: string, cls: string, tag: string) => {
       const col = [...html.matchAll(new RegExp(`<div class="${cls}">[\\s\\S]*?</div>`, 'g'))]
-        .map((m) => m[0]).find((c) => c.includes('href="/#faq"')) ?? '';
+        .map((m) => m[0]).find((c) => c.includes('href="/pricing#faq"')) ?? '';
       return col.match(new RegExp(`<${tag}[^>]*>([^<]+)</${tag}>`))?.[1] ?? null;
     };
     expect(columnOf(PREMIUM_FOOTER, 'footer-col', 'h4')).toBe('Company');

@@ -24,15 +24,13 @@ describe('public static page smoke checks', () => {
     expect(html).not.toContain('For shippers &amp; BCOs');
     expect(html).toMatch(/data-aud="carriers"[^>]*>Carriers</);
     expect(html).toMatch(/data-aud="shippers"[^>]*>Shippers</);
-    // The illustrated hosted URL must be a domain WE OWN. `yourquote.net` is a
-    // GoDaddy/Afternic for-sale parking page belonging to someone else (307 →
-    // forsale.godaddy.com, NS = ns1.afternic.com, verified 2026-09-11) and is
-    // not in HOST_DOMAINS. `yourquote.online` is: Cloudflare NS in our account,
-    // serving the real QuoteFleet app.
-    expect(html).toContain('acmetrucking.yourquote.online');
+    // The illustrated hosted URL and the "email signature" line moved off this
+    // page with the below-the-grid band (2026-09-11); both are still asserted,
+    // against the partial they live in now, in the test below. What stays here
+    // is the half that is about THIS page: the domain we do not own must never
+    // appear on it.
     expect(html, 'the homepage must not illustrate the product with a domain we do not own')
       .not.toContain('yourquote.net');
-    expect(html).toContain('email signature');
     // CRO hero: outcome-first subhead and short toggle labels.
     expect(html).toContain('A branded quote page your customers fill out themselves');
     expect(html).toContain('>Carriers</button>');
@@ -46,11 +44,6 @@ describe('public static page smoke checks', () => {
     expect(html).not.toContain('hero-trust-line');
     // The hero's redundant "See a live demo" link (class="demo-link") is gone.
     expect(html).not.toContain('class="demo-link"');
-    expect(html).toContain('Branded PDF quotes');
-    expect(html).toContain('Automatic follow-ups');
-    expect(html).toContain('24/7 AI service agent');
-    expect(html).toContain('Everything included');
-    expect(html).toContain('No contracts');
     expect(html).toContain('/w/demo');
     expect(html).toContain('/signup');
     expect(html).toContain('/security');
@@ -66,6 +59,38 @@ describe('public static page smoke checks', () => {
     expect(html).not.toContain('quote desk');
     expect(html).not.toContain('freight quote leads');
     expect(html).not.toContain('Private rates by default');
+  });
+
+  it('the below-the-grid band it used to smoke-check is hidden, not lost', async () => {
+    // Those checks lived in the test above until 2026-09-11, when everything
+    // below the freight-tool bento grid came off the live homepage (see
+    // src/server/home/homeSections.ts). They are kept — pointed at the partial
+    // the markup moved into — because each one still guards something real:
+    // the illustrated hosted URL must be a domain WE OWN, and the three paid
+    // differentiators must be spelled the way the pricing page spells them.
+    //
+    // `yourquote.net` is a GoDaddy/Afternic for-sale parking page belonging to
+    // someone else (307 → forsale.godaddy.com, NS = ns1.afternic.com, verified
+    // 2026-09-11) and is not in HOST_DOMAINS. `yourquote.online` is: Cloudflare
+    // NS in our account, serving the real QuoteFleet app.
+    const legacy = await readFile(
+      resolve(process.cwd(), 'src/server/home/legacy-below-grid.html'),
+      'utf8',
+    );
+    expect(legacy).toContain('acmetrucking.yourquote.online');
+    expect(legacy, 'never illustrate the product with a domain we do not own')
+      .not.toContain('yourquote.net');
+    expect(legacy).toContain('email signature');
+    expect(legacy).toContain('Branded PDF quotes');
+    expect(legacy).toContain('Automatic follow-ups');
+    expect(legacy).toContain('24/7 AI service agent');
+    expect(legacy).toContain('Everything included');
+    expect(legacy).toContain('No contracts');
+
+    // And the other half: none of it reaches a visitor today.
+    const html = renderStaticPage('landing.html');
+    expect(html).not.toContain('acmetrucking.yourquote.online');
+    expect(html).not.toContain('class="section qf-included-section"');
   });
 
   it('landing reveal CSS keeps content visible without JavaScript', async () => {

@@ -457,17 +457,22 @@ export const DIRECTORY_DATA_SOURCES = `<div class="qf-datasources">`
  * RENDERED homepage for that reason.
  *
  * THE ONE IN-PAGE ANCHOR, AND WHY IT IS ABSOLUTE. The homepage used to run a
- * bespoke footer whose single unique destination was `#faq` — the "Simple
- * answers before you start" block that still carries `id="faq"` in
- * landing.html. Replacing that footer with this shared one gained six
- * destinations and dropped that one, leaving the FAQ reachable only by
- * scrolling. It is restored HERE rather than only on the homepage, because a
- * footer that is byte-identical everywhere cannot carry a bare `#faq`: on
- * /pricing or a carrier profile that fragment resolves against a page with no
- * such element and the click does nothing. `/#faq` is ROOT-RELATIVE, so it
- * scrolls in place on `/` (same path, fragment only) and navigates home to the
- * right section from every other page. Filed under Company beside Support,
- * which is the other "answer my question" destination.
+ * bespoke footer whose single unique destination was `#faq`. Replacing that
+ * footer with this shared one gained six destinations and dropped that one,
+ * leaving the FAQ reachable only by scrolling, so it was restored HERE rather
+ * than only on the homepage. A footer that is byte-identical everywhere cannot
+ * carry a BARE `#faq`: on a page with no such element that fragment resolves
+ * against the current page and the click does nothing. It is therefore always
+ * written path-first, so it navigates from wherever it is clicked.
+ *
+ * IT POINTS AT /pricing#faq SINCE 2026-09-11. It was `/#faq` while the homepage
+ * carried the "Simple answers before you start" block; that block came off the
+ * live page with the rest of the below-the-bento-grid band (see
+ * src/server/home/homeSections.ts) and a footer link to an id that no longer
+ * renders is a dead link. /pricing carries the site's one VISIBLE FAQ — eight
+ * <details> under `id="faq"`, with its own FAQPage graph — so the link, the
+ * anchor and the structured data now all agree. Filed under Company beside
+ * Support, which is the other "answer my question" destination.
  *
  * Closes with the FOOTER_PAY_ROW accepted-payment + trust strip as its very
  * last child.
@@ -541,7 +546,7 @@ export const FOOTER_COLUMNS: FooterColumn[] = [
     links: [
       { href: 'mailto:hello@quotefleet.net', label: 'Contact' },
       { href: '/support', label: 'Support' },
-      { href: '/#faq', label: 'FAQ' },
+      { href: '/pricing#faq', label: 'FAQ' },
       { href: '/partners', label: 'Partners &amp; affiliates' },
       { href: '/security', label: 'Security' },
       { href: '/login', label: 'Sign in' },

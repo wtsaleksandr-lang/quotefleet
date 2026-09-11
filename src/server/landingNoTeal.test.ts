@@ -36,9 +36,19 @@ describe('landing WeFixTrades cleanup skin', () => {
     expect(css).not.toContain('.compare-simple-section');
   });
 
-  it('keeps the legacy mockup blocks hidden but surfaces their features via the "Everything included" band', async () => {
+  it('keeps the legacy mockup blocks hidden but preserves the "Everything included" band', async () => {
     const css = await file('landing-wefixtrades-cleanup.css');
-    const html = await file('landing.html');
+    // The "Everything included" band moved OFF the homepage on 2026-09-11 with
+    // the rest of the below-the-bento-grid stack, so it is no longer in
+    // landing.html — it is in the legacy partial, one flag away from returning
+    // (src/server/home/homeSections.ts). Read it from there. This assertion is
+    // kept rather than deleted because the point of it stands: those three paid
+    // differentiators must be carried by the consolidated band and NOT by the
+    // .ai/.pdf/.scheduler mockups, which stay in the hide-list either way.
+    const legacy = await readFile(
+      resolve(process.cwd(), 'src/server/home/legacy-below-grid.html'),
+      'utf8',
+    );
 
     // The four legacy hero-mockup blocks stay in the display:none hide-list —
     // .use-section is redundant with the hero/how-it-works, and the .ai/.pdf/
@@ -53,12 +63,12 @@ describe('landing WeFixTrades cleanup skin', () => {
     expect(hideBlock).toContain('display: none !important');
 
     // The real paid differentiators (24/7 AI service agent, branded PDF,
-    // automatic follow-ups) ARE now surfaced — as one clean, on-brand
-    // consolidated band, not the legacy blocks. Present and NOT in the hide-list.
-    expect(html).toContain('class="section qf-included-section"');
-    expect(html).toContain('24/7 AI service agent');
-    expect(html).toContain('Branded PDF quotes');
-    expect(html).toContain('Automatic follow-ups');
+    // automatic follow-ups) are carried by the consolidated band, not the
+    // legacy blocks — and the band was never folded into the hide-list.
+    expect(legacy).toContain('class="section qf-included-section"');
+    expect(legacy).toContain('24/7 AI service agent');
+    expect(legacy).toContain('Branded PDF quotes');
+    expect(legacy).toContain('Automatic follow-ups');
     expect(css).toContain('body.qf-wft .qf-included-card');
     expect(hideBlock).not.toContain('.qf-included-section');
     expect(css).toContain('.floating-note');
@@ -66,5 +76,13 @@ describe('landing WeFixTrades cleanup skin', () => {
     expect(css).toContain('.flow-rates');
     expect(css).not.toContain('#59ff75');
     expect(css).not.toContain('#0bd477');
+  });
+
+  it('no longer renders that band on the homepage itself', async () => {
+    // The other half of the same fact: hidden means ABSENT from what the
+    // visitor receives, not styled out of sight. homeSections.test.ts covers
+    // the whole band; this pins the one section this file has always tracked.
+    const html = await file('landing.html');
+    expect(html).not.toContain('qf-included-section');
   });
 });
