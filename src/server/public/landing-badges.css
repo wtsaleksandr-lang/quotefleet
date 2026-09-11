@@ -2,8 +2,8 @@
    One shared .qf-chip component drives both rows so they stay visually identical.
 
    Dark page only (body.qf-wft): light, high-contrast text on a hairline surface,
-   and a periwinkle (#6E8BFF) check. This page forces --accent to cobalt
-   (#0d3cfc), which fails contrast on the dark bg — so the accent here is the
+   and a periwinkle (#8DA2F9) check. This page forces --accent to cobalt
+   (#3356EE), which fails contrast on the dark bg — so the accent here is the
    readable on-dark periwinkle, never var(--accent). Loaded LAST. */
 
 /* ── Shared chip ──────────────────────────────────────────────────────────── */
@@ -27,7 +27,7 @@ body.qf-wft .qf-chip-ico {
   width: 14px;
   height: 14px;
   flex: 0 0 auto;
-  color: #6E8BFF; /* periwinkle check — readable accent, not the forced cobalt */
+  color: #8DA2F9; /* periwinkle check — readable accent, not the forced cobalt */
 }
 
 /* ── Trust-badge icons (hero pills) ──────────────────────────────────────────

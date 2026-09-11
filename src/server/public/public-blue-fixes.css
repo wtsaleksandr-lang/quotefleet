@@ -1,8 +1,8 @@
 /* Phase BX: final no-teal public accent overrides. */
 :root {
-  --accent: #0d3cfc;
+  --accent: #3356EE;
   --accent-ink: #ffffff;
-  --accent-soft: rgba(13,60,252,.14);
+  --accent-soft: rgba(51,86,238,.14);
 }
 
 body.qf-wft .premium-footer a,
@@ -11,7 +11,7 @@ body.qf-wft .footer-col a,
 body.qf-wft .footer-bottom a,
 body.qf-public-wft a,
 body.qf-auth-wft a {
-  color: #9aaeff !important;
+  color: #B4C2FC !important;
 }
 
 body.qf-wft .premium-footer a:hover,
@@ -35,7 +35,7 @@ body.qf-wft .premium-footer strong {
 body.qf-wft .qf-mc-bubble,
 body.qf-public-wft .qf-mc-bubble,
 body.qf-auth-wft .qf-mc-bubble {
-  background: #0d3cfc !important;
+  background: #3356EE !important;
   color: #ffffff !important;
 }
 
@@ -43,13 +43,13 @@ body.qf-wft .qf-mc-bubble.open,
 body.qf-public-wft .qf-mc-bubble.open,
 body.qf-auth-wft .qf-mc-bubble.open {
   background: #242426 !important;
-  color: #9aaeff !important;
+  color: #B4C2FC !important;
 }
 
 body.qf-wft .qf-mc-head .dot,
 body.qf-public-wft .qf-mc-head .dot,
 body.qf-auth-wft .qf-mc-head .dot {
-  background: #0d3cfc !important;
+  background: #3356EE !important;
   box-shadow: var(--qf-shadow-lift) !important;
 }
 
@@ -59,12 +59,12 @@ body.qf-auth-wft .qf-mc-send,
 body.qf-wft .qf-mc-bubble-msg.user,
 body.qf-public-wft .qf-mc-bubble-msg.user,
 body.qf-auth-wft .qf-mc-bubble-msg.user {
-  background: #0d3cfc !important;
+  background: #3356EE !important;
   color: #ffffff !important;
 }
 
 body.qf-wft .qf-mc-input:focus,
 body.qf-public-wft .qf-mc-input:focus,
 body.qf-auth-wft .qf-mc-input:focus {
-  border-color: #0d3cfc !important;
+  border-color: #3356EE !important;
 }

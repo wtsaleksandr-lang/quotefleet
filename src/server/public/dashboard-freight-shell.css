@@ -1,21 +1,21 @@
 /* Phase AV: lighter premium freight dashboard shell */
 html[data-theme="light"] {
-  --bg: #f6f9ff;
+  --bg: #F8FAFC;
   --surface: #ffffff;
-  --surface-2: #eef7ff;
-  --surface-3: #dbeafe;
-  --border: #d9e7ff;
-  --border-strong: #b8cff5;
-  --ink: #0f172a;
-  --ink-soft: #1f2937;
-  --muted: #536174;
-  --muted-soft: #8a96a8;
-  --accent: #0D3CFC;
-  --accent-strong: #0A2FCB;
-  --accent-soft: rgba(13, 60, 252, 0.08);
+  --surface-2: #F2F4F7;
+  --surface-3: #EAECF0;
+  --border: #E2E8F0;
+  --border-strong: #CAD5E2;
+  --ink: #020618;
+  --ink-soft: #314158;
+  --muted: #475467;
+  --muted-soft: #90A1B9;
+  --accent: #3356EE;
+  --accent-strong: #2440C4;
+  --accent-soft: rgba(51, 86, 238, 0.08);
   --accent-ink: #ffffff;
-  --accent-2: #38bdf8;
-  --accent-2-soft: rgba(56, 189, 248, 0.12);
+  --accent-2: #3356EE;
+  --accent-2-soft: rgba(51, 86, 238, 0.10);
   --shadow-md: var(--qf-shadow-md);
   --shadow-lg: var(--qf-shadow-md);
 }

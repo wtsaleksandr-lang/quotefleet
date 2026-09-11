@@ -6,21 +6,21 @@
    dark cards #22282A, light cards #E4EDF1, muted text #B1C5CE.
    Alternate light surfaces: #F3EDDF, #EFE7D8, #E6E3E0, hover #D4CFC9, text #1E1E1E. */
 :root {
-  --qf-color-accent: #0D3CFC;
+  --qf-color-accent: #3356EE;
   --qf-color-white: #FFFFFF;
-  --qf-color-bg: #181D1F;
-  --qf-color-card-dark: #22282A;
-  --qf-color-card-light: #E4EDF1;
-  --qf-color-muted: #B1C5CE;
-  --qf-color-warm-card: #F3EDDF;
-  --qf-color-warm-muted: #EFE7D8;
-  --qf-color-neutral-card: #E6E3E0;
-  --qf-color-neutral-card-hover: #D4CFC9;
-  --qf-color-light-text: #1E1E1E;
+  --qf-color-bg: #0C111D;
+  --qf-color-card-dark: #131A28;
+  --qf-color-card-light: #F2F4F7;
+  --qf-color-muted: #90A1B9;
+  --qf-color-warm-card: #F2F4F7;
+  --qf-color-warm-muted: #E2E8F0;
+  --qf-color-neutral-card: #EAECF0;
+  --qf-color-neutral-card-hover: #CAD5E2;
+  --qf-color-light-text: #020618;
   /* Standard design tokens (--bg/--surface/--accent/--ink/--muted/--border …)
      are intentionally NOT redefined here. The dashboard (/app, /admin) and the
      public site share ONE source of truth: style.css's WeFixTrades token set
-     (warm near-black #161616 canvas, #0D3CFC fill / #6E8BFF on-dark accent,
+     (warm near-black #161616 canvas, #3356EE fill / #6E8BFF on-dark accent,
      cream CTA, warm text, hairline borders, full light-theme block). Keeping
      the --qf-color-* palette above lets the legacy marketing / calculator
      rules below resolve without hijacking the shared token cascade. */
@@ -166,7 +166,7 @@ body.qf-auth-wft .input,
 body.qf-auth-wft .select,
 body.qf-auth-wft .url-builder-preview {
   background: var(--qf-color-neutral-card) !important;
-  border-color: rgba(13,60,252,.22) !important;
+  border-color: rgba(51, 86, 238,.22) !important;
   color: var(--qf-color-light-text) !important;
 }
 
@@ -251,8 +251,8 @@ body.qf-public-wft .support-pill,
 body.qf-public-wft .sec-shell .pill,
 body.qf-public-wft .tag {
   color: var(--qf-color-white) !important;
-  background: rgba(13,60,252,.16) !important;
-  border-color: rgba(13,60,252,.42) !important;
+  background: rgba(51, 86, 238,.16) !important;
+  border-color: rgba(51, 86, 238,.42) !important;
 }
 
 body.qf-app-calculator {
@@ -262,7 +262,7 @@ body.qf-app-calculator {
   --qf-app-shell: #22282A;
   --qf-app-card: #E6E3E0;
   --qf-app-card-soft: #F3EDDF;
-  --qf-app-border: rgba(13,60,252,.20);
+  --qf-app-border: rgba(51, 86, 238,.20);
   --qf-app-text: #1E1E1E;
   --qf-app-muted: #4F6670;
   background: var(--qf-color-bg) !important;
@@ -297,7 +297,7 @@ body.qf-app-calculator .qf-demo-brand-editor,
 body.qf-app-calculator .qf-options-panel .qf-flags label,
 body.qf-app-calculator .qf-options-panel .qf-acc-chip {
   background: var(--qf-color-neutral-card) !important;
-  border-color: rgba(13,60,252,.20) !important;
+  border-color: rgba(51, 86, 238,.20) !important;
   color: var(--qf-color-light-text) !important;
 }
 

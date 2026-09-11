@@ -33,7 +33,7 @@ html[data-theme="light"] .sidebar {
 }
 .sidebar a.active,
 .sidebar button.active {
-  background: rgba(13, 60, 252, 0.14);
+  background: rgba(51, 86, 238, 0.14);
   color: var(--ink);
   box-shadow: inset 3px 0 0 var(--accent);
 }
@@ -100,8 +100,8 @@ html[data-theme="light"] .price-card {
   padding: 9px 13px;
 }
 .qf-tab.active {
-  background: rgba(13, 60, 252,0.15);
-  border-color: rgba(13, 60, 252,0.28);
+  background: rgba(51, 86, 238,0.15);
+  border-color: rgba(51, 86, 238,0.28);
   color: var(--ink);
   box-shadow: inset 0 -2px 0 var(--accent);
 }
@@ -115,7 +115,7 @@ html[data-theme="light"] .price-card {
   background: var(--surface-2);
 }
 .table tbody tr:hover {
-  background: rgba(13, 60, 252,0.055);
+  background: rgba(51, 86, 238,0.055);
 }
 .table .input,
 .table .select {
@@ -140,7 +140,7 @@ html[data-theme="light"] .qf-filter-row th {
 }
 .notice {
   border-left: 4px solid var(--accent);
-  background: rgba(13, 60, 252,0.12);
+  background: rgba(51, 86, 238,0.12);
   color: var(--ink-soft);
 }
 .notice a {

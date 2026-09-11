@@ -227,11 +227,11 @@
   white-space: nowrap;
 }
 .qf-rate-live[data-mode="saving"] {
-  border-color: rgba(13, 60, 252,.45);
+  border-color: rgba(51, 86, 238,.45);
   color: var(--accent-2);
 }
 .qf-rate-live[data-mode="saved"] {
-  border-color: rgba(13, 60, 252,.42);
+  border-color: rgba(51, 86, 238,.42);
   color: var(--success);
 }
 .qf-rate-live[data-mode="error"] {

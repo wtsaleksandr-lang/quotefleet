@@ -2,20 +2,20 @@
 
 /* Phase BQ: WeFixTrades-style skin for secondary public pages. */
 .qf-public-wft {
-  --accent: #6E8BFF; /* on-dark TEXT/link accent (accentOnDark); was cobalt #0D3CFC → failed WCAG (~2.5:1) on dark. Solid cobalt button fills below stay hardcoded. */
+  --accent: #8DA2F9; /* on-dark TEXT/link accent (accentOnDark); the #3356EE fill is ~2.6:1 on this dark band. Solid fills below stay the accent. */
   --accent-ink: #ffffff;
-  --accent-soft: rgba(13,60,252,.14);
+  --accent-soft: rgba(51,86,238,.22);
   --qf-wft-bg: #181D1F;
   --qf-wft-panel: #22282A;
   --qf-wft-panel-2: #22282A;
   --qf-wft-line: rgba(255,255,255,.12);
   --qf-wft-line-strong: rgba(255,255,255,.22);
   --qf-wft-text: #FFFFFF;
-  --qf-wft-muted: #B1C5CE;
-  --qf-wft-faint: rgba(177,197,206,.74);
-  --qf-wft-blue: #0D3CFC;
+  --qf-wft-muted: #90A1B9;
+  --qf-wft-faint: rgba(144,161,185,.82);
+  --qf-wft-blue: #3356EE;
   --qf-wft-cream: #E4EDF1;
-  --qf-wft-radius: 8px;
+  --qf-wft-radius: 12px;
   background: #181D1F;
   color: var(--qf-wft-muted);
 }
@@ -54,9 +54,9 @@
   text-transform: uppercase;
 }
 .qf-public-wft .btn-primary {
-  background: #0D3CFC;
+  background: #3356EE;
   color: #FFFFFF;
-  border-color: #0D3CFC;
+  border-color: #3356EE;
   box-shadow: none;
   border-radius: 4px;
 }
@@ -65,16 +65,16 @@
 .qf-public-wft .btn-secondary {
   background: #FFFFFF;
   border-color: #FFFFFF;
-  color: #0D3CFC;
+  color: #3356EE;
   border-radius: 4px;
 }
-.qf-public-wft .btn-secondary:hover { border-color: #0D3CFC; }
+.qf-public-wft .btn-secondary:hover { border-color: #3356EE; }
 .qf-public-wft .hero {
   padding-top: var(--space-7-5);
   padding-bottom: var(--space-4);
 }
 .qf-public-wft .hero::before {
-  background: rgba(13,60,252,.16);
+  background: rgba(51, 86, 238,.16);
 }
 .qf-public-wft .hero h1,
 .qf-public-wft .support-shell h1,
@@ -107,7 +107,7 @@
   box-shadow: var(--qf-shadow-md), inset 0 1px 0 rgba(255,255,255,.04) !important;
 }
 .qf-public-wft .price-card.featured {
-  border-color: rgba(13,60,252,.58) !important;
+  border-color: rgba(51, 86, 238,.58) !important;
   box-shadow: 0 0 0 1px rgba(13,60,252,.18), var(--qf-shadow-md) !important;
 }
 .qf-public-wft .price-card h3,
@@ -142,7 +142,7 @@
 .qf-public-wft .sec-shell .pill,
 .qf-public-wft .tag {
   color: #FFFFFF !important;
-  background: rgba(13,60,252,.16) !important;
+  background: rgba(51, 86, 238,.16) !important;
   border: 1px solid rgba(13,60,252,.42) !important;
 }
 .qf-public-wft .support-table th,
@@ -184,8 +184,8 @@
    the higher specificity + !important beats color-system's !important.
    ───────────────────────────────────────────────────────────────── */
 html[data-theme="light"] .qf-public-wft {
-  --accent: #0D3CFC;                    /* on light, brand blue reads as itself */
-  --accent-soft: rgba(13, 60, 252, .10);
+  --accent: #3356EE;                    /* on light, brand blue reads as itself */
+  --accent-soft: rgba(51, 86, 238, .10);
   --qf-wft-bg: var(--bg);
   --qf-wft-panel: var(--surface);
   --qf-wft-panel-2: var(--surface);
@@ -281,7 +281,7 @@ html[data-theme="light"] body.qf-public-wft .sec-shell .pill,
 html[data-theme="light"] body.qf-public-wft .tag {
   color: var(--accent) !important;
   background: var(--accent-soft) !important;
-  border-color: rgba(13, 60, 252, .28) !important;
+  border-color: rgba(51, 86, 238, .28) !important;
 }
 
 /* Table header tint (was rgba(255,255,255,.04) — invisible on white). */
@@ -345,7 +345,7 @@ html[data-theme="light"] body.qf-public-wft .btn-secondary:hover {
   box-shadow: var(--qf-shadow-md), inset 0 1px 0 rgba(255, 255, 255, 0.05) !important;
 }
 .qf-public-wft .price-card.featured {
-  border-color: rgba(13, 60, 252, 0.62) !important;
+  border-color: rgba(51, 86, 238, 0.62) !important;
   box-shadow: 0 0 0 1px rgba(13, 60, 252, 0.36), var(--qf-shadow-lift), var(--qf-shadow-md) !important;
 }
 

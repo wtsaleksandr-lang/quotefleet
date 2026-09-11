@@ -23,7 +23,7 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  color: #6E8BFF; /* was var(--accent): computes cobalt #0d3cfc on qf-wft — 2.6:1 */
+  color: #8DA2F9; /* was var(--accent): computes cobalt #0d3cfc on qf-wft — 2.6:1 */
   font-family: var(--font-mono, "JetBrains Mono", monospace);
   font-size: 11px;
   letter-spacing: 0.16em;
@@ -45,7 +45,7 @@
 }
 
 .qf-globe-head h2 .qf-globe-accent {
-  color: #6E8BFF; /* was var(--accent): computes cobalt on qf-wft — failed contrast */
+  color: #8DA2F9; /* was var(--accent): computes cobalt on qf-wft — failed contrast */
 }
 
 .qf-globe-head p {
@@ -149,7 +149,7 @@
 .qf-globe-stat b {
   font-size: clamp(18px, 2vw, 24px);
   font-weight: 800;
-  color: #6E8BFF; /* was var(--accent): computes cobalt on qf-wft — failed contrast */
+  color: #8DA2F9; /* was var(--accent): computes cobalt on qf-wft — failed contrast */
   letter-spacing: -0.01em;
 }
 .qf-globe-stat span {
@@ -175,8 +175,8 @@
   width: 15px;
   height: 15px;
   border-radius: 50%;
-  background: rgba(110, 139, 255, 0.12);
-  border: 1px solid rgba(110, 139, 255, 0.3);
+  background: rgba(141, 162, 249, 0.12);
+  border: 1px solid rgba(141, 162, 249, 0.3);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -192,13 +192,13 @@
   position: absolute;
   inset: -3px;
   border-radius: 50%;
-  border: 1px solid rgba(110, 139, 255, 0.1);
+  border: 1px solid rgba(141, 162, 249, 0.1);
 }
 .qfg-circle.active {
   width: 40px;
   height: 40px;
-  background: rgba(110, 139, 255, 0.22);
-  border: 1.5px solid #0d3cfc;
+  background: rgba(141, 162, 249, 0.22);
+  border: 1.5px solid #3356EE;
   box-shadow: var(--qf-shadow-lift);
 }
 .qfg-circle.active svg {
@@ -206,19 +206,19 @@
 }
 .qfg-circle.active::after {
   inset: -4px;
-  border-color: rgba(110, 139, 255, 0.3);
+  border-color: rgba(141, 162, 249, 0.3);
 }
 
 /* Hub (database) marker — always emphasised */
 .qfg-marker--hub .qfg-circle {
   width: 46px;
   height: 46px;
-  background: rgba(13, 60, 252, 0.22);
-  border: 1.5px solid #6e8bff;
+  background: rgba(51, 86, 238, 0.22);
+  border: 1.5px solid #8DA2F9;
   box-shadow: var(--qf-shadow-lift);
 }
 .qfg-marker--hub .qfg-circle::after {
-  border-color: rgba(110, 139, 255, 0.35);
+  border-color: rgba(141, 162, 249, 0.35);
 }
 .qfg-marker--hub .qfg-circle svg {
   width: 18px;
@@ -267,8 +267,8 @@
 }
 /* Hub card carries the brand tint */
 .qfg-marker--hub .qfg-card {
-  border-color: rgba(110, 139, 255, 0.3);
-  background: rgba(13, 60, 252, 0.14);
+  border-color: rgba(141, 162, 249, 0.3);
+  background: rgba(51, 86, 238, 0.14);
   max-width: 200px;
 }
 .qfg-marker--hub .qfg-card__stat {

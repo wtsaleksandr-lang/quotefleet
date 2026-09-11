@@ -96,8 +96,8 @@ body.qf-wft .qf-badge-tile {
 }
 body.qf-wft .qf-badge-tile:hover,
 body.qf-wft .qf-badge-tile:focus-visible {
-  border-color: rgba(110,139,255,.5);
-  background: rgba(110,139,255,.08);
+  border-color: rgba(141, 162, 249,.5);
+  background: rgba(141, 162, 249,.08);
   outline: none;
 }
 body.qf-wft .qf-badge-ico {
@@ -108,8 +108,8 @@ body.qf-wft .qf-badge-ico {
   align-items: center;
   justify-content: center;
   border-radius: 8px;
-  background: rgba(110,139,255,.1);
-  border: 1px solid rgba(110,139,255,.22);
+  background: rgba(141, 162, 249,.1);
+  border: 1px solid rgba(141, 162, 249,.22);
 }
 body.qf-wft .qf-badge-ico svg {
   width: 18px;
@@ -237,8 +237,8 @@ body.qf-wft .qf-badge.is-open .qf-badge-pop {
   body.qf-wft .qf-badge.is-open .qf-badge-tile {
     height: auto;
     justify-content: flex-start;
-    border-color: rgba(110,139,255,.5);
-    background: rgba(110,139,255,.08);
+    border-color: rgba(141, 162, 249,.5);
+    background: rgba(141, 162, 249,.08);
   }
   body.qf-wft .qf-badge.is-open .qf-badge-pop {
     display: block;

@@ -30,25 +30,25 @@ html.qf-ob-open body {
      DEFINITIONS (not color/background declarations), so the hardcoded-color
      guard doesn't scan them; the values mirror style.css's
      html[data-theme="light"] block verbatim. */
-  --bg:            #F7F8FA;
+  --bg:            #F8FAFC;
   --surface:       #FFFFFF;
-  --surface-2:     #F1F3F6;
-  --surface-3:     #E5E7EB;
-  --border:        #E5E7EB;
+  --surface-2:     #F2F4F7;
+  --surface-3:     #EAECF0;
+  --border:        #E2E8F0;
   --border-strong: #CBD0D6;
-  --ink:        #0B0F14;
-  --ink-soft:   #1E2530;
-  --muted:      #5A6470;
-  --muted-soft: #8F98A4;
-  --accent:        #0D3CFC;
-  --accent-strong: #0B34D6;
-  --accent-soft:   rgba(13, 60, 252, 0.08);
-  --accent-fill:   #0D3CFC;
+  --ink:        #020618;
+  --ink-soft:   #314158;
+  --muted:      #475467;
+  --muted-soft: #90A1B9;
+  --accent:        #3356EE;
+  --accent-strong: #2440C4;
+  --accent-soft:   rgba(51, 86, 238, 0.08);
+  --accent-fill:   #3356EE;
   --accent-ink:    #FFFFFF;
   /* Primary CTA on white = solid high-contrast brand blue with white text (the
      cream --cta-bg is a dark-surface treatment and washes out on white). */
-  --cta-bg:        #0D3CFC;
-  --cta-bg-hover:  #0B34D6;
+  --cta-bg:        #3356EE;
+  --cta-bg-hover:  #2440C4;
   --cta-text:      #FFFFFF;
   --error:      #B91C1C;
   --shadow-lg:  var(--qf-shadow-md);
@@ -75,7 +75,7 @@ html.qf-ob-open body {
   --ob-card-hover:  rgba(255, 255, 255, 0.74);
   --ob-card-solid:  rgba(255, 255, 255, 0.97);
   --ob-input-bg:    rgba(255, 255, 255, 0.90);
-  --ob-glow:        rgba(13, 60, 252, 0.35);
+  --ob-glow:        rgba(51, 86, 238, 0.35);
   --ob-shell-shadow: 0 24px 60px -16px rgba(15, 23, 42, 0.28);
   --ob-float-shadow: var(--qf-shadow-md);
   position: fixed;
@@ -110,10 +110,10 @@ html.qf-ob-open body {
    untouched. These are custom-property DEFINITIONS, exempt from both guards. */
 @media (prefers-color-scheme: dark) {
   .qf-ob-overlay {
-    --bg:            #0A0E1A;
-    --surface:       #111827;
-    --surface-2:     #1B2230;
-    --surface-3:     #2A3342;
+    --bg:            #0C111D;
+    --surface:       #131A28;
+    --surface-2:     #1A2333;
+    --surface-3:     #232E42;
     --border:        rgba(255, 255, 255, 0.14);
     --border-strong: rgba(255, 255, 255, 0.26);
     --ink:        #F4F6FA;

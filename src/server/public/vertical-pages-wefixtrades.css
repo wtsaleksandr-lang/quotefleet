@@ -124,5 +124,5 @@ html[data-theme="light"] .qf-vertical-wft .code,
 html[data-theme="light"] .qf-vertical-wft code {
   color: var(--accent);
   background: var(--accent-soft);
-  border-color: rgba(13, 60, 252, .20);
+  border-color: rgba(51, 86, 238, .20);
 }

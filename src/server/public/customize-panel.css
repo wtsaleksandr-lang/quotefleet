@@ -148,14 +148,14 @@
 .qf-ms-branded    { background: #16204a; }
 .qf-ms-branded::after    { background: #3f5cc0; }
 .qf-ms-grayscale  { background: #f2f3f5; }
-.qf-ms-grayscale::after  { background: #0D3CFC; }
+.qf-ms-grayscale::after  { background: #3356EE; }
 .qf-ms-standard   { background: #e8efe4; }
-.qf-ms-standard::after   { background: #0D3CFC; }
+.qf-ms-standard::after   { background: #3356EE; }
 .qf-ms-dark-routes,
 .qf-ms-dark_routes { background: #2c2c2c; }
 .qf-ms-dark_routes::after { background: #f4f6f8; height: 4px; }
 .qf-ms-soft       { background: #f4f1ea; }
-.qf-ms-soft::after       { background: #0D3CFC; }
+.qf-ms-soft::after       { background: #3356EE; }
 .qf-ms-satellite  { background: #4f6b3f; }
 .qf-ms-satellite::after  { background: #f4f6f8; height: 4px; }
 

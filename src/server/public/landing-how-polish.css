@@ -45,7 +45,7 @@
    ~2.8:1 on the dark background. Number goes light periwinkle (>=4.5:1); the
    subtle accent wash + ring from landing-home-fixes.css stay as-is. */
 body.qf-wft.landing-v2 .hiw-card .hiw-num {
-  color: #9aaeff !important;
+  color: #B4C2FC !important;
 }
 
 /* ── Media normalization: all four slots share the same horizontal frame ─────

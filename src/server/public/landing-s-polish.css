@@ -62,7 +62,7 @@
   line-height: 1.55;
 }
 .scheduler-card {
-  border: 1px solid rgba(110,139,255,.18);
+  border: 1px solid rgba(141, 162, 249,.18);
   border-radius: 24px;
   background: rgba(27,33,35,.96);
   box-shadow: var(--shadow-md);
@@ -93,7 +93,7 @@
   display: grid;
   place-items: center;
   border-radius: 999px;
-  background: rgba(110,139,255,.10);
+  background: rgba(141, 162, 249,.10);
   color: var(--accent);
   font: 800 11px var(--font-mono);
 }
@@ -129,14 +129,14 @@
   transition: all .2s ease;
 }
 .flow-card:hover {
-  border-color: rgba(110,139,255,.34);
+  border-color: rgba(141, 162, 249,.34);
 }
 
 /* Phase BL: serious CargoWise/Ship4wd-style landing brand polish. */
 .landing-v2 {
-  --accent: #6E8BFF;
-  --accent-strong: #0D3CFC;
-  --accent-soft: rgba(13, 60, 252, 0.10);
+  --accent: #8DA2F9;
+  --accent-strong: #B4C2FC;
+  --accent-soft: rgba(51, 86, 238, 0.10);
   --accent-ink: #ffffff;
   --success: #22c55e;
   background: #0a1018;
@@ -170,28 +170,28 @@
 }
 .landing-v2 .eyebrow,
 .landing-v2 .section-kicker {
-  color: #6E8BFF;
+  color: #8DA2F9;
 }
 .landing-v2 .eyebrow {
-  border-color: rgba(110, 139, 255, .20);
-  background: rgba(110, 139, 255, .055);
+  border-color: rgba(141, 162, 249, .20);
+  background: rgba(141, 162, 249, .055);
 }
 /* Primary CTA: solid WeFixTrades brand blue with white text — matches the
    site's established landing CTA (body.qf-wft .btn-primary in cleanup). */
 .landing-v2 .btn-primary {
-  background: #0D3CFC;
+  background: #3356EE;
   color: #ffffff;
-  border-color: #0D3CFC;
+  border-color: #3356EE;
   box-shadow: var(--qf-shadow-lift), inset 0 1px 0 rgba(255,255,255,.18);
 }
 .landing-v2 .btn-primary:hover {
-  background: #0B34D6;
-  border-color: #0B34D6;
+  background: #2440C4;
+  border-color: #2440C4;
   box-shadow: var(--qf-shadow-lift), inset 0 1px 0 rgba(255,255,255,.18);
 }
 .landing-v2 .demo-link,
 .landing-v2 a {
-  color: #6E8BFF;
+  color: #8DA2F9;
 }
 .landing-v2 .hero-quick-points span,
 .landing-v2 .flow-card,
@@ -204,31 +204,31 @@
   box-shadow: var(--qf-shadow-md), inset 0 1px 0 rgba(255,255,255,.045);
 }
 .landing-v2 .flow-card:hover {
-  border-color: rgba(110, 139, 255, .30);
+  border-color: rgba(141, 162, 249, .30);
 }
 .landing-v2 .flow-icon,
 .landing-v2 .scheduler-dot {
-  background: rgba(13,60,252,.10);
-  color: #6E8BFF;
+  background: rgba(51, 86, 238,.10);
+  color: #8DA2F9;
 }
 .landing-v2 .mini-rate-table b,
 .landing-v2 .scheduler-top span,
 .landing-v2 .mini-actions span,
 .landing-v2 .mini-checks span {
-  color: #6E8BFF;
+  color: #8DA2F9;
 }
 .landing-v2 .mini-browser div,
 .landing-v2 .mini-browser button,
 .landing-v2 .pdf-card button {
-  background: #0D3CFC;
+  background: #3356EE;
   color: #ffffff;
 }
 .landing-v2 .mini-result {
-  border-color: rgba(110,139,255,.20);
-  background: rgba(13,60,252,.07);
+  border-color: rgba(141, 162, 249,.20);
+  background: rgba(51, 86, 238,.07);
 }
 .landing-v2 .flow-arrow {
-  background: rgba(13,60,252,.12);
+  background: rgba(51, 86, 238,.12);
 }
 
 @media (prefers-reduced-motion: reduce) {

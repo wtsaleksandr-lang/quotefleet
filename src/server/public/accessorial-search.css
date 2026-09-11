@@ -156,7 +156,7 @@
 .qf-acc-filters button:hover,
 .qf-acc-filters button.active {
   border-color: var(--accent);
-  background: rgba(13, 60, 252, 0.1);
+  background: rgba(51, 86, 238, 0.1);
   color: var(--ink);
 }
 

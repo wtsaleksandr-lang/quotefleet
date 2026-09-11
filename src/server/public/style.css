@@ -9,7 +9,7 @@
    widget-style.css.
 
    Restyled to the WeFixTrades (DOSS) design language: self-hosted
-   Satoshi, brand blue accent (#0D3CFC), hairline borders. Dark mode
+   Satoshi, brand blue accent (#3356EE), hairline borders. Dark mode
    retains the warm near-black canvas (#161616) with cream CTAs.
    ─────────────────────────────────────────────────────────────── */
 
@@ -369,7 +369,7 @@ p { margin: 0; }
      Use: <span class="tag">[ Recognized as the best MVNE globally ]</span>
    ─────────────────────────────────────────────────────────────── */
 /* Eyebrow — WeFixTrades style: mono uppercase, letter-spaced, brand accent
-   on dark (#6E8BFF). No brackets (that was the old Effortel treatment). */
+   on dark (#8DA2F9). No brackets (that was the old Effortel treatment). */
 .tag {
   display: inline-block;
   font-family: var(--font-mono);
@@ -546,7 +546,7 @@ p { margin: 0; }
 .card.elevated { box-shadow: var(--shadow-md); }
 .card.glow {
   box-shadow: var(--glow-cyan);
-  border-color: rgba(13, 60, 252, 0.30);
+  border-color: rgba(51, 86, 238, 0.30);
 }
 .card-title {
   font-size: 16px; font-weight: 700; margin: 0 0 4px 0;
@@ -840,7 +840,7 @@ html[data-theme="light"] .hero h1 .accent {
   transition: all .2s ease;
   overflow: hidden;
 }.feature-card:hover {
-  border-color: rgba(13, 60, 252, 0.35);
+  border-color: rgba(51, 86, 238, 0.35);
   box-shadow: var(--qf-shadow-lift);
 }
 .feature-card .icon {
@@ -973,7 +973,7 @@ html[data-theme="light"] .hero h1 .accent {
   position: relative;
 }
 .price-card.featured {
-  border-color: rgba(13, 60, 252, 0.40);
+  border-color: rgba(51, 86, 238, 0.40);
   box-shadow: var(--glow-cyan);
 }
 .price-card.featured::after {
