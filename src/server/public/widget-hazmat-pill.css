@@ -65,7 +65,7 @@
   border: 1px solid var(--w-chip-inactive-border, var(--w-input-border, var(--w-border)));
   border-radius: 12px;
   background: var(--w-chip-inactive-bg, var(--w-input-bg, #E6E3E0));
-  color: var(--w-fg);
+  color: var(--w-input-text, var(--w-fg));
   font: inherit;
   font-size: 12.5px;
   font-weight: 650;
@@ -211,12 +211,12 @@
 }
 .qf-hz-opt:hover,
 .qf-hz-opt.active {
-  background: rgba(37, 99, 235, 0.08);
+  background: var(--w-input-bg-hover, #F2F4F7);
 }
 .qf-hz-opt-badge {
   font-size: 12.5px;
   font-weight: 800;
-  color: var(--w-fg);
+  color: var(--w-input-text, var(--w-fg));
 }
 .qf-hz-opt-desc {
   font-size: 11.5px;
