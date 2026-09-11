@@ -15,10 +15,11 @@
    THE WASH IS NOT A GRADIENT.  The design law forbids CSS gradients, so this
    card uses the SAME technique as the hero card (landing-home-grid.css §1): a
    flat `--surface-hero` base with the two generated rasters over it —
-   `--surface-hero-grain` tiled at its natural 192px size, `--surface-hero-image`
-   cropped with `cover`. Both are decorative, so a failed image leaves the card
-   on the flat tint rather than white. See the Wave 5 block at the foot of
-   style.css for how the rasters are made (scripts/make-hero-wash.mjs).
+   `--surface-hero-grain` tiled at its natural 192px size, and the wash itself
+   over that (cropped differently — see the card rule). Both are decorative, so
+   a failed image leaves the card on the flat tint rather than white. See the
+   Wave 5 block at the foot of style.css for how the rasters are made
+   (scripts/make-hero-wash.mjs).
 
    DESIGN LAW.  Tokens only; zero gradients, zero backdrop-filter, zero
    keyframes here; radii 6/8/12; spacing on {0,4,8,12,16,24,32,48,60,80,120};
@@ -30,11 +31,41 @@ html body.qf-wft.landing-v2 .qf-partner-section {
   padding: 0 0 80px !important;
 }
 
-/* The card. Anchored `50% 100%` like the hero card so the wash's deep base
-   stays pinned to the foot of the card at every crop width, and carrying the
-   same 1px `--border-strong` rim — at 375 the card is nearly the full viewport
-   and `cover` shows only the pale centre column, so the rim is what makes the
-   12px radius read as an edge. */
+/* The card.
+
+   THE CROP IS NOT `cover`, AND THAT IS A CONTRAST DECISION, NOT A TASTE ONE.
+   The wash is a centre-lit vignette: a light column down the middle, with the
+   tone falling away to deep left and right rails. Those rails are allowed to be
+   deep precisely because on the hero card they are STRUCTURALLY TEXT-FREE —
+   its copy is capped at 780px inside a card up to 2509px wide. This card is the
+   opposite shape: short, wide, and at 375 its headline spans nearly the whole
+   width. `background-size: cover` scales the 2560×1100 field to the card WIDTH,
+   which puts the rails and the deep bottom of the vertical ramp directly under
+   the text. Measured off the rendered page, over exactly the box the headline
+   and the CTA occupy, `--muted` against that ground came out:
+
+       light  3.68:1 @1440   3.19:1 @1024   3.94:1 @375
+       dark   4.41:1 @1440   4.22:1 @1024   4.62:1 @375
+
+   — below AA in five of six, and the dark ground peaked at luminance 0.0446
+   against the 0.0386 ceiling its own generator is capped to.
+
+   So the field is painted at 300% of the card width instead: it spans three
+   card-widths, `50% 0%` shows the middle third and the top band, and the only
+   slice that ever reaches this card is the light column the contrast floor was
+   built for. Re-measured the same way:
+
+       light  5.65:1 @1440   5.64:1 @1024   5.18:1 @375
+       dark   5.39:1 @1440   5.28:1 @1024   5.12:1 @375
+
+   Nothing is left uncovered: 300% of the width is ~129% of it in height
+   (1100/2560 × 3), always taller than this card, and `--surface-hero` sits
+   behind it regardless.
+
+   THE HAIRLINE IS THEN LOAD-BEARING. With the rails cropped out, the card's
+   edge is no longer drawn by the wash at all, so the 1px `--border-strong` rim
+   is what makes the 12px radius read as an edge against `--bg`. Same rim, same
+   reason, as the hero card at 375. */
 .qf-partner-card {
   display: flex;
   flex-direction: column;
@@ -45,8 +76,8 @@ html body.qf-wft.landing-v2 .qf-partner-section {
   background-color: var(--surface-hero);
   background-image: var(--surface-hero-grain), var(--surface-hero-image);
   background-repeat: repeat, no-repeat;
-  background-position: 0 0, 50% 100%;
-  background-size: auto, cover;
+  background-position: 0 0, 50% 0%;
+  background-size: auto, 300% auto;
   border: 1px solid var(--border-strong);
   border-radius: var(--radius);
   text-align: center;

@@ -141,6 +141,24 @@ html body.qf-wft .qf-marquee-head .qf-marquee-head__soft { color: var(--muted-so
   color: var(--muted);
 }
 
+/* `.visually-hidden` has NO global definition in this bundle — the only other
+   sheet that uses it ships its own scoped copy (landing-audience-toggle.css,
+   `.qf-shipper-hero`), and without one the label renders as literal text beside
+   the initials. It is needed here because the monogram is decorative shorthand:
+   two letters are not a company name, so the real name has to reach a screen
+   reader without being painted. Margin-free (and inset-free), like the other
+   copy, so the spacing guard's 8px ramp stays green. */
+.qf-marquee .visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  border: 0;
+  clip-path: inset(50%);
+  overflow: hidden;
+  white-space: nowrap;
+}
+
 /* ── Breakpoints ─────────────────────────────────────────────────────────── */
 
 @media (max-width: 1100px) {
