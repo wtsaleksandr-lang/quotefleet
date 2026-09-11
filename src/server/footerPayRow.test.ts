@@ -7,9 +7,12 @@
  *  1. DRIFT. The strip ships on three surfaces that do NOT share a template:
  *     the injected/server-rendered marketing chrome (PREMIUM_FOOTER), the
  *     static homepage (landing.html), and the directory subsite footer
- *     (directory/pages.ts). The homepage carries a LITERAL copy — the same trap
- *     the footer link columns already fell into, where landing.html quietly
- *     lost /partners, /importers and /manifest-privacy. Pin the copies equal.
+ *     (directory/pages.ts). The homepage used to carry a LITERAL copy — the
+ *     same trap the footer link columns already fell into, where landing.html
+ *     quietly lost /partners, /importers and /manifest-privacy. It now takes
+ *     the strip by injection like everything else, so these assertions run
+ *     against the RENDERED homepage (renderStaticPage) rather than the slot
+ *     file on disk, which is what a visitor actually receives.
  *
  *  2. AN UNTRUTHFUL PAYMENT MARK. The marks are a claim about what a customer
  *     can actually pay with, verified against the live Stripe account: every
@@ -24,7 +27,7 @@
 import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { DIRECTORY_DATA_SOURCES, FOOTER_PAY_ROW, PREMIUM_FOOTER } from './siteChrome.js';
+import { DIRECTORY_DATA_SOURCES, FOOTER_PAY_ROW, PREMIUM_FOOTER, renderStaticPage } from './siteChrome.js';
 
 const publicDir = resolve(process.cwd(), 'src/server/public');
 const srcDir = resolve(process.cwd(), 'src/server');
@@ -40,7 +43,7 @@ describe('footer accepted-payment + trust strip', () => {
   });
 
   it('ships BYTE-IDENTICAL on landing.html and the directory subsite footer', async () => {
-    const landing = await readFile(resolve(publicDir, 'landing.html'), 'utf8');
+    const landing = renderStaticPage('landing.html');
     expect(landing).toContain(FOOTER_PAY_ROW);
 
     // The directory footer interpolates the constant rather than copying it, so
@@ -59,7 +62,7 @@ describe('footer accepted-payment + trust strip', () => {
   });
 
   it('never shows a payment method we do not actually accept', async () => {
-    const landing = await readFile(resolve(publicDir, 'landing.html'), 'utf8');
+    const landing = renderStaticPage('landing.html');
     // PayPal: `paypal_payments` does not exist on this Canadian account at all.
     // Klarna/Afterpay: EUR/PLN/BRL or non-recurring, filtered out of our USD
     // subscription sessions. Discover: supported but unproven by any charge.
@@ -108,7 +111,7 @@ describe('footer accepted-payment + trust strip', () => {
     // Text only — a Stripe wordmark/logo would be a brand asset, and the strip
     // is specified as monochrome inline markup with no external requests.
     expect(FOOTER_PAY_ROW).not.toMatch(/<img/);
-    const landing = await readFile(resolve(publicDir, 'landing.html'), 'utf8');
+    const landing = renderStaticPage('landing.html');
     expect(landing).toContain('Powered by Stripe');
   });
 });

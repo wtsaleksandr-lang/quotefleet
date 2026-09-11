@@ -1885,3 +1885,45 @@ html[data-theme="dark"],
 /* Container — the measured 1328/24/1280 geometry. Declared here rather than
    edited in place at .container so the baseline line keys stay stable. */
 .container { max-width: var(--container-max); padding: 0 var(--container-gutter); }
+
+/* ── Wave 3: SITE CHROME TOKENS ───────────────────────────────────────────
+   The header and footer are now styled in exactly two places — nav-unify.css
+   for every injected page, and an EOF block in nav-ia.css that re-states the
+   same result at the homepage bundle's own specificity, because that bundle
+   carries seven sheets of `!important` chrome overrides this wave did not set
+   out to delete. Two rule blocks, ONE set of values: both read the tokens
+   below, so the header height or the footer ground changes here and nowhere
+   else.
+
+   Appended at EOF for the usual reason (baseline-protocol.md rule 1): the two
+   CI guards key on `file:line`, so editing the :root block at the top of this
+   file would renumber every baselined entry under it.
+   ───────────────────────────────────────────────────────────────────────── */
+:root {
+  /* 83px, flat, opaque. No border, no blur, no scroll-state change — the bar
+     looks the same at scrollTop 0 as it does at 4000. */
+  --chrome-h:          83px;
+  --chrome-h-compact:  64px;          /* below the 1023px collapse point */
+  --chrome-bg:         var(--surface);
+  --chrome-ink:        var(--ink);
+
+  /* Mega-menu / drawer: a 12px canvas shell with 4px of padding holding 8px
+     inner cards, so the 4px gap between cards IS the divider. No hairlines. */
+  --chrome-panel-radius: var(--radius);
+  --chrome-panel-pad:    var(--space-0-5);
+  --chrome-card-radius:  var(--radius-md);
+  --chrome-panel-bg:     var(--surface-2);
+  --chrome-card-bg:      var(--surface);
+
+  /* The footer sits on the dark surface in BOTH themes, so its ink cannot come
+     from --ink (near-black on light). Measured against #0C111D:
+     heading 18.02:1, link 12.69:1, quiet line 7.17:1, hover 7.78:1 — every
+     pair clears AA, and the hover uses the LIGHTENED accent because #3356EE is
+     only 3.33:1 on this ground. */
+  --footer-bg:      var(--surface-dark);
+  --footer-ink:     #F8FAFC;
+  --footer-link:    #CAD5E2;
+  --footer-quiet:   #90A1B9;
+  --footer-accent:  #8DA2F9;
+  --footer-rule:    rgba(226, 232, 240, 0.14);
+}

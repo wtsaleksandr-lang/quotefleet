@@ -256,9 +256,11 @@ html body.qf-wft .premium-footer .footer-brand .qf-footer-tagline {
 
 /* ═══════════════════════════════════════════════════════════════════════════
    NAV POLISH — the homepage half. nav-unify.css carries the same two fixes for
-   every other page; the homepage does not load it, so they are restated here at
-   `html body.qf-wft` specificity (this sheet is injected LAST by
-   landing-motion.js, so it wins the cascade without !important on layout).
+   every other page. The homepage loads that sheet too now (wave 3 put it on
+   the same injection path), but its own bundle outranks it on every
+   `body.qf-wft` selector, so they are restated here at `html body.qf-wft`
+   specificity (this sheet is injected LAST by landing-motion.js, so it wins
+   the cascade without !important on layout).
 
    1. NO BUTTON WRAPS ITS OWN LABEL. The homepage broke "For Carriers &/Brokers"
       across two lines at 1024–1032px — a narrower band than the directory
@@ -292,9 +294,9 @@ html body.qf-wft .site-actions .signin { white-space: nowrap; }
    Same arithmetic as the block at the foot of nav-unify.css: N=5 link columns,
    `5 mod 2 === 1`, so the last column spans both tracks and paginates its own
    links into two CSS columns. The four that remain wrap 2+2 with no remainder.
-   Restated here at `html body.qf-wft` specificity because the homepage does not
-   load nav-unify.css and landing-conversion.css / landing-home-fixes.css both
-   declare a one-track phone footer of their own. */
+   Restated here at `html body.qf-wft` specificity because the homepage bundle
+   outranks nav-unify.css: landing-conversion.css and landing-home-fixes.css
+   both declare a one-track phone footer of their own. */
 @media (max-width: 640px) {
   html body.qf-wft .premium-footer .premium-footer-inner {
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -336,4 +338,216 @@ html body.qf-wft .site-actions .signin { white-space: nowrap; }
      `display: inline-flex !important`, which no amount of specificity beats.
      Same reason the `.signin` rule at the top of this file carries one. */
   html body.qf-wft .site-actions .btn-secondary { display: none !important; }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   WAVE 3 — THE CHROME, ON THE DESIGN SYSTEM: the homepage half.
+
+   WHY THIS BLOCK EXISTS AT ALL. The markup is now single-sourced — the
+   homepage declares `<!--qf:site-header-->` / `<!--qf:site-footer-->` and
+   siteChrome.ts fills them, exactly like every other static page, and it loads
+   nav-unify.css for the first time. The CSS is NOT single-sourced yet: seven
+   homepage sheets (landing-conversion, landing-home-fixes, landing-glass,
+   landing-nav-consistency, landing-footer-polish, landing-wefixtrades and its
+   cleanup) style `.site-header` / `.premium-footer` at `body.qf-wft` and
+   `body.qf-wft.landing-v2` specificity, most of it `!important`, and one of
+   them does `all: unset` on both elements. Unpicking that is a CSS
+   consolidation wave of its own; doing it inside a markup-dedup wave would
+   mean deleting rules from seven sheets whose literals four VALUE tests pin.
+
+   So the homepage gets the same RESULT stated at the homepage bundle's own
+   specificity — and, critically, from the SAME VALUES: every declaration below
+   reads the --chrome-* / --footer-* tokens defined once at the foot of
+   style.css, which nav-unify.css also reads. Change the header height or the
+   footer ground there and both surfaces move together. There is no second
+   number to keep in step.
+
+   The selector lists are deliberately explicit rather than clever: one entry
+   per specificity the sheets below us actually use, so this wins by stated
+   rule instead of by load-order luck. Removing a competing sheet's chrome
+   rules later simply makes an entry here redundant; nothing breaks.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ── Header: 83px, flat, opaque, no border, no blur, no scroll state ─────── */
+html body.qf-wft .site-header,
+html body.qf-wft.landing-v2 .site-header,
+html[data-theme="light"] body.qf-wft.landing-v2 .site-header,
+html:not([data-theme="light"]) body.qf-wft.landing-v2 .site-header {
+  display: block !important;
+  position: sticky !important;
+  top: 0 !important;
+  z-index: 70 !important;
+  padding: 0 !important;
+  background: var(--chrome-bg) !important;
+  border: 0 !important;
+  border-bottom: 0 !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+  transition: none !important;
+}
+html body.qf-wft .site-header-inner,
+html body.qf-wft.landing-v2 .site-header-inner,
+html[data-theme="light"] body.qf-wft.landing-v2 .site-header-inner,
+html:not([data-theme="light"]) body.qf-wft.landing-v2 .site-header-inner {
+  display: flex !important;
+  align-items: center !important;
+  max-width: var(--container-max) !important;
+  margin: 0 auto !important;
+  min-height: var(--chrome-h) !important;
+  padding: 0 var(--container-gutter) !important;
+  gap: var(--space-3) !important;
+  justify-content: flex-start !important;
+  background: transparent !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+}
+html body.qf-wft .site-brand { color: var(--chrome-ink) !important; }
+
+@media (max-width: 1023px) {
+  html body.qf-wft .site-header-inner,
+  html body.qf-wft.landing-v2 .site-header-inner,
+  html[data-theme="light"] body.qf-wft.landing-v2 .site-header-inner,
+  html:not([data-theme="light"]) body.qf-wft.landing-v2 .site-header-inner {
+    min-height: var(--chrome-h-compact) !important;
+    padding: 0 var(--space-2) !important;
+    gap: var(--space-1-5) !important;
+    justify-content: space-between !important;
+  }
+  html body.qf-wft .site-actions { margin-left: auto !important; }
+  html[data-theme="light"] body.qf-wft .site-burger { color: var(--chrome-ink) !important; }
+}
+@media (min-width: 641px) and (max-width: 1023px) {
+  html body.qf-wft .site-header-inner,
+  html body.qf-wft.landing-v2 .site-header-inner {
+    padding: 0 var(--container-gutter) !important;
+  }
+}
+
+/* ── Mega-menu panel: 12px shell, 4px padding, 8px cards, gap dividers ──── */
+html body.qf-wft .nav-dd-panel,
+html[data-theme="light"] body.qf-wft .nav-dd-panel,
+html:not([data-theme="light"]) body.qf-wft .nav-dd-panel {
+  padding: var(--chrome-panel-pad) !important;
+  gap: var(--chrome-panel-pad) !important;
+  background: var(--chrome-panel-bg) !important;
+  border: 0 !important;
+  border-radius: var(--chrome-panel-radius) !important;
+  box-shadow: var(--qf-shadow-md) !important;
+  backdrop-filter: none !important;
+}
+html body.qf-wft .nav-dd-group {
+  padding: var(--space-1-5) !important;
+  background: var(--chrome-card-bg) !important;
+  border-radius: var(--chrome-card-radius) !important;
+  gap: 0 !important;
+}
+html body.qf-wft .nav-dd-head { padding: 0 var(--space-1) !important; margin: 0 0 var(--space-1) !important; }
+html body.qf-wft .nav-dd-panel a { padding: var(--space-1) !important; border-radius: var(--radius-sm) !important; }
+html body.qf-wft .nav-dd-panel a:hover,
+html body.qf-wft .nav-dd-panel a:focus-visible { color: var(--accent) !important; background: var(--chrome-panel-bg) !important; }
+
+/* ── Mobile drawer ──────────────────────────────────────────────────────── */
+@media (max-width: 1023px) {
+  html body.qf-wft .site-mobile-menu:not([hidden]),
+  html[data-theme="light"] body.qf-wft .site-mobile-menu:not([hidden]) {
+    gap: var(--chrome-panel-pad) !important;
+    padding: var(--chrome-panel-pad) !important;
+    margin: var(--space-1) var(--space-2) var(--space-2) !important;
+    background: var(--chrome-panel-bg) !important;
+    border: 0 !important;
+    border-radius: var(--chrome-panel-radius) !important;
+    box-shadow: var(--qf-shadow-md) !important;
+  }
+  html body.qf-wft .site-mobile-menu .mm-group {
+    border-top: 0 !important;
+    background: var(--chrome-card-bg) !important;
+    border-radius: var(--chrome-card-radius) !important;
+    padding: var(--space-1) 0 !important;
+  }
+  html body.qf-wft .site-mobile-menu .mm-flat,
+  html body.qf-wft .site-mobile-menu .mm-account {
+    border-top: 0 !important;
+    margin-top: 0 !important;
+    padding-top: var(--space-1-5) !important;
+    background: var(--chrome-card-bg) !important;
+    border-radius: var(--chrome-card-radius) !important;
+  }
+}
+
+/* -- Footer: the dark band, as the same TOKEN ISLAND ---------------------
+   Identical device to nav-unify.css: re-point --ink / --ink-soft / --muted /
+   --border / --accent ON the footer element so the whole subtree recolours,
+   including the homepage skin's var(--muted) !important rules, which no
+   per-element override here could outrank, and the payment trust list, which
+   this sheet must not open a rule block for. */
+html body.qf-wft .premium-footer,
+html body.qf-wft.landing-v2 .premium-footer,
+html[data-theme="light"] body.qf-wft .premium-footer {
+  --ink: var(--footer-ink);
+  --ink-soft: var(--footer-link);
+  --muted: var(--footer-quiet);
+  --border: var(--footer-rule);
+  --border-strong: var(--footer-rule);
+  --accent: var(--footer-accent);
+  display: block !important;
+  background: var(--footer-bg) !important;
+  border-top: 0 !important;
+  color: var(--footer-ink) !important;
+}
+html body.qf-wft .premium-footer .premium-footer-inner { max-width: var(--container-max) !important; }
+html body.qf-wft .premium-footer .qf-footer-wordmark { color: var(--footer-ink) !important; }
+html body.qf-wft .premium-footer .footer-brand .qf-footer-tagline { color: var(--footer-link) !important; }
+html body.qf-wft .premium-footer .footer-col h4 { color: var(--footer-ink) !important; }
+html body.qf-wft .premium-footer .footer-col a { color: var(--footer-link) !important; }
+html body.qf-wft .premium-footer .footer-col a:hover,
+html body.qf-wft .premium-footer .footer-col a:focus-visible { color: var(--footer-accent) !important; }
+html body.qf-wft .premium-footer .qf-footer-trustbar {
+  max-width: var(--container-max) !important;
+  border-top: 1px solid var(--footer-rule) !important;
+}
+html body.qf-wft .premium-footer .qf-footer-trustbar li { color: var(--footer-link) !important; }
+html body.qf-wft .premium-footer .footer-bottom {
+  max-width: var(--container-max) !important;
+  border-top: 1px solid var(--footer-rule) !important;
+  color: var(--footer-quiet) !important;
+}
+html body.qf-wft .premium-footer .footer-bottom .qf-foot-operator,
+html body.qf-wft .premium-footer .footer-bottom strong,
+html body.qf-wft .premium-footer .footer-bottom span { color: var(--footer-quiet) !important; }
+html body.qf-wft .premium-footer .footer-bottom .qf-foot-oog { color: var(--footer-link) !important; }
+html body.qf-wft .premium-footer .footer-bottom .qf-foot-oog:hover,
+html body.qf-wft .premium-footer .footer-bottom .qf-foot-oog:focus-visible { color: var(--footer-accent) !important; }
+html body.qf-wft .premium-footer .qf-footer-payrow { border-top: 1px solid var(--footer-rule) !important; }
+html body.qf-wft .premium-footer .qf-paymark,
+html body.qf-wft .premium-footer .qf-pm { color: var(--footer-ink) !important; fill: currentColor !important; }
+
+/* ── The footer track ladder, keyed on the count the markup declares ─────
+   qf-footer-ladder: columns=5 wide=5 mid=3 phone=2 span-last=yes
+   Derived by footerTrackLadder(FOOTER_COLUMNS.length) in siteChrome.ts and
+   re-checked against this sentinel by siteChromeSingleSource.test.ts. Same
+   arithmetic, same numbers, same `data-cols` key as nav-unify.css — stated
+   here at homepage specificity because landing-conversion.css and
+   landing-home-fixes.css both declare a phone footer of their own. */
+html body.qf-wft .premium-footer .premium-footer-inner[data-cols="5"] {
+  grid-template-columns: repeat(5, minmax(0, 1fr)) !important;
+}
+@media (max-width: 1100px) {
+  html body.qf-wft .premium-footer .premium-footer-inner[data-cols="5"] {
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  }
+}
+@media (max-width: 640px) {
+  html body.qf-wft .premium-footer .premium-footer-inner[data-cols="5"] {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    column-gap: 16px !important;
+    row-gap: 24px !important;
+  }
+  html body.qf-wft .premium-footer .premium-footer-inner[data-cols-odd] > .footer-col:last-child {
+    grid-column: 1 / -1 !important;
+    display: block !important;
+    columns: 2 !important;
+    column-gap: 16px !important;
+  }
 }

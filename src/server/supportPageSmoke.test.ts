@@ -15,7 +15,7 @@ describe('public support page', () => {
     // dropdown + mobile hamburger + premium footer), registered ahead of the
     // express.static handler so the skinned HTML wins over the raw file.
     expect(app).toContain("['/support', 'support.html']");
-    expect(app).toContain('applyFullSiteHeader(html)');
+    expect(app).toContain('applyFullSiteHeader(html, file)');
     expect(app.indexOf("['/support', 'support.html']")).toBeLessThan(app.indexOf('express.static'));
   });
 

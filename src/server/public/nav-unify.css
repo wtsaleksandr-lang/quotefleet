@@ -795,3 +795,234 @@ html[data-theme="light"] .nav-dd-panel {
   .premium-footer-inner > .footer-col:last-child h4 { column-span: all; }
   .premium-footer-inner > .footer-col:last-child a { break-inside: avoid; }
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   WAVE 3 — THE CHROME, ON THE DESIGN SYSTEM.
+
+   Appended at EOF for the reason every other block here is: the spacing and
+   colour guards baseline by FILE:LINE, so a mid-file edit renumbers the 18
+   tolerated entries above and turns a green run red for no reason
+   (docs/design-refactor/baseline-protocol.md rule 1). Everything below is
+   additive and, at equal specificity, later — so it is what actually renders.
+
+   WHAT CHANGES, AND WHY EACH ONE
+   • THE HEADER IS A BAR, NOT A FLOATING CARD. It was a 52px pill inset 12px
+     from the top with a 14px radius, a 1px border and a shadow, sitting on a
+     transparent strip — five decorative decisions doing the work of one. It is
+     now 83px, flat, opaque, full-bleed, with NO border, NO blur and NO
+     scroll-state change: identical at scrollTop 0 and 4000. A header that
+     restyles itself as you scroll is a second header to design, test and get
+     wrong; there is one now.
+   • THE OPAQUE GROUND IS WHAT MAKES IT LEGIBLE. The old bar was translucent
+     over whatever section happened to be under it, so its contrast was a
+     function of the page. On --surface the ink pairs are fixed: 20.16:1 for
+     the brand, 7.69:1 for a nav label, 5.67:1 for the accent (light), and
+     18.02 / 7.17 / 7.78:1 for the same three on the dark theme's #0C111D.
+   • THE MEGA-PANEL'S DIVIDERS ARE GAPS. A 12px shell with 4px of padding and
+     4px between 8px inner cards: every line you see between two groups is the
+     canvas showing through, not a border. One shadow (--qf-shadow-md), no
+     second border, no blur.
+   • THE FOOTER SITS ON #0C111D IN BOTH THEMES, so its ink comes from the
+     --footer-* tokens rather than --ink (which is near-black on light and
+     would be invisible). Values and their measured ratios: style.css EOF.
+
+   WHAT DOES NOT CHANGE — the interaction contract is untouched. The single
+   1023px collapse point, #site-burger / #site-mobile-menu and their
+   aria-expanded/aria-controls wiring, .qf-theme-btn[aria-pressed], the
+   .site-header stickiness directory/pages.ts depends on, #year, and every
+   href. Selection/focus stays a 2px border-colour swap so nothing reflows.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ── Header shell ───────────────────────────────────────────────────────── */
+.site-header {
+  position: sticky;
+  top: 0;
+  z-index: 70;
+  padding: 0;
+  background: var(--chrome-bg);
+  border: 0;
+  box-shadow: none;
+  backdrop-filter: none;
+  transition: none;
+}
+.site-header-inner {
+  max-width: var(--container-max);
+  margin: 0 auto;
+  min-height: var(--chrome-h);
+  padding: 0 var(--container-gutter);
+  gap: var(--space-3);
+  justify-content: flex-start;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
+html[data-theme="light"] .site-header-inner { box-shadow: none; }
+
+/* Below the ONE collapse point the bar is brand + theme + burger, so it takes
+   the compact height and the gutter phones actually have. */
+@media (max-width: 1023px) {
+  .site-header { padding: 0; background: var(--chrome-bg); }
+  .site-header-inner {
+    max-width: var(--container-max);
+    margin: 0 auto;
+    min-height: var(--chrome-h-compact);
+    padding: 0 var(--space-2);
+    gap: var(--space-1-5);
+    justify-content: space-between;
+    background: transparent;
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+  }
+  html[data-theme="light"] .site-header-inner { background: transparent; }
+  .site-mobile-menu:not([hidden]) { margin: var(--space-1) var(--space-2) var(--space-2); }
+}
+@media (min-width: 641px) and (max-width: 1023px) {
+  .site-header { padding: 0; }
+  .site-header-inner {
+    max-width: var(--container-max);
+    margin: 0 auto;
+    padding: 0 var(--container-gutter);
+    background: transparent;
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+  }
+  html[data-theme="light"] .site-header-inner { background: transparent; box-shadow: none; }
+  .site-mobile-menu:not([hidden]) { margin: var(--space-1) var(--container-gutter) var(--space-2); }
+}
+
+/* ── Mega-menu panel: 12px shell, 4px padding, 8px cards, gap dividers ──── */
+.nav-dd-panel {
+  padding: var(--chrome-panel-pad);
+  gap: var(--chrome-panel-pad);
+  background: var(--chrome-panel-bg);
+  border: 0;
+  border-radius: var(--chrome-panel-radius);
+  box-shadow: var(--qf-shadow-md);
+  backdrop-filter: none;
+}
+html[data-theme="light"] .nav-dd-panel { box-shadow: var(--qf-shadow-md); }
+.nav-dd-group {
+  padding: var(--space-1-5);
+  background: var(--chrome-card-bg);
+  border-radius: var(--chrome-card-radius);
+  gap: 0;
+}
+.nav-dd-head { padding: 0 var(--space-1); margin: 0 0 var(--space-1); }
+.nav-dd-panel a { padding: var(--space-1); border-radius: var(--radius-sm); }
+.nav-dd-panel a:hover,
+.nav-dd-panel a:focus-visible { color: var(--accent); background: var(--chrome-panel-bg); }
+.nav-dd-sub { padding: var(--space-1) var(--space-1) 0; }
+
+/* ── Mobile drawer: the same shell/card idiom, no hairlines ─────────────── */
+.site-mobile-menu:not([hidden]) {
+  gap: var(--chrome-panel-pad);
+  padding: var(--chrome-panel-pad);
+  background: var(--chrome-panel-bg);
+  border: 0;
+  border-radius: var(--chrome-panel-radius);
+  box-shadow: var(--qf-shadow-md);
+}
+.site-mobile-menu .mm-group {
+  border-top: 0;
+  background: var(--chrome-card-bg);
+  border-radius: var(--chrome-card-radius);
+  padding: var(--space-1) 0;
+}
+.site-mobile-menu .mm-flat,
+.site-mobile-menu .mm-account {
+  border-top: 0;
+  margin-top: 0;
+  padding-top: var(--space-1-5);
+  background: var(--chrome-card-bg);
+  border-radius: var(--chrome-card-radius);
+}
+.site-mobile-menu a { border-radius: var(--radius-md); }
+
+/* -- Footer: the dark band, as a TOKEN ISLAND ----------------------------
+   The footer sits on #0C111D in BOTH themes, so every token it inherits from
+   :root is wrong on light: --ink is near-black, --border is #E2E8F0 (a bright
+   hairline on a near-black ground) and --muted lands at 3.1:1 there.
+   Re-pointing those tokens ON the footer element fixes the whole subtree in
+   one place -- including rules in OTHER sheets written as var(--muted) and
+   carrying !important, which no per-element override here could reach. It also
+   means this block never has to name a class it must not touch: the payment
+   trust list's deliberate one-per-line stack (style.css:1698, pinned by
+   navInformationArchitecture.test.ts) recolours without a rule block of its
+   own, which is exactly what that rule is protecting.
+
+   Measured on #0C111D: heading/ink 18.02:1, link 12.69:1, quiet 7.17:1, hover
+   accent 7.78:1 -- all AA, and the accent is the LIGHTENED one because #3356EE
+   is 3.33:1 on this ground. */
+.premium-footer {
+  --ink: var(--footer-ink);
+  --ink-soft: var(--footer-link);
+  --muted: var(--footer-quiet);
+  --border: var(--footer-rule);
+  --border-strong: var(--footer-rule);
+  --accent: var(--footer-accent);
+  background: var(--footer-bg);
+  border-top: 0;
+  color: var(--footer-ink);
+  padding: var(--space-7-5) var(--container-gutter) var(--space-4);
+}
+.premium-footer-inner { max-width: var(--container-max); }
+.premium-footer .qf-footer-wordmark { color: var(--footer-ink); }
+.premium-footer .footer-brand .qf-footer-tagline { color: var(--footer-link); }
+.premium-footer .footer-col h4 { color: var(--footer-ink); }
+.premium-footer .footer-col a { color: var(--footer-link); }
+.premium-footer .footer-col a:hover,
+.premium-footer .footer-col a:focus-visible { color: var(--footer-accent); }
+.premium-footer .qf-footer-trustbar {
+  max-width: var(--container-max);
+  border-top: 1px solid var(--footer-rule);
+}
+.premium-footer .qf-footer-trustbar li { color: var(--footer-link); }
+.premium-footer .footer-bottom {
+  max-width: var(--container-max);
+  border-top: 1px solid var(--footer-rule);
+  color: var(--footer-quiet);
+}
+.premium-footer .footer-bottom .qf-foot-oog { color: var(--footer-link); }
+.premium-footer .footer-bottom .qf-foot-oog:hover,
+.premium-footer .footer-bottom .qf-foot-oog:focus-visible { color: var(--footer-accent); }
+.premium-footer .qf-footer-payrow { border-top: 1px solid var(--footer-rule); }
+.premium-footer .qf-paymark,
+.premium-footer .qf-pm { color: var(--footer-ink); fill: currentColor; }
+
+/* ── The footer track ladder, keyed on the count the markup declares ─────
+   qf-footer-ladder: columns=5 wide=5 mid=3 phone=2 span-last=yes
+
+   siteChrome.ts builds the columns from FOOTER_COLUMNS and writes their COUNT
+   into `data-cols` (plus `data-cols-odd` when the count is odd), and
+   footerTrackLadder() derives the three track counts from it: T is legal only
+   where `N mod T !== 1`, because a remainder of one strands a column alone on
+   the last row (DESIGN-SYSTEM.md §8). The sentinel line above states what that
+   function returns for today's array; siteChromeSingleSource.test.ts reads it
+   back and fails, naming the sheet and the required numbers, the moment a
+   column is added or removed. That is the whole point: the count used to be
+   hard-coded here AND in the markup AND again in nav-ia.css, so the three
+   could disagree silently — and did.
+
+   For N=5 the ladder is 5 -> 3 -> 2-with-the-last-column-spanning. Keying the
+   rules on `[data-cols="5"]` means a changed count stops matching them rather
+   than inheriting a grid derived for a different number. */
+.premium-footer-inner[data-cols="5"] { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+@media (max-width: 1100px) {
+  .premium-footer-inner[data-cols="5"] { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+@media (max-width: 640px) {
+  .premium-footer-inner[data-cols="5"] {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    column-gap: 16px;
+    row-gap: 24px;
+  }
+  .premium-footer-inner[data-cols-odd] > .footer-col:last-child {
+    grid-column: 1 / -1;
+    display: block;
+    columns: 2;
+    column-gap: 16px;
+  }
+}

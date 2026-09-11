@@ -73,68 +73,30 @@ html[data-theme="light"] body.qf-wft .hero.visual-hero::before {
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
-   2 — TOP NAV → ultraThin frosted glass.
-   Dark desktop pill is already glass (landing-s-polish / landing-home-fixes);
-   light mode was force-flattened to solid white by cleanup.css (~L1275-1289) and
-   the Solutions dropdown to solid --surface (~L1304-1310). Re-glass both, at
-   matching specificity + !important so this later sheet wins.
+   2 — TOP NAV: RETIRED (design refactor wave 3).
+
+   This section re-glassed the header pill and the dropdown panel — translucent
+   ground, 1px border, glass shadow, at matching specificity + !important so it
+   would beat the cleanup sheets that had flattened them.
+
+   The design system now specifies the opposite, and for a reason the glass
+   could not answer: a translucent bar has whatever contrast the section
+   underneath it happens to give it, so its legibility was a property of the
+   page rather than of the bar. The chrome is a flat, opaque 83px bar with no
+   border, no blur and no scroll-state change, and the dropdown is a 12px
+   canvas shell whose dividers are 4px gaps rather than hairlines. Both are
+   stated once, from the --chrome-* tokens at the foot of style.css, in
+   nav-unify.css (every injected page) and nav-ia.css (the homepage).
+
+   Deleting the rules rather than out-ranking them is deliberate: they carried
+   !important at html[data-theme] body.qf-wft.landing-v2 specificity, so
+   leaving them in place would have forced every later chrome rule into a
+   specificity race it can only win by accident of load order — which is how
+   the homepage header came out translucent on the first pass of this wave.
+
+   KEPT from this sheet: the --glass-* tokens (sections 1, 3+ still use them),
+   the light-mode burger contrast fix in section 8, and the load-order role.
    ═══════════════════════════════════════════════════════════════════════════ */
-
-/* Dark desktop pill: unify the blur toward the canonical ultraThin (20 / 1.4). */
-html:not([data-theme="light"]) body.qf-wft.landing-v2 .site-header-inner {
-  background: var(--glass-ultra-bg) !important;
-  border: 1px solid var(--glass-ultra-brd) !important;
-  box-shadow: var(--glass-shadow) !important;
-}
-
-/* Light desktop: the floating pill (.site-header-inner) becomes frosted white;
-   the outer bar goes transparent so the pill floats (cleanup forced it white). */
-html[data-theme="light"] body.qf-wft.landing-v2 .site-header {
-  background: transparent !important;
-  border-bottom: 0 !important;
-  box-shadow: none !important;
-}
-html[data-theme="light"] body.qf-wft.landing-v2 .site-header-inner {
-  background: var(--glass-ultra-bg) !important;
-  border: 1px solid var(--glass-ultra-brd) !important;
-  box-shadow: var(--glass-shadow) !important;
-}
-
-/* Mobile (≤640px): the header ITSELF is the full-width frosted bar and the inner
-   is transparent (landing-home-fixes). Re-assert that split in light mode. */
-@media (max-width: 640px) {
-  html[data-theme="light"] body.qf-wft.landing-v2 .site-header {
-    background: var(--glass-ultra-bg) !important;
-    border-bottom: 1px solid var(--glass-ultra-brd) !important;
-    box-shadow: none !important;
-  }
-  html[data-theme="light"] body.qf-wft.landing-v2 .site-header-inner {
-    background: transparent !important;
-    border: 0 !important;
-    box-shadow: none !important;
-  }
-}
-
-/* Solutions dropdown panel → ultraThin frosted (light was solid --surface). */
-html[data-theme="light"] body.qf-wft .nav-dd-panel {
-  background: var(--glass-ultra-bg) !important;
-  border: 1px solid var(--glass-ultra-brd) !important;
-  box-shadow: var(--glass-shadow) !important;
-}
-/* Nav / dropdown solid fallback where backdrop-filter is unsupported. */
-html[data-theme="light"] body.qf-wft.landing-v2 .site-header-inner,
-html[data-theme="light"] body.qf-wft .nav-dd-panel {
-  background: var(--glass-ultra-solid) !important;
-}
-html:not([data-theme="light"]) body.qf-wft.landing-v2 .site-header-inner,
-html:not([data-theme="light"]) body.qf-wft .nav-dd-panel {
-  background: var(--glass-ultra-solid) !important;
-}
-@media (max-width: 640px) {
-  html[data-theme="light"] body.qf-wft.landing-v2 .site-header {
-    background: var(--glass-ultra-solid) !important;
-  }
-}
 
 /* ═══════════════════════════════════════════════════════════════════════════
    3 — HERO FINDER + SHIPPER SEARCH shells → thin glass.

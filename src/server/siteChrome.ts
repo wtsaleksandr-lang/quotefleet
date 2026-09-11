@@ -129,6 +129,9 @@
  * compaction step in nav-unify.css was extended to cover it), and the FOOTER
  * copy carries every width, phones included.
  */
+import { readFileSync } from 'node:fs';
+import { resolve as resolvePath } from 'node:path';
+
 export const OOG_QUOTE_HREF = '/tools/heavy-haul-quote';
 export const HEADER_OOG_CTA = `<a class="site-oog" href="${OOG_QUOTE_HREF}">OOG quote</a>`;
 export const FOOTER_OOG_CTA = `<a class="qf-foot-oog" href="${OOG_QUOTE_HREF}">Oversize or out-of-gauge load? Get an OOG trucking quote <span class="arr" aria-hidden="true">→</span></a>`;
@@ -189,6 +192,45 @@ export const SITE_MOBILE_MENU_HTML = `<div class="site-mobile-menu" id="site-mob
   + `<a class="mm-account" href="/login">Sign in</a>`
   + `</div>`;
 
+/**
+ * THE CHROME SLOTS — the single anchor every page hands the injector.
+ *
+ * WHAT THIS REPLACED, AND WHY IT HAD TO GO. Until this wave the injector found
+ * its insertion point by REGEX over the page's own duplicated markup:
+ *
+ *     html.replace(/<header class="topnav">[\s\S]*?<\/header>/, FULL_SITE_HEADER)
+ *
+ * which means every static page had to keep a full, throwaway copy of a header
+ * and a footer purely so the regex had something to match. Nineteen files
+ * carried one. That is not a source of truth, it is nineteen chances to drift,
+ * and it drifted: `landing.html` is served by a raw `res.sendFile`, so the
+ * regex never ran on it at all and its embedded copy — the one real visitors
+ * saw — was free to diverge from the constants below. It did.
+ *
+ * Worse, the failure is SILENT in both directions. Rename a class in a page and
+ * the regex stops matching: the page renders its stale local copy and no error
+ * is raised. Forget to strip a local copy and the page renders the local one
+ * AND the injected one: two headers, still no error.
+ *
+ * So the anchor is now an EMPTY HTML COMMENT the page declares deliberately,
+ * and the count is CHECKED rather than assumed — exactly one header slot, and
+ * exactly one footer slot on the variants that take a footer. Anything else
+ * throws `SiteChromeError`, at request time AND at boot (see
+ * `verifySiteChromeSlots`, called from createApp), so "no chrome" and "double
+ * chrome" are both loud, immediate failures instead of a visual regression
+ * somebody notices a week later.
+ */
+export const SITE_HEADER_SLOT = '<!--qf:site-header-->';
+export const SITE_FOOTER_SLOT = '<!--qf:site-footer-->';
+
+/** Raised when a page's chrome slots do not match what the variant requires. */
+export class SiteChromeError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'SiteChromeError';
+  }
+}
+
 export const THEME_TOGGLE_BTN = `<button type="button" class="qf-theme-btn" aria-label="Toggle light/dark theme" aria-pressed="false" title="Toggle theme"><svg class="qf-ico-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg><svg class="qf-ico-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg></button>`;
 
 export const SITE_BURGER_BTN = `<button type="button" class="site-burger" id="site-burger" aria-label="Open menu" aria-expanded="false" aria-controls="site-mobile-menu"><svg class="ico-open" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><line x1="4" y1="7" x2="20" y2="7"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="17" x2="20" y2="17"/></svg><svg class="ico-close" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><line x1="6" y1="6" x2="18" y2="18"/><line x1="18" y1="6" x2="6" y2="18"/></svg></button>`;
@@ -198,10 +240,43 @@ export const FULL_SITE_HEADER = `<header class="site-header">
     <div class="site-header-inner">
       <a href="/" class="site-brand" aria-label="QuoteFleet home"><span class="site-logo" aria-hidden="true"><img class="qf-brand-mark" src="/brand/mark-keys-ondark.png" alt="QuoteFleet" width="28" height="30" decoding="async"></span>QuoteFleet</a>
       ${SITE_NAV_HTML}
-      <div class="site-actions">${HEADER_OOG_CTA}${THEME_TOGGLE_BTN}<a class="signin" href="/login">Sign in</a><a class="btn btn-secondary" href="/w/demo">View demo <span class="arr">→</span></a>${SITE_BURGER_BTN}</div>
+      <div class="site-actions">${HEADER_OOG_CTA}${THEME_TOGGLE_BTN}<a class="signin" href="/login">Sign in</a><a class="btn btn-secondary" href="/w/demo" data-aud-cta>View demo <span class="arr">→</span></a>${SITE_BURGER_BTN}</div>
     </div>
     ${SITE_MOBILE_MENU_HTML}
   </header>`;
+
+/**
+ * THE AUTH BAR — the second, deliberately smaller chrome variant.
+ *
+ * /login, /signup and /reset-password do NOT get the full navigation, and that
+ * is a product decision rather than an oversight: a sign-in page that offers
+ * three mega-menus and a footer with forty links is a page that invites the
+ * visitor to leave before finishing the one job it exists for. They ship a
+ * brand mark, the theme toggle and ONE contextual link ("New here?" on /login,
+ * "Already have an account?" on /signup, "Back to sign in" on /reset-password),
+ * and no footer at all.
+ *
+ * What was wrong was not the decision, it was that the same fourteen lines of
+ * markup were pasted into three files, so the three bars had already started
+ * differing in whitespace and would eventually differ in substance. The bar is
+ * built here once; the only thing a page varies is the trailing link, which it
+ * declares at its route.
+ */
+export interface AuthChromeLink {
+  href: string;
+  label: string;
+}
+
+export function authSiteHeader(link: AuthChromeLink): string {
+  return `<header class="topnav">
+    <div class="topnav-inner">
+      <a href="/" class="brand-mark"><span class="logo"><img class="qf-brand-mark" src="/brand/mark-keys-ondark.png" alt="QuoteFleet" width="28" height="30" decoding="async"></span>QuoteFleet</a>
+      <span class="topnav-spacer"></span>
+      ${THEME_TOGGLE_BTN}
+      <a class="nav-link" href="${link.href}">${link.label}</a>
+    </div>
+  </header>`;
+}
 
 /**
  * VERY-BOTTOM footer strip — accepted-payment marks + commercial trust badges.
@@ -356,19 +431,29 @@ export const DIRECTORY_DATA_SOURCES = `<div class="qf-datasources">`
  * appeared twice ("Partners" and "Affiliate program") and /signup appeared twice
  * ("Start free" and "Claim your listing").
  *
- * EXACTLY FIVE LINK COLUMNS, AND THE GRID KNOWS IT. `nav-unify.css` steps the
- * track count 5 → 3 → 1, never 4 or 2, because a five-item group in four or two
- * tracks leaves ONE column alone on the last row (the standing no-orphan rule).
- * See the ladder comment at the foot of nav-unify.css for the arithmetic.
+ * THE COLUMN COUNT IS DATA, NOT A CONSTANT REPEATED IN TWO LANGUAGES. The
+ * columns are the `FOOTER_COLUMNS` array below; the markup is generated from
+ * it, the count is written into `data-cols` on `.premium-footer-inner`, and the
+ * responsive track ladder is DERIVED from that count by `footerTrackLadder()`
+ * rather than re-guessed per breakpoint. Before this the number five was
+ * hard-coded in the markup here AND in a hand-written ladder in nav-unify.css
+ * (and again in nav-ia.css for the homepage), so adding a sixth column left a
+ * five-track grid with a permanently empty sixth column and removing one left a
+ * five-track grid wrapping four. `footerColumnLadderReport()` states the tracks
+ * the current count requires, and siteChromeSingleSource.test.ts fails with
+ * those exact numbers if a sheet disagrees — so a column change cannot break
+ * the grid quietly, it breaks the build.
  *
- * THIS CONSTANT IS ALSO THE HOMEPAGE'S FOOTER, byte-for-byte. landing.html is a
- * static file that is NOT passed through applyFullSiteHeader (it ships its own
- * header), so it carries a LITERAL copy — and a literal copy is exactly how the
+ * THIS CONSTANT IS ALSO THE HOMEPAGE'S FOOTER — now by INJECTION, not by
+ * transcription. landing.html used to be served by a raw `res.sendFile`, so it
+ * carried a literal copy of this string, and a literal copy is exactly how the
  * homepage came to render a stale four-column PRODUCT / SOLUTIONS / COMPANY /
  * LEGAL footer, missing /partners, /importers, /manifest-privacy, /guides,
  * /directory/join and the RFQ link, while every other page rendered these five.
- * navInformationArchitecture.test.ts now pins landing.html to contain this
- * string verbatim, the same way footerPayRow.test.ts pins FOOTER_PAY_ROW.
+ * The homepage now carries `SITE_FOOTER_SLOT` like every other static page and
+ * this constant is substituted into it at request time, so there is nothing
+ * left to transcribe. navInformationArchitecture.test.ts asserts against the
+ * RENDERED homepage for that reason.
  *
  * THE ONE IN-PAGE ANCHOR, AND WHY IT IS ABSOLUTE. The homepage used to run a
  * bespoke footer whose single unique destination was `#faq` — the "Simple
@@ -394,7 +479,150 @@ export const TOOL_PROMO_CTA = `<section class="qf-tool-promo" aria-label="Get yo
   </div>
 </section>`;
 
-export const PREMIUM_FOOTER = `<footer class="premium-footer"><div class="premium-footer-inner"><div class="footer-brand"><a href="/" class="qf-footer-brand" aria-label="QuoteFleet home"><img class="qf-footer-logo" src="/brand/logo-full-ondark.png" alt="QuoteFleet — freight rate calculator" width="168" height="113" decoding="async"></a><div class="qf-footer-brandtext"><a href="/" class="qf-footer-wordmark">QuoteFleet</a><p class="qf-footer-tagline">Branded rate calculator pages, PDF quotes, and optional AI chat for trucking service providers.</p></div></div><div class="footer-col"><h4>For Carriers &amp; Brokers</h4><a href="/w/demo">See a live demo</a><a href="/compare">Why QuoteFleet</a><a href="/pricing">Pricing</a><a href="/signup">Start free</a><a href="/claim">Claim your listing — free</a><a href="/importers">Importers directory</a><a href="/for/brokers">Freight brokers</a><a href="/for/forwarders">Freight forwarders</a><a href="/for/ltl">LTL carriers</a></div><div class="footer-col"><h4>For Shippers</h4><a href="/directory">Carrier directory</a><a href="/guides">Carrier market guides</a><a href="/compliance">Compliance tools</a><a href="/services">Carriers by capability</a><a href="/directory/join">Directory Pro</a><a href="${RFQ_HREF}">Request freight quotes</a><a href="/drayage-rates">Port drayage rates</a><a href="/manifest-privacy">Manifest privacy</a></div><div class="footer-col"><h4>Free Tools</h4><a href="/tools">Freight rate calculator</a><a href="/tools/oversize-permits">Oversize permit calculator</a><a href="/tools/bridge-formula">Bridge formula calculator</a><a href="/tools/axle-weights">Axle weight checker</a><a href="/tools/heavy-haul-quote">Heavy-haul quote tool</a><a href="/tools/seasonal-weight-restrictions">Frost law restrictions</a><a href="/oversize">Oversize permit guide</a><a href="/pilot-cars">Pilot car &amp; escort directory</a><a href="/glossary">Freight glossary</a></div><div class="footer-col"><h4>Company</h4><a href="mailto:hello@quotefleet.net">Contact</a><a href="/support">Support</a><a href="/#faq">FAQ</a><a href="/partners">Partners &amp; affiliates</a><a href="/security">Security</a><a href="/login">Sign in</a></div><div class="footer-col"><h4>Legal</h4><a href="/terms">Terms of Service</a><a href="/privacy">Privacy Policy</a><a href="/refund">Refund &amp; Cancellation</a><a href="/dpa">Data Processing (DPA)</a><a href="/cookie">Cookie Policy</a><a href="/.well-known/security.txt">security.txt</a></div></div><ul class="qf-footer-trustbar" role="list"><li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="11" width="18" height="10" rx="2"/><path d="M7 11V7.5a5 5 0 0 1 10 0V11"/></svg>Payments secured by Stripe</li><li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3 4.5 6v6c0 4.4 3.2 7.4 7.5 8.9 4.3-1.5 7.5-4.5 7.5-8.9V6z"/><path d="m9 12 2 2 4-4"/></svg>SSL/TLS encrypted</li><li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2.5 4 5.5v6c0 4.6 3.3 7.7 8 9.5 4.7-1.8 8-4.9 8-9.5v-6z"/><circle cx="12" cy="11" r="2.4"/><path d="M12 13.4V16"/></svg>GDPR &amp; CCPA-ready</li><li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M4 10h16M10 4v16"/></svg>Per-tenant data isolation</li></ul><div class="footer-bottom"><span>© <span id="year"></span> QuoteFleet. All rights reserved.</span><span class="qf-foot-operator">QuoteFleet is a product of MR Holdings &amp; Trade LLC.</span>${FOOTER_OOG_CTA}</div>${FOOTER_PAY_ROW}</footer>`;
+/** One link column of the premium footer. Labels are pre-escaped HTML. */
+export interface FooterColumn {
+  heading: string;
+  links: Array<{ href: string; label: string }>;
+}
+
+/**
+ * THE FOOTER'S LINK COLUMNS — the one place the count lives.
+ *
+ * Order mirrors the header menus (For Carriers & Brokers → For Shippers → Free
+ * Tools), then Company and Legal close it, so the footer teaches the same site
+ * map as the nav. Add or remove a column HERE and nowhere else: the markup, the
+ * `data-cols` hint and the required track ladder all derive from this array.
+ */
+export const FOOTER_COLUMNS: FooterColumn[] = [
+  {
+    heading: 'For Carriers &amp; Brokers',
+    links: [
+      { href: '/w/demo', label: 'See a live demo' },
+      { href: '/compare', label: 'Why QuoteFleet' },
+      { href: '/pricing', label: 'Pricing' },
+      { href: '/signup', label: 'Start free' },
+      { href: '/claim', label: 'Claim your listing — free' },
+      { href: '/importers', label: 'Importers directory' },
+      { href: '/for/brokers', label: 'Freight brokers' },
+      { href: '/for/forwarders', label: 'Freight forwarders' },
+      { href: '/for/ltl', label: 'LTL carriers' },
+    ],
+  },
+  {
+    heading: 'For Shippers',
+    links: [
+      { href: '/directory', label: 'Carrier directory' },
+      { href: '/guides', label: 'Carrier market guides' },
+      { href: '/compliance', label: 'Compliance tools' },
+      { href: '/services', label: 'Carriers by capability' },
+      { href: '/directory/join', label: 'Directory Pro' },
+      { href: RFQ_HREF, label: 'Request freight quotes' },
+      { href: '/drayage-rates', label: 'Port drayage rates' },
+      { href: '/manifest-privacy', label: 'Manifest privacy' },
+    ],
+  },
+  {
+    heading: 'Free Tools',
+    links: [
+      { href: '/tools', label: 'Freight rate calculator' },
+      { href: '/tools/oversize-permits', label: 'Oversize permit calculator' },
+      { href: '/tools/bridge-formula', label: 'Bridge formula calculator' },
+      { href: '/tools/axle-weights', label: 'Axle weight checker' },
+      { href: '/tools/heavy-haul-quote', label: 'Heavy-haul quote tool' },
+      { href: '/tools/seasonal-weight-restrictions', label: 'Frost law restrictions' },
+      { href: '/oversize', label: 'Oversize permit guide' },
+      { href: '/pilot-cars', label: 'Pilot car &amp; escort directory' },
+      { href: '/glossary', label: 'Freight glossary' },
+    ],
+  },
+  {
+    heading: 'Company',
+    links: [
+      { href: 'mailto:hello@quotefleet.net', label: 'Contact' },
+      { href: '/support', label: 'Support' },
+      { href: '/#faq', label: 'FAQ' },
+      { href: '/partners', label: 'Partners &amp; affiliates' },
+      { href: '/security', label: 'Security' },
+      { href: '/login', label: 'Sign in' },
+    ],
+  },
+  {
+    heading: 'Legal',
+    links: [
+      { href: '/terms', label: 'Terms of Service' },
+      { href: '/privacy', label: 'Privacy Policy' },
+      { href: '/refund', label: 'Refund &amp; Cancellation' },
+      { href: '/dpa', label: 'Data Processing (DPA)' },
+      { href: '/cookie', label: 'Cookie Policy' },
+      { href: '/.well-known/security.txt', label: 'security.txt' },
+    ],
+  },
+];
+
+export interface FooterTrackLadder {
+  /** Columns the markup actually emits. */
+  columns: number;
+  /** Track count above the mid breakpoint. */
+  wide: number;
+  /** Track count in the tablet band. */
+  mid: number;
+  /** Track count on phones. */
+  phone: number;
+  /** Whether the LAST link column must span every track on phones. */
+  phoneSpansLast: boolean;
+}
+
+/**
+ * THE LADDER IS ARITHMETIC, SO COMPUTE IT INSTEAD OF WRITING IT DOWN TWICE.
+ *
+ * Standing rule (DESIGN-SYSTEM.md §8): a group never wraps so that ONE item
+ * sits alone on a line. With N columns laid out in T tracks the last row holds
+ * `N mod T`, so every T where `N mod T === 1` is forbidden. T = 1 is a
+ * deliberate full stack rather than a wrap remainder and is always legal, and
+ * so is a column pinned `grid-column: 1 / -1` — it owns a row by instruction.
+ *
+ * Each band therefore takes the WIDEST legal track count it can afford:
+ *   • wide  — one row, so T = N (N mod N is 0 for every N ≥ 1).
+ *   • mid   — at most three tracks, stepping down until `N mod T !== 1`.
+ *   • phone — two tracks (Alex, 2026-09: "make 2 columns"), which for an ODD N
+ *             is only legal with the last column spanning both, leaving an even
+ *             number to wrap.
+ *
+ * For today's N = 5 that yields 5 → 3 → 2-with-span, which is exactly what the
+ * stylesheets declare. Change `FOOTER_COLUMNS` and this function immediately
+ * reports different numbers; siteChromeSingleSource.test.ts then fails naming
+ * the sheets that still declare the old ones.
+ */
+export function footerTrackLadder(columns: number): FooterTrackLadder {
+  const widest = (max: number): number => {
+    for (let t = Math.min(max, columns); t >= 2; t--) if (columns % t !== 1) return t;
+    return 1;
+  };
+  return {
+    columns,
+    wide: widest(columns),
+    mid: widest(3),
+    phone: 2,
+    phoneSpansLast: columns % 2 === 1,
+  };
+}
+
+/** Human-readable one-liner for the failure message a ladder mismatch prints. */
+export function footerColumnLadderReport(columns = FOOTER_COLUMNS.length): string {
+  const l = footerTrackLadder(columns);
+  return `${l.columns} columns → wide ${l.wide} / mid ${l.mid} / phone ${l.phone}`
+    + `${l.phoneSpansLast ? ' with the last column spanning' : ''}`;
+}
+
+const FOOTER_LADDER = footerTrackLadder(FOOTER_COLUMNS.length);
+
+const FOOTER_COLUMNS_HTML = FOOTER_COLUMNS.map(
+  (col) => `<div class="footer-col"><h4>${col.heading}</h4>`
+    + col.links.map((l) => `<a href="${l.href}">${l.label}</a>`).join('')
+    + `</div>`,
+).join('');
+
+export const PREMIUM_FOOTER = `<footer class="premium-footer"><div class="premium-footer-inner" data-cols="${FOOTER_LADDER.columns}"${FOOTER_LADDER.phoneSpansLast ? ' data-cols-odd' : ''}><div class="footer-brand"><a href="/" class="qf-footer-brand" aria-label="QuoteFleet home"><img class="qf-footer-logo" src="/brand/logo-full-ondark.png" alt="QuoteFleet — freight rate calculator" width="168" height="113" decoding="async"></a><div class="qf-footer-brandtext"><a href="/" class="qf-footer-wordmark">QuoteFleet</a><p class="qf-footer-tagline">Branded rate calculator pages, PDF quotes, and optional AI chat for trucking service providers.</p></div></div>${FOOTER_COLUMNS_HTML}</div><ul class="qf-footer-trustbar" role="list"><li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="11" width="18" height="10" rx="2"/><path d="M7 11V7.5a5 5 0 0 1 10 0V11"/></svg>Payments secured by Stripe</li><li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3 4.5 6v6c0 4.4 3.2 7.4 7.5 8.9 4.3-1.5 7.5-4.5 7.5-8.9V6z"/><path d="m9 12 2 2 4-4"/></svg>SSL/TLS encrypted</li><li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2.5 4 5.5v6c0 4.6 3.3 7.7 8 9.5 4.7-1.8 8-4.9 8-9.5v-6z"/><circle cx="12" cy="11" r="2.4"/><path d="M12 13.4V16"/></svg>GDPR &amp; CCPA-ready</li><li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M4 10h16M10 4v16"/></svg>Per-tenant data isolation</li></ul><div class="footer-bottom"><span>© <span id="year"></span> QuoteFleet. All rights reserved.</span><span class="qf-foot-operator">QuoteFleet is a product of MR Holdings &amp; Trade LLC.</span>${FOOTER_OOG_CTA}</div>${FOOTER_PAY_ROW}</footer>`;
 
 // Burger + Solutions-dropdown behaviour, mirrored from landing.html so the
 // injected header is interactive. Idempotent #year setter included.
@@ -445,20 +673,161 @@ export const HEADER_SCRIPTS = `<script>
 </script>
 <script src="/nav-auth.js" defer></script>`;
 
+/** The two chrome variants a static page can ask for. */
+export type SiteChromeVariant = 'full' | 'auth';
+
+export interface SiteChromeOptions {
+  /** 'full' = canonical header + premium footer. 'auth' = brand bar, no footer. */
+  variant?: SiteChromeVariant;
+  /** Trailing contextual link for the auth bar. Required when variant is 'auth'. */
+  authLink?: AuthChromeLink;
+  /** Name used in error messages — the filename, normally. */
+  label?: string;
+}
+
+/** Non-overlapping occurrences of a literal needle. */
+function countOccurrences(haystack: string, needle: string): number {
+  return haystack.split(needle).length - 1;
+}
+
 /**
- * Replace a static page's stripped `.topnav` header + reduced `.site-footer`
- * with the canonical full header + premium footer, and inject the header CSS +
- * interactivity. Safe to compose on top of other page skins.
+ * Literal markup that means a page still carries its own chrome. Finding any of
+ * it AFTER the slots have been substituted is the double-chrome case, which
+ * used to render two headers with no error anywhere.
  */
-export function applyFullSiteHeader(html: string): string {
-  let out = html;
-  if (!out.includes('/nav-unify.css')) {
-    out = out.replace('</head>', '  <link rel="stylesheet" href="/nav-unify.css">\n</head>');
+const LEGACY_CHROME_MARKERS: Array<[string, RegExp]> = [
+  ['a literal <header> element', /<header[\s>]/],
+  ['a literal <footer> element', /<footer[\s>]/],
+];
+
+/**
+ * Substitute the canonical chrome into a static page's slots.
+ *
+ * THE COUNTS ARE CHECKED, WHICH IS THE ENTIRE POINT. A page must declare
+ * exactly one `SITE_HEADER_SLOT`, and exactly one `SITE_FOOTER_SLOT` when the
+ * variant takes a footer. Zero slots means the page would render with NO chrome;
+ * two means it would render it twice; leftover literal `<header>`/`<footer>`
+ * markup means the page kept a stale copy alongside the injected one. All three
+ * were previously silent — the regex this replaced simply did not match and the
+ * response went out anyway — and all three now throw `SiteChromeError`, which
+ * the route turns into a 500 rather than a quietly wrong page.
+ */
+export function applySiteChrome(html: string, opts: SiteChromeOptions = {}): string {
+  const variant: SiteChromeVariant = opts.variant ?? 'full';
+  const label = opts.label ?? 'page';
+  const wantsFooter = variant === 'full';
+
+  const headers = countOccurrences(html, SITE_HEADER_SLOT);
+  if (headers !== 1) {
+    throw new SiteChromeError(
+      `${label}: expected exactly 1 ${SITE_HEADER_SLOT} but found ${headers}. `
+      + `Every page served with site chrome declares the slot once; `
+      + `${headers === 0 ? 'without it the page would render no header at all' : 'more than one would render the header twice'}.`,
+    );
   }
-  out = out.replace(/<header class="topnav">[\s\S]*?<\/header>/, FULL_SITE_HEADER);
-  out = out.replace(/<footer class="site-footer">[\s\S]*?<\/footer>/, PREMIUM_FOOTER);
-  out = out.replace('</body>', `${HEADER_SCRIPTS}\n</body>`);
+  const footers = countOccurrences(html, SITE_FOOTER_SLOT);
+  if (footers !== (wantsFooter ? 1 : 0)) {
+    throw new SiteChromeError(
+      `${label}: the '${variant}' chrome variant expects ${wantsFooter ? 1 : 0} ${SITE_FOOTER_SLOT}`
+      + ` but found ${footers}.`,
+    );
+  }
+  for (const [what, re] of LEGACY_CHROME_MARKERS) {
+    if (re.test(html)) {
+      throw new SiteChromeError(
+        `${label}: still ships ${what}. Site chrome comes from siteChrome.ts — `
+        + `replace the local copy with ${SITE_HEADER_SLOT} / ${SITE_FOOTER_SLOT}.`,
+      );
+    }
+  }
+
+  const header = variant === 'auth'
+    ? authSiteHeader(opts.authLink ?? { href: '/login', label: 'Sign in' })
+    : FULL_SITE_HEADER;
+
+  // Function replacers: the chrome contains `$` sequences in no version today,
+  // but a `$&` slipping into a label would silently splice the match back in.
+  let out = html.replace(SITE_HEADER_SLOT, () => header);
+  if (wantsFooter) out = out.replace(SITE_FOOTER_SLOT, () => PREMIUM_FOOTER);
+
+  if (variant === 'full') {
+    if (!out.includes('/nav-unify.css')) {
+      out = out.replace('</head>', () => '  <link rel="stylesheet" href="/nav-unify.css">\n</head>');
+    }
+    out = out.replace('</body>', () => `${HEADER_SCRIPTS}\n</body>`);
+  }
   return out;
+}
+
+/**
+ * The canonical full header + premium footer, injected into a page's slots.
+ * Kept under its historical name because every marketing/legal route calls it.
+ */
+export function applyFullSiteHeader(html: string, label?: string): string {
+  return applySiteChrome(html, { variant: 'full', label });
+}
+
+/** The compact auth bar (no footer) for /login, /signup and /reset-password. */
+export function applyAuthChrome(html: string, authLink: AuthChromeLink, label?: string): string {
+  return applySiteChrome(html, { variant: 'auth', authLink, label });
+}
+
+/**
+ * A static page rendered exactly as its route serves it — the raw file with the
+ * canonical chrome substituted into its slots.
+ *
+ * This exists because the slot files on disk are deliberately INCOMPLETE now.
+ * A test that reads `landing.html` straight off disk is reading a page with a
+ * comment where its header should be, which is not what any visitor receives;
+ * the thing worth asserting on is the rendered artifact. Using it also means a
+ * chrome assertion covers the injection itself, not just the constant.
+ */
+export function renderStaticPage(file: string, opts: SiteChromeOptions = {}): string {
+  const html = readFileSync(resolvePath(process.cwd(), 'src/server/public', file), 'utf8');
+  return applySiteChrome(html, { label: file, ...opts });
+}
+
+export interface ChromedPageSpec {
+  /** Filename under src/server/public. */
+  file: string;
+  variant: SiteChromeVariant;
+}
+
+/**
+ * BOOT-TIME SLOT AUDIT — the loud half of "a mismatch must not be silent".
+ *
+ * `applySiteChrome` catches a bad page when someone requests it. That is late:
+ * a legal page nobody visits for a week would sit broken for a week. This reads
+ * every registered page once while the app is being constructed and throws a
+ * single aggregated error naming every offender, so a page that lost its slots
+ * fails the very first `createApp()` — in the test suite, in CI, and before a
+ * deploy can serve it.
+ */
+export function verifySiteChromeSlots(publicDir: string, pages: ChromedPageSpec[]): void {
+  const problems: string[] = [];
+  for (const page of pages) {
+    let html: string;
+    try {
+      html = readFileSync(resolvePath(publicDir, page.file), 'utf8');
+    } catch {
+      problems.push(`${page.file}: registered for site chrome but missing from ${publicDir}`);
+      continue;
+    }
+    try {
+      applySiteChrome(html, {
+        variant: page.variant,
+        label: page.file,
+        authLink: { href: '/login', label: 'Sign in' },
+      });
+    } catch (err) {
+      problems.push(err instanceof Error ? err.message : String(err));
+    }
+  }
+  if (problems.length) {
+    throw new SiteChromeError(
+      `site chrome slots are wrong on ${problems.length} page(s):\n  - ${problems.join('\n  - ')}`,
+    );
+  }
 }
 
 export interface MarketingShellOpts {
@@ -510,12 +879,12 @@ export function renderMarketingShell(opts: MarketingShellOpts): string {
   ${opts.headStyles ? `<style>${opts.headStyles}</style>` : ''}
 </head>
 <body class="qf-public-wft">
-  <header class="topnav"><div class="topnav-inner"><a href="/" class="brand-mark">QuoteFleet</a></div></header>
+  ${SITE_HEADER_SLOT}
   ${opts.bodyHtml}
-  <footer class="site-footer">© QuoteFleet</footer>
+  ${SITE_FOOTER_SLOT}
   <script src="/marketing-chat.js" defer></script>
   <script src="/theme-toggle.js" defer></script>
 </body>
 </html>`;
-  return applyFullSiteHeader(doc);
+  return applyFullSiteHeader(doc, `renderMarketingShell(${opts.canonicalPath})`);
 }

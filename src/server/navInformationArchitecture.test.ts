@@ -26,11 +26,13 @@
  * The first sixteen tests here all passed while the shipped site had four broken
  * footers, because they asserted against PREMIUM_FOOTER and nothing else:
  *
- *   • They never looked at landing.html's INLINE footer. The homepage is a
- *     static file that never passes through applyFullSiteHeader, so it carries
+ *   • They never looked at landing.html's INLINE footer. The homepage was a
+ *     static file that never passed through applyFullSiteHeader, so it carried
  *     its own copy — and that copy was still the old four-column PRODUCT /
  *     SOLUTIONS / COMPANY / LEGAL block, laid out by a five-track grid, which
- *     is a permanently empty 203–230px trailing column at 981–1600px.
+ *     is a permanently empty 203–230px trailing column at 981–1600px. The
+ *     homepage is served through the same injector as every other static page
+ *     now, and LANDING_HTML below is the RENDERED result.
  *   • They asserted nothing RESPONSIVE. Every one of the four defects was a
  *     wrap that strands ONE column alone on the last row, and a track count is
  *     only wrong at the widths where its media query applies:
@@ -48,11 +50,18 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { runInNewContext } from 'node:vm';
-import { SITE_NAV_HTML, SITE_MOBILE_MENU_HTML, PREMIUM_FOOTER, FULL_SITE_HEADER } from './siteChrome.js';
+import { SITE_NAV_HTML, SITE_MOBILE_MENU_HTML, PREMIUM_FOOTER, FULL_SITE_HEADER, renderStaticPage } from './siteChrome.js';
 import { NAV_SHIPPER_SCRIPT } from './directory/pages.js';
 
 const read = (p: string) => readFileSync(resolve(process.cwd(), p), 'utf8');
-const LANDING_HTML = read('src/server/public/landing.html');
+/* THE HOMEPAGE AS SERVED, not the file on disk. landing.html now declares
+   `<!--qf:site-header-->` / `<!--qf:site-footer-->` and the canonical chrome is
+   substituted into them at request time, so the file alone is not what any
+   visitor receives. Rendering it here keeps every assertion below on the
+   REAL homepage — and additionally proves the injection runs, which the raw
+   read never did. That gap is exactly how the homepage drifted in the first
+   place: it was the one page no injector touched. */
+const LANDING_HTML = renderStaticPage('landing.html');
 const SITE_CHROME_TS = read('src/server/siteChrome.ts');
 const SELF_TS = read('src/server/navInformationArchitecture.test.ts');
 const PRICING_HTML = read('src/server/public/pricing.html');
@@ -242,11 +251,21 @@ describe('ONE responsive collapse point — no band without navigation', () => {
     expect(DIRECTORY_PAGES_TS).toMatch(/@media \(max-width: 1023px\)[\s\S]{0,120}\.nav-shipper/);
   });
 
-  it('loads the homepage IA sheet after the glass sheet', () => {
+  it('loads the homepage IA sheet after the glass sheet — and ACTUALLY appends it', () => {
     const glass = LANDING_MOTION_JS.indexOf("loadStylesheet('/landing-glass.css')");
-    const navIa = LANDING_MOTION_JS.indexOf("loadStylesheet('/nav-ia.css')");
+    const navIa = LANDING_MOTION_JS.indexOf("loadStylesheet('/nav-ia.css'");
     expect(glass).toBeGreaterThan(-1);
     expect(navIa).toBeGreaterThan(glass);
+    // CALL ORDER WAS NOT ENOUGH, which is the half this test used to miss.
+    // landing.html ALSO links nav-ia.css statically (so a phone's first paint
+    // is already collapsed), and loadStylesheet deduped against any existing
+    // <link> — so the call below returned early and the sheet only ever
+    // occupied its EARLY head position. Every homepage sheet injected here
+    // then out-cascaded it at equal specificity: measured on the chrome wave,
+    // the header rendered translucent and the footer light-on-light. The
+    // second argument re-appends it, which is what makes "after" true.
+    expect(LANDING_MOTION_JS).toContain("loadStylesheet('/nav-ia.css', true)");
+    expect(LANDING_MOTION_JS).toMatch(/function loadStylesheet\(href, again\)[\s\S]{0,120}if \(!again &&/);
   });
 });
 

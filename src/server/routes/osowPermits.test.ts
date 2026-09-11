@@ -35,7 +35,7 @@ import {
   OSOW_SELECTABLE_STATE_CODES,
   OSOW_TOOL_PATH,
 } from './osowPermits.js';
-import { SITE_NAV_HTML, SITE_MOBILE_MENU_HTML, PREMIUM_FOOTER } from '../siteChrome.js';
+import { SITE_NAV_HTML, SITE_MOBILE_MENU_HTML, PREMIUM_FOOTER, renderStaticPage } from '../siteChrome.js';
 
 /**
  * THE AS-OF MUST BE INSIDE THE WINDOW `OSOW_ASOF_MIN` COMPUTES, and that window
@@ -458,7 +458,7 @@ describe('the page', () => {
 });
 
 describe('the Free Tools group carries the new tool on every surface', () => {
-  const LANDING = readFileSync(resolve(process.cwd(), 'src/server/public/landing.html'), 'utf8');
+  const LANDING = renderStaticPage('landing.html');
   const DIRECTORY_PAGES = readFileSync(resolve(process.cwd(), 'src/server/directory/pages.ts'), 'utf8');
   const HREF = `href="${OSOW_TOOL_PATH}"`;
 
@@ -474,7 +474,8 @@ describe('the Free Tools group carries the new tool on every surface', () => {
     // The directory subsite footer is a separate markup copy.
     const dirFooter = DIRECTORY_PAGES.match(/<nav class="dirfoot"[\s\S]*?<\/nav>/)?.[0] ?? '';
     expect((dirFooter.match(new RegExp(HREF, 'g')) ?? []).length).toBe(1);
-    // landing.html holds literal copies of the nav, the drawer and the footer.
+    // The rendered homepage carries the nav, the drawer and the footer —
+    // injected from the same constants, so the count is the same three.
     expect((LANDING.match(new RegExp(HREF, 'g')) ?? []).length).toBe(3);
   });
 
@@ -498,7 +499,7 @@ describe('the Free Tools group carries the new tool on every surface', () => {
     expect((DIRECTORY_PAGES.match(/class="dirfoot-col"/g) ?? []).length).toBe(4);
   });
 
-  it('keeps landing.html byte-identical to the shared chrome constants', () => {
+  it('renders landing.html from the shared chrome constants, byte for byte', () => {
     expect(LANDING).toContain(SITE_NAV_HTML);
     expect(LANDING).toContain(SITE_MOBILE_MENU_HTML);
     expect(LANDING).toContain(PREMIUM_FOOTER);
