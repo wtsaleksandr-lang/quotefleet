@@ -555,7 +555,8 @@ const GLOSSARY_CSS = `
   .gl-crumbs { font-size: 12px; font-family: var(--font-mono); letter-spacing: 0.04em; color: var(--muted); margin: 0 0 12px; }
   .gl-crumbs a { color: var(--muted); text-decoration: none; }
   .gl-crumbs a:hover { color: var(--accent); }
-  .gl-crumbs .sep { margin: 0 8px; opacity: 0.6; }
+  /* No opacity wash — see .dir-crumbs .sep in pages.ts. */
+  .gl-crumbs .sep { margin: 0 8px; color: var(--muted); }
   .gl-pill { display: inline-block; font-size: 11px; font-family: var(--font-mono); letter-spacing: 0.06em; text-transform: uppercase; padding: 4px 12px; border-radius: 999px; border: 1px solid var(--accent); background: var(--accent-soft); color: var(--accent); }
   .gl-cat-block { margin: 34px 0 0; }
   .gl-cat-h { display: flex; align-items: baseline; gap: 12px; margin: 0 0 14px; padding-bottom: 8px; border-bottom: 1px solid var(--border); }

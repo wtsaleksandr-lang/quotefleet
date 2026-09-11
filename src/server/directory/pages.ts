@@ -663,8 +663,9 @@ export const DIRECTORY_CSS = `
   .dir-grid--browse { grid-auto-rows: 1fr; }
   .dir-grid--browse > .dir-card { display: flex; flex-direction: column; }
   .dir-grid--browse > .dir-card .cnt { margin-top: auto; padding-top: 12px; }
-  .dir-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 18px 20px; text-decoration: none; color: inherit; display: block; transition: border-color 0.15s ease, transform 0.15s ease; }
-  .dir-card:hover { border-color: var(--border-strong); transform: translateY(-2px); }
+  .dir-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 18px 20px; text-decoration: none; color: inherit; display: block; transition: border-color .2s ease; }
+  /* No hover LIFT — a card answers a hover with a border-colour change only. */
+  .dir-card:hover { border-color: var(--border-strong); }
   .dir-card h3 { margin: 0 0 4px; font-size: 17px; }
   .dir-card .sub { font-size: 12px; color: var(--muted); font-family: var(--font-mono); letter-spacing: 0.04em; }
   .dir-card .cnt { margin-top: 12px; font-size: 22px; font-family: var(--font-mono); color: var(--accent); }
@@ -673,7 +674,7 @@ export const DIRECTORY_CSS = `
   .dir-chip { font-size: 12px; font-family: var(--font-mono); letter-spacing: 0.04em; padding: 6px 12px; border-radius: var(--radius-chip); border: 1px solid var(--border); background: var(--surface); color: var(--ink-soft); text-decoration: none; white-space: nowrap; }
   .dir-chip:hover { border-color: var(--border-strong); }
   .dir-chip.active { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); }
-  .carrier-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 18px 20px; text-decoration: none; color: inherit; display: block; transition: border-color 0.15s ease; }
+  .carrier-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 18px 20px; text-decoration: none; color: inherit; display: block; transition: border-color .2s ease; }
   .carrier-card:hover { border-color: var(--border-strong); }
   .carrier-card .top { display: flex; justify-content: space-between; gap: 10px; align-items: flex-start; }
   .carrier-card h3 { margin: 0 0 3px; font-size: 16px; line-height: 1.3; }
@@ -685,9 +686,15 @@ export const DIRECTORY_CSS = `
   .carrier-facts .f span { font-size: 10px; text-transform: uppercase; letter-spacing: 0.07em; color: var(--muted); }
   .pill { font-size: 10px; font-family: var(--font-mono); letter-spacing: 0.06em; text-transform: uppercase; padding: 4px 8px; border-radius: var(--radius-chip); white-space: nowrap; }
   .pill-dray { background: var(--accent-soft); color: var(--accent); border: 1px solid var(--accent); }
-  .pill-good { background: rgba(46, 160, 87, 0.14); color: #57c274; border: 1px solid rgba(46, 160, 87, 0.4); }
-  .pill-warn { background: rgba(214, 158, 46, 0.14); color: #e0b054; border: 1px solid rgba(214, 158, 46, 0.4); }
-  .pill-bad { background: rgba(220, 76, 76, 0.14); color: #e88; border: 1px solid rgba(220, 76, 76, 0.4); }
+  /* Status pills carry their meaning in the BORDER + tint, never in the label
+     colour. The three hand-mixed label colours that used to live here measured
+     1.9:1 (good), 1.8:1 (warn) and 2.4:1 (bad) against their own tint on a white
+     page — unreadable, on the safety facts a shipper books on. Ink label plus a
+     semantic outline is AA in both themes and matches the outline-not-fill
+     selection rule. */
+  .pill-good { background: var(--success-bg); color: var(--ink); border: 1px solid var(--success); }
+  .pill-warn { background: var(--warn-bg); color: var(--ink); border: 1px solid var(--warn); }
+  .pill-bad { background: var(--error-bg); color: var(--ink); border: 1px solid var(--error); }
   .pill-none { background: var(--surface-2); color: var(--muted); border: 1px solid var(--border); }
   .pill-eq { background: var(--surface-2); color: var(--ink-soft); border: 1px solid var(--border); }
   /* Carrier-card chip row — always narrow, so it always uses the count-aware
@@ -722,7 +729,9 @@ export const DIRECTORY_CSS = `
   .dir-crumbs { font-size: 12px; font-family: var(--font-mono); letter-spacing: 0.03em; color: var(--muted); margin: 0 0 4px; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
   .dir-crumbs a { color: var(--muted); text-decoration: none; }
   .dir-crumbs a:hover { color: var(--accent); }
-  .dir-crumbs .sep { opacity: 0.5; }
+  /* No opacity on the separator: 0.5 dropped --muted to 2.3:1 (light) / 2.7:1
+     (dark). The crumb trail is navigation, so it stays at full token strength. */
+  .dir-crumbs .sep { color: var(--muted); }
   .dir-crumbs .cur { color: var(--ink-soft); }
   /* Faceted two-column layout */
   /* Source order is head (search + toolbar) → rail → results, so that on a
@@ -736,7 +745,9 @@ export const DIRECTORY_CSS = `
   .dir-results { grid-column: 2; grid-row: 2; min-width: 0; }
   .facet-group { border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--surface); padding: 14px 16px; margin-bottom: 12px; }
   .facet-group h3 { margin: 0 0 4px; font-size: 12px; text-transform: uppercase; letter-spacing: 0.07em; color: var(--muted); font-family: var(--font-mono); }
-  .facet-src { font-size: 10px; font-family: var(--font-mono); letter-spacing: 0.04em; color: var(--muted); opacity: 0.8; display: block; margin: 0 0 8px; }
+  /* opacity:0.8 put this provenance line at 4.3:1 — under AA in BOTH themes.
+     It says where a facet's data comes from, so it is content, not chrome. */
+  .facet-src { font-size: 10px; font-family: var(--font-mono); letter-spacing: 0.04em; color: var(--muted); display: block; margin: 0 0 8px; }
   .facet-opt { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 7px 8px; border-radius: 8px; text-decoration: none; color: var(--ink-soft); font-size: 13px; border: 1px solid transparent; }
   .facet-opt:hover { background: var(--surface-2); }
   .facet-opt .cb { font-family: var(--font-mono); font-size: 11px; color: var(--muted); background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--radius-chip); padding: 1px 8px; min-width: 20px; text-align: center; }
@@ -749,11 +760,11 @@ export const DIRECTORY_CSS = `
   .facet-group--claim { background: var(--surface-2); border-style: dashed; }
   .facet-group--claim .cap-sub { margin-top: 10px; }
   .facet-group--claim .cap-sub:first-of-type { margin-top: 6px; }
-  .cap-sublabel { display: block; font-size: 10px; font-family: var(--font-mono); letter-spacing: 0.05em; text-transform: uppercase; color: var(--muted); opacity: 0.85; margin: 0 0 3px 8px; }
+  .cap-sublabel { display: block; font-size: 10px; font-family: var(--font-mono); letter-spacing: 0.05em; text-transform: uppercase; color: var(--muted); margin: 0 0 3px 8px; }
   .cap-claim-cta { display: inline-block; margin-top: 12px; font-size: 12px; font-family: var(--font-mono); color: var(--accent); text-decoration: none; }
   .cap-claim-cta:hover { text-decoration: underline; }
   .facet-opt .lbl { display: flex; align-items: center; gap: 7px; }
-  .facet-check { position: relative; width: 14px; height: 14px; border: 1px solid var(--border-strong); border-radius: 4px; display: inline-block; flex: 0 0 auto; box-sizing: border-box; }
+  .facet-check { position: relative; width: 14px; height: 14px; border: 1px solid var(--border-strong); border-radius: 6px; display: inline-block; flex: 0 0 auto; box-sizing: border-box; }
   .facet-opt.active .facet-check { background: var(--accent); border-color: var(--accent); }
   /* A real ✓ (CSS border-trick, no glyph/emoji) so a checked box reads as
      checked, not merely as a filled square. */
@@ -763,11 +774,12 @@ export const DIRECTORY_CSS = `
   details.port-picker { padding: 0; overflow: hidden; }
   .port-picker-sum { list-style: none; cursor: pointer; display: flex; align-items: baseline; gap: 8px; padding: 14px 16px; }
   .port-picker-sum::-webkit-details-marker { display: none; }
-  .port-picker-sum::after { content: '▾'; color: var(--muted); font-size: 11px; margin-left: auto; align-self: center; transition: transform 0.15s ease; }
+  .port-picker-sum::after { content: '▾'; color: var(--muted); font-size: 11px; margin-left: auto; align-self: center; transition: transform .2s ease; }
   details[open] .port-picker-sum::after { transform: rotate(180deg); }
   @media (prefers-reduced-motion: reduce) { .port-picker-sum::after { transition: none; } }
   .port-picker-sum .pp-title { font-size: 12px; text-transform: uppercase; letter-spacing: 0.07em; color: var(--muted); font-family: var(--font-mono); }
-  .port-picker-sum .pp-hint { font-size: 10px; font-family: var(--font-mono); color: var(--muted); opacity: 0.7; }
+  /* opacity:0.7 measured 3.6:1 light / 3.9:1 dark — under AA. */
+  .port-picker-sum .pp-hint { font-size: 10px; font-family: var(--font-mono); color: var(--muted); }
   .port-picker-sum:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; border-radius: var(--radius-lg); }
   .port-picker-body { padding: 0 16px 14px; }
   .pp-search { display: flex; flex-direction: column; gap: 4px; margin: 0 0 10px; }
@@ -777,7 +789,7 @@ export const DIRECTORY_CSS = `
   .pp-search-input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; border-color: var(--accent); }
   .pp-list { max-height: 320px; overflow-y: auto; }
   .pp-country + .pp-country { margin-top: 6px; }
-  .pp-country-h { margin: 6px 0 2px; font-size: 10px; font-family: var(--font-mono); letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); opacity: 0.85; }
+  .pp-country-h { margin: 6px 0 2px; font-size: 10px; font-family: var(--font-mono); letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
   .pp-empty { font-size: 12px; color: var(--muted); padding: 8px 2px; }
   .rail-toggle { display: none; }
   /* Slim breadcrumb bar for the hero-less results view. */
@@ -789,10 +801,10 @@ export const DIRECTORY_CSS = `
   .dir-search { margin: 0 0 14px; }
   .dir-search-lbl { display: block; font-size: 12px; font-family: var(--font-mono); color: var(--muted); margin: 0 0 6px; }
   .dir-search-row { display: flex; gap: 8px; align-items: stretch; }
-  .dir-search-input { flex: 1 1 auto; min-width: 0; font-family: var(--font-sans); font-size: 14px; color: var(--ink); background: var(--surface); border: 1px solid var(--border-strong); border-radius: 4px; padding: 10px 12px; min-height: 44px; }
+  .dir-search-input { flex: 1 1 auto; min-width: 0; font-family: var(--font-sans); font-size: 14px; color: var(--ink); background: var(--surface); border: 1px solid var(--border-strong); border-radius: 6px; padding: 10px 12px; min-height: 44px; }
   .dir-search-input::placeholder { color: var(--muted); }
   .dir-search-input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; border-color: var(--accent); }
-  .dir-search-btn { flex: 0 0 auto; border-radius: 4px; }
+  .dir-search-btn { flex: 0 0 auto; border-radius: 6px; }
   .dir-search-hint { display: block; font-size: 11px; color: var(--muted); margin: 6px 0 0; }
   @media (max-width: 640px) {
     .dir-search-row { flex-wrap: wrap; }
@@ -820,8 +832,7 @@ export const DIRECTORY_CSS = `
   .sort-noscript a { font-size: 12px; font-family: var(--font-mono); color: var(--accent); text-decoration: none; }
   .applied-chips { display: flex; gap: 8px; flex-wrap: wrap; margin: 0 0 14px; align-items: center; }
   .applied-chip { font-size: 12px; font-family: var(--font-mono); padding: 5px 10px; border-radius: var(--radius-chip); border: 1px solid var(--accent); color: var(--accent); background: var(--accent-soft); text-decoration: none; display: inline-flex; gap: 6px; align-items: center; }
-  .applied-chip .x { opacity: 0.7; }
-  .applied-chip:hover .x { opacity: 1; }
+  .applied-chip .x { color: inherit; }
   .applied-clear { font-size: 12px; font-family: var(--font-mono); color: var(--muted); text-decoration: underline; }
   .dir-pagenums { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; justify-content: center; margin: 26px 0 8px; }
   .dir-pagenums a, .dir-pagenums span { min-width: 38px; height: 38px; display: inline-flex; align-items: center; justify-content: center; border: 1px solid var(--border); border-radius: 8px; text-decoration: none; color: var(--ink-soft); font-family: var(--font-mono); font-size: 13px; padding: 0 8px; }
@@ -840,7 +851,7 @@ export const DIRECTORY_CSS = `
      44px without visually growing the chip. onclick stopPropagation is belt-and-
      suspenders (the link is a SIBLING, so a checkbox click never bubbles to it). */
   .cc-check { position: absolute; top: 6px; right: 6px; z-index: 4; margin: 0; display: inline-flex; align-items: flex-start; padding: 6px 6px 20px 20px; line-height: 0; cursor: pointer; -webkit-tap-highlight-color: transparent; }
-  .cc-box { display: inline-flex; padding: 4px; background: var(--surface-2); border: 1px solid var(--border-strong); border-radius: 4px; box-shadow: var(--shadow-sm); transition: border-color 0.15s ease, background 0.15s ease; }
+  .cc-box { display: inline-flex; padding: 4px; background: var(--surface-2); border: 1px solid var(--border-strong); border-radius: 6px; box-shadow: var(--shadow-sm); transition: border-color .2s ease, background .2s ease; }
   .cc-check:hover .cc-box { border-color: var(--accent); }
   .cc-check:has(.cc-cb:checked) .cc-box { border-color: var(--accent); background: var(--accent-soft); }
   .cc-check:has(.cc-cb:focus-visible) .cc-box { outline: 2px solid var(--accent); outline-offset: 2px; }
@@ -848,7 +859,7 @@ export const DIRECTORY_CSS = `
   /* One-line legend above the grid — makes the per-card checkbox's purpose
      obvious without crowding each card. Mirrors the action-bar hint wording. */
   .cc-legend { display: flex; align-items: center; gap: 8px; margin: 0 0 12px; font-size: 12px; color: var(--muted); }
-  .cc-legend-box { flex: 0 0 auto; width: 16px; height: 16px; border: 1px solid var(--border-strong); border-radius: 3px; background: var(--surface-2); }
+  .cc-legend-box { flex: 0 0 auto; width: 16px; height: 16px; border: 1px solid var(--border-strong); border-radius: 6px; background: var(--surface-2); }
   .qf-actionbar { position: sticky; bottom: 12px; z-index: 20; display: flex; align-items: center; justify-content: space-between; gap: 8px 16px; flex-wrap: wrap; margin: 20px 0 0; padding: 10px 14px; background: var(--surface-2); border: 1px solid var(--border-strong); border-radius: 8px; box-shadow: var(--shadow-md); }
   .qf-ab-info { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
   .qf-ab-count { font-size: 14px; color: var(--ink); }
@@ -977,7 +988,10 @@ export const DIRECTORY_CSS = `
     .cp-chiprow.cp-chiprow > .cp-badge, .cp-chiprow.cp-chiprow > .cp-chip { justify-content: center; text-align: center; white-space: normal; }
     .cp-chiprow.cp-chiprow > :first-child:nth-last-child(odd) { grid-column: 1 / -1; }
   }
-  .cp-badge-active { font-size: 10px; font-family: var(--font-mono); letter-spacing: 0.06em; text-transform: uppercase; padding: 5px 9px; border-radius: var(--radius-chip); background: var(--success-bg); color: var(--success); border: 1px solid var(--success); display: inline-flex; align-items: center; gap: 6px; }
+  /* "Active" is an authority FACT a shipper books on. --success as the label
+     colour measured 3.2:1 on its own tint (light); the green stays on the dot
+     and the outline, and the label takes readable ink. */
+  .cp-badge-active { font-size: 10px; font-family: var(--font-mono); letter-spacing: 0.06em; text-transform: uppercase; padding: 5px 9px; border-radius: var(--radius-chip); background: var(--success-bg); color: var(--ink); border: 1px solid var(--success); display: inline-flex; align-items: center; gap: 6px; }
   .cp-badge-active::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: var(--success); display: inline-block; }
   /* The badge is now ALWAYS in the markup and toggled by the live-authority
      hydration, so the server HTML stays byte-identical while the client can
@@ -1067,9 +1081,9 @@ export const DIRECTORY_CSS = `
   .cp-chiprow { display: flex; flex-wrap: wrap; gap: 8px; }
   .cp-chip { font-size: 12px; font-family: var(--font-mono); letter-spacing: 0.02em; padding: 8px 12px; border-radius: var(--radius-chip); border: 1px solid var(--border); background: var(--surface-2); color: var(--ink-soft); display: inline-flex; align-items: center; gap: 8px; white-space: nowrap; }
   .cp-chip.on { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); }
-  .cp-chip.good { border-color: var(--success); color: var(--success); background: var(--success-bg); }
+  .cp-chip.good { border-color: var(--success); color: var(--ink); background: var(--success-bg); }
   .cp-chip.muted { opacity: 0.6; }
-  .cp-chip .tag { font-size: 9px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); border: 1px solid var(--border); border-radius: 4px; padding: 2px 6px; }
+  .cp-chip .tag { font-size: 9px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); border: 1px solid var(--border); border-radius: 6px; padding: 2px 6px; }
   .cp-note { margin: 16px 0 0; font-size: 12px; color: var(--muted); line-height: 1.5; }
   /* Safety-record rate context — muted, own line, never colour-coded. */
   .cp-safety-ctx { display: block; margin-top: 2px; font-size: 12px; font-family: var(--font-sans, inherit); font-variant-numeric: normal; color: var(--muted); line-height: 1.4; }
@@ -1121,53 +1135,72 @@ export const DIRECTORY_CSS = `
      a compact "Claim" affordance. Every badge is keyboard-focusable and carries a
      tooltip (data-tip → ::after on :hover/:focus). The badge rows clip horizontal
      overflow so a tooltip never triggers page horizontal scroll at 375px. */
+  /* THE PALETTE IS NOW TWO TIERS, NOT SEVENTEEN HUES.
+     This block used to hand-mix 17 solid brand colours (34 raw hex) — a rainbow
+     of decorative washes in a system that has exactly ONE accent. Replaced with
+     token-derived outline-and-tint, split by what the badge actually MEANS:
+
+       · STATUS  (safety rating, hazmat) → the semantic token + readable ink.
+         These are the facts a shipper books on, so they keep their colour.
+       · TAXONOMY (equipment, credentials, authority type) → neutral recess.
+         Equipment class is a category, not a verdict; it should not out-shout
+         the safety rating sitting next to it.
+
+     Every pair is theme-aware through the tokens and clears AA in both themes
+     (ink / ink-soft on a 10-12% tint), where the old solid fills were fixed
+     light-theme colours that ignored the dark palette entirely. */
   :root {
     /* Maersk-corner rule: EVERY directory badge / chip / pill uses this one small
-       squared radius — no fully-rounded pills anywhere in the directory. */
-    --radius-chip: 4px;
-    --badge-dray-bg: #2563eb;        --badge-dray-fg: #ffffff;
-    --badge-hazmat-bg: #ea580c;      --badge-hazmat-fg: #111827;
-    --badge-reefer-bg: #14b8a6;      --badge-reefer-fg: #111827;
-    --badge-dryvan-bg: #0f766e;      --badge-dryvan-fg: #ffffff;
-    --badge-tanker-bg: #0369a1;      --badge-tanker-fg: #ffffff;
-    --badge-flatbed-bg: #b45309;     --badge-flatbed-fg: #ffffff;
-    --badge-drybulk-bg: #6d28d9;     --badge-drybulk-fg: #ffffff;
-    --badge-authority-bg: #475569;   --badge-authority-fg: #ffffff;
-    --badge-safety-good-bg: #15803d; --badge-safety-good-fg: #ffffff;
-    --badge-safety-warn-bg: #d97706; --badge-safety-warn-fg: #111827;
-    --badge-safety-bad-bg: #b91c1c;  --badge-safety-bad-fg: #ffffff;
-    --badge-safety-none-bg: #6b7280; --badge-safety-none-fg: #ffffff;
-    --badge-uiia-bg: #7c3aed;        --badge-uiia-fg: #ffffff;
-    --badge-twic-bg: #4338ca;        --badge-twic-fg: #ffffff;
-    --badge-bonded-bg: #166534;      --badge-bonded-fg: #ffffff;
-    --badge-transload-bg: #92400e;   --badge-transload-fg: #ffffff;
-    --badge-yard-bg: #334155;        --badge-yard-fg: #ffffff;
-    --badge-tip-bg: #1f2937;         --badge-tip-fg: #f9fafb;
-    --badge-tip-border: rgba(148, 163, 184, 0.28);
-    --badge-focus: #2563eb;
+       squared radius — no fully-rounded pills anywhere in the directory.
+       6px is the smallest radius on the ramp {0, 6, 8, 12, 9999}; the former
+       4px was off-ramp. */
+    --radius-chip: 6px;
+
+    /* Taxonomy — neutral recess. */
+    --badge-neutral-bg: var(--surface-2);
+    --badge-neutral-fg: var(--ink-soft);
+    --badge-neutral-brd: var(--border-strong);
+
+    /* Status — semantic tint + outline, ink label. */
+    --badge-good-bg: var(--success-bg);
+    --badge-good-brd: var(--success);
+    --badge-warn-bg: var(--warn-bg);
+    --badge-warn-brd: var(--warn);
+    --badge-bad-bg: var(--error-bg);
+    --badge-bad-brd: var(--error);
+    --badge-status-fg: var(--ink);
+
+    /* Tooltip — inverted surface, so it flips with the theme instead of being
+       a fixed dark slab that vanishes into a dark page. */
+    --badge-tip-bg: var(--ink);
+    --badge-tip-fg: var(--bg);
+    --badge-tip-border: var(--border-strong);
+    --badge-focus: var(--accent);
   }
   .cp-chiprow, .cp-caps, .cp-nameline { overflow-x: clip; }
   .cp-badge { position: relative; display: inline-flex; align-items: center; gap: 6px; font-size: 11px; font-family: var(--font-mono); letter-spacing: 0.05em; text-transform: uppercase; padding: 5px 9px; border-radius: var(--radius-chip); border: 1px solid transparent; white-space: nowrap; cursor: help; }
   .cp-badge:focus-visible, .cp-fmcsa:focus-visible { outline: 2px solid var(--badge-focus); outline-offset: 2px; }
-  .cp-badge--dray { background: var(--badge-dray-bg); color: var(--badge-dray-fg); }
-  .cp-badge--hazmat { background: var(--badge-hazmat-bg); color: var(--badge-hazmat-fg); }
-  .cp-badge--reefer { background: var(--badge-reefer-bg); color: var(--badge-reefer-fg); }
-  .cp-badge--dryvan { background: var(--badge-dryvan-bg); color: var(--badge-dryvan-fg); }
-  .cp-badge--tanker { background: var(--badge-tanker-bg); color: var(--badge-tanker-fg); }
-  .cp-badge--flatbed { background: var(--badge-flatbed-bg); color: var(--badge-flatbed-fg); }
-  .cp-badge--drybulk { background: var(--badge-drybulk-bg); color: var(--badge-drybulk-fg); }
-  .cp-badge--authority { background: var(--badge-authority-bg); color: var(--badge-authority-fg); }
-  .cp-badge--safety-good { background: var(--badge-safety-good-bg); color: var(--badge-safety-good-fg); }
-  .cp-badge--safety-warn { background: var(--badge-safety-warn-bg); color: var(--badge-safety-warn-fg); }
-  .cp-badge--safety-bad { background: var(--badge-safety-bad-bg); color: var(--badge-safety-bad-fg); }
-  .cp-badge--safety-none { background: var(--badge-safety-none-bg); color: var(--badge-safety-none-fg); }
-  .cp-badge--uiia { background: var(--badge-uiia-bg); color: var(--badge-uiia-fg); }
-  .cp-badge--twic { background: var(--badge-twic-bg); color: var(--badge-twic-fg); }
-  .cp-badge--bonded { background: var(--badge-bonded-bg); color: var(--badge-bonded-fg); }
-  .cp-badge--transload { background: var(--badge-transload-bg); color: var(--badge-transload-fg); }
-  .cp-badge--yard { background: var(--badge-yard-bg); color: var(--badge-yard-fg); }
+  /* Taxonomy tier — equipment class, credential category, authority TYPE. */
+  .cp-badge--dray,
+  .cp-badge--reefer,
+  .cp-badge--dryvan,
+  .cp-badge--tanker,
+  .cp-badge--flatbed,
+  .cp-badge--drybulk,
+  .cp-badge--authority,
+  .cp-badge--safety-none,
+  .cp-badge--uiia,
+  .cp-badge--twic,
+  .cp-badge--bonded,
+  .cp-badge--transload,
+  .cp-badge--yard { background: var(--badge-neutral-bg); color: var(--badge-neutral-fg); border-color: var(--badge-neutral-brd); }
+  /* Status tier — the safety verdict, and hazmat as a genuine hazard signal. */
+  .cp-badge--safety-good { background: var(--badge-good-bg); color: var(--badge-status-fg); border-color: var(--badge-good-brd); }
+  .cp-badge--hazmat,
+  .cp-badge--safety-warn { background: var(--badge-warn-bg); color: var(--badge-status-fg); border-color: var(--badge-warn-brd); }
+  .cp-badge--safety-bad { background: var(--badge-bad-bg); color: var(--badge-status-fg); border-color: var(--badge-bad-brd); }
   .cp-badge--claim { background: var(--surface-2); color: var(--muted); border-color: var(--border); }
-  .cp-badge--claim .tag { font-size: 9px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); border: 1px solid var(--border); border-radius: 4px; padding: 2px 6px; white-space: nowrap; flex: 0 0 auto; }
+  .cp-badge--claim .tag { font-size: 9px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); border: 1px solid var(--border); border-radius: 6px; padding: 2px 6px; white-space: nowrap; flex: 0 0 auto; }
   /* Self-declared credentials → a UNIFORM card grid: 2-up on desktop, 1-up on
      narrow mobile. Each card is the same height per row (align-items:stretch),
      credential name left + compact "Claim" button right, so long labels
@@ -1189,7 +1222,7 @@ export const DIRECTORY_CSS = `
     font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; font-size: 12px; line-height: 1.45;
     padding: 9px 11px; border-radius: 8px;
     background: var(--badge-tip-bg); color: var(--badge-tip-fg); border: 1px solid var(--badge-tip-border);
-    box-shadow: 0 8px 24px rgba(2, 6, 23, 0.35); pointer-events: none;
+    box-shadow: var(--shadow-lg); pointer-events: none;
   }
   .cp-tip[data-tip]:hover::before,
   .cp-tip[data-tip]:focus::before,
@@ -1219,8 +1252,8 @@ export const DIRECTORY_CSS = `
     font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; font-size: 12px; line-height: 1.45;
     padding: 8px 11px; border-radius: 8px;
     background: var(--badge-tip-bg); color: var(--badge-tip-fg); border: 1px solid var(--badge-tip-border);
-    box-shadow: 0 8px 24px rgba(2, 6, 23, 0.35); pointer-events: none;
-    opacity: 0; transition: opacity 0.12s ease;
+    box-shadow: var(--shadow-lg); pointer-events: none;
+    opacity: 0; transition: opacity .2s ease;
   }
   .qf-tip.is-open { opacity: 1; }
   .qf-tip::after {
@@ -1241,7 +1274,7 @@ export const DIRECTORY_CSS = `
   .cp-idtext { min-width: 0; }
   .cp-nameline { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
   .cp-nameline h1 { font-size: 30px; line-height: 1.15; margin: 0; }
-  .cp-fmcsa { position: relative; font-size: 10px; font-family: var(--font-mono); letter-spacing: 0.08em; text-transform: uppercase; padding: 3px 7px; border-radius: 4px; background: var(--surface-2); color: var(--muted); border: 1px solid var(--border); white-space: nowrap; cursor: help; }
+  .cp-fmcsa { position: relative; font-size: 10px; font-family: var(--font-mono); letter-spacing: 0.08em; text-transform: uppercase; padding: 3px 7px; border-radius: 6px; background: var(--surface-2); color: var(--muted); border: 1px solid var(--border); white-space: nowrap; cursor: help; }
   .cp-subtitle { margin: 8px 0 0; }
   .cp-headrow .cp-claimline { margin: 4px 0 0; }
   /* Profile trailing blocks — desktop defaults (classes replace former inline
@@ -1306,9 +1339,18 @@ export const DIRECTORY_CSS = `
   .cp-tabs { display: flex; flex-wrap: wrap; position: relative; margin-top: 24px; }
   /* Visually hidden, still focusable (not display:none / visibility:hidden). */
   .cp-tab-input { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; border: 0; clip: rect(0 0 0 0); clip-path: inset(50%); overflow: hidden; white-space: nowrap; }
+  /* SANS, NOT MONO — and that is a metrics decision, not a taste one. These
+     four labels are the profile's primary navigation: flex: 1 1 0 gives each a
+     fixed quarter of the row, and nowrap + ellipsis means anything too wide is
+     silently TRUNCATED rather than wrapped. --font-mono is a platform stack, so
+     the rendered face (and its advance) differs per OS; measured with a face
+     ~25% wider than the local one, "Services & equipment" lost 51px to the
+     ellipsis on desktop and "Overview" lost 22px at 375px. Mono buys nothing
+     here — there are no figures in a tab label — so the sans stack removes the
+     per-OS variance instead of trying to budget for it. */
   .cp-tab {
     flex: 1 1 0; min-width: 0; text-align: center; cursor: pointer; user-select: none;
-    padding: 13px 14px; font-size: 13px; font-family: var(--font-mono); letter-spacing: 0.04em;
+    padding: 13px 14px; font-size: 13px; font-family: var(--font-sans); letter-spacing: 0.04em;
     color: var(--muted); background: var(--surface);
     border: 1px solid var(--border); border-bottom-width: 2px; border-right: 0;
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
@@ -1381,8 +1423,8 @@ export const DIRECTORY_CSS = `
     min-height: 40px; padding: 4px 8px;
     list-style: none; cursor: pointer;
     background: transparent; color: var(--ink);
-    border: 1px solid var(--border-strong); border-radius: 10px;
-    transition: border-color 0.16s ease, color 0.16s ease;
+    border: 1px solid var(--border-strong); border-radius: 8px;
+    transition: border-color .2s ease, color .2s ease;
   }
   .nav-acct > summary::-webkit-details-marker { display: none; }
   .nav-acct > summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
@@ -1394,16 +1436,15 @@ export const DIRECTORY_CSS = `
     background: var(--accent-soft); color: var(--accent); border: 1px solid var(--accent);
   }
   .nav-acct--pro .nav-acct-ini { background: var(--success-bg); color: var(--success); border-color: var(--success); }
-  .nav-acct-caret { width: 12px; height: 12px; transition: transform 0.18s ease; }
+  .nav-acct-caret { width: 12px; height: 12px; transition: transform .2s ease; }
   .nav-acct[open] .nav-acct-caret { transform: rotate(180deg); }
   .nav-acct-panel {
     position: absolute; top: calc(100% + 8px); right: 0; z-index: 80;
     display: flex; flex-direction: column; align-items: flex-start; gap: 8px;
     min-width: 240px; max-width: 320px; padding: 16px;
     background: var(--surface); border: 1px solid var(--border);
-    border-radius: var(--radius-lg); box-shadow: 0 18px 42px rgba(0, 0, 0, 0.42);
+    border-radius: var(--radius-lg); box-shadow: var(--shadow-lg);
   }
-  html[data-theme="light"] .nav-acct-panel { box-shadow: 0 18px 42px rgba(10, 37, 64, 0.14); }
   .nav-acct-head { margin: 0; font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; font-weight: 700; color: var(--muted); }
   /* The panel is where the address is finally allowed its full length — the
      200px ellipsis cap above exists only for the retired inline layout. */
@@ -1416,7 +1457,7 @@ export const DIRECTORY_CSS = `
   }
 
   .join-shell { max-width: 720px; }
-  .join-panel { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-card, 16px); padding: 24px; }
+  .join-panel { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 24px; }
   .join-panel h2 { margin: 0 0 8px; font-size: 22px; text-align: left; }
   .join-sub { margin: 0 0 16px; color: var(--ink-soft); font-size: 15px; line-height: 1.5; }
   .join-badge-row { margin-bottom: 12px; }
@@ -1427,14 +1468,14 @@ export const DIRECTORY_CSS = `
   .join-price b { font-size: 24px; font-weight: 700; color: var(--ink); }
   .join-price span { font-size: 13px; color: var(--ink-soft); }
   .join-split { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 16px 0 0; }
-  .join-plan { border: 1px solid var(--border); border-radius: var(--radius-input, 12px); background: var(--surface-2); padding: 16px; }
+  .join-plan { border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface-2); padding: 16px; }
   .join-plan--pro { border-color: var(--accent); }
   .join-plan-head { font-size: 11px; font-family: var(--font-mono); letter-spacing: 0.04em; text-transform: uppercase; color: var(--ink-soft); margin: 0 0 4px; }
   .join-plan-price { font-size: 13px; font-weight: 600; color: var(--ink); margin: 0 0 12px; }
   .join-plan .join-features { margin-top: 0; }
   @media (max-width: 560px) { .join-split { grid-template-columns: 1fr; } }
   .join-form { display: grid; gap: 12px; margin: 0 0 12px; }
-  .join-field { display: block; position: relative; border: 1px solid var(--border); border-radius: var(--radius-input, 12px); background: var(--surface-2); padding: 8px 12px; }
+  .join-field { display: block; position: relative; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface-2); padding: 8px 12px; }
   .join-field:focus-within { border-color: var(--accent); }
   .join-field-label { display: block; font-size: 11px; font-family: var(--font-mono); letter-spacing: 0.04em; text-transform: uppercase; color: var(--ink-soft); }
   .join-field input { width: 100%; border: 0; background: transparent; color: var(--ink); font-size: 16px; padding: 2px 0 0; outline: none; }
@@ -1444,38 +1485,14 @@ export const DIRECTORY_CSS = `
   .join-msg--ok { color: var(--success); }
   .join-msg--err { color: var(--error); }
 
-  /* Premium GLASS on the shipper subscribe panel (funnel surface 3) — the
-     $19/mo Directory Pro path should read as premium as the trucker pricing
-     flagship. Regular-material glass + accent outline/glow; the input FIELDS
-     (.join-field) keep their SOLID --surface-2 fill (glass never sits behind
-     typed text). Directory is dark by default (style.css :root) with a
-     html[data-theme="light"] override. -webkit-backdrop-filter is paired and
-     an @supports-not SOLID fallback ships. */
-  .join-panel {
-    background: rgba(34, 40, 42, 0.60);
-    border: 1px solid rgba(13, 60, 252, 0.55);
-    border-radius: 18px;
-    -webkit-backdrop-filter: blur(16px) saturate(1.3);
-    backdrop-filter: blur(16px) saturate(1.3);
-    box-shadow:
-      0 0 0 1px rgba(13, 60, 252, 0.22),
-      0 10px 34px rgba(13, 60, 252, 0.16),
-      0 8px 32px rgba(0, 0, 0, 0.30);
-  }
-  html[data-theme="light"] .join-panel {
-    background: rgba(255, 255, 255, 0.70);
-    border: 1px solid rgba(13, 60, 252, 0.45);
-    box-shadow:
-      0 0 0 1px rgba(13, 60, 252, 0.14),
-      0 12px 40px rgba(13, 60, 252, 0.12),
-      0 8px 32px rgba(10, 37, 64, 0.10);
-  }
-  @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
-    .join-panel { background: rgba(34, 40, 42, 0.98); }
-    html[data-theme="light"] .join-panel { background: rgba(255, 255, 255, 0.98); }
-  }
+  /* The "premium glass" override that used to sit here (blur(16px) + saturate,
+     a hand-mixed cobalt outline, a three-layer glow, an 18px radius and an
+     @supports-not solid fallback) is GONE. Wave 1 stripped glass from every
+     public stylesheet; this copy survived only because it lives in a .ts
+     template literal the guards do not scan. The base .join-panel above is the
+     whole card now: one surface, one hairline border, one ramp radius. */
 
-  .dir-upgrade-banner { border: 1px solid var(--border); border-radius: var(--radius-card, 16px); padding: 16px; margin-bottom: 16px; font-size: 15px; line-height: 1.5; color: var(--ink); }
+  .dir-upgrade-banner { border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 16px; margin-bottom: 16px; font-size: 15px; line-height: 1.5; color: var(--ink); }
   .dir-upgrade-banner strong { color: var(--ink); }
   .dir-upgrade-banner a { color: var(--accent); }
   .dir-upgrade-banner--ok { background: var(--success-bg); border-color: var(--success); }
@@ -1513,7 +1530,7 @@ export const DIRECTORY_CSS = `
   .qf-save-ic { font-size: 15px; line-height: 1; font-weight: 700; }
   .qf-save-pop { position: absolute; z-index: 40; left: 0; top: calc(100% + 8px); width: 260px; max-width: 80vw;
     background: var(--surface); border: 1px solid var(--border-strong); border-radius: var(--radius-lg);
-    box-shadow: 0 12px 32px rgba(0,0,0,0.28); padding: 12px; }
+    box-shadow: var(--shadow-lg); padding: 12px; }
   .qf-save-pop h4 { margin: 0 0 8px; font-size: 13px; color: var(--ink); }
   .qf-save-pop p { margin: 0 0 8px; font-size: 12px; color: var(--muted); line-height: 1.5; }
   .qf-save-lists { display: flex; flex-direction: column; gap: 4px; max-height: 180px; overflow-y: auto; margin-bottom: 8px; }
@@ -1563,30 +1580,19 @@ export const DIRECTORY_CSS = `
     .aud-cta-row .btn { flex: 1 1 100%; }
   }
 
-  /* ── Glass tokens (directory-local; canonical DESIGN-SYSTEM values) ────────
-     landing-glass.css isn't linked on directory pages, so we define the few
-     glass tokens the toolbar / action bar / modal need here. rgba() literals are
-     NOT flagged by the hardcoded-color guard. Dark-default base + light override
-     (mirrors style.css theming). Solid fallbacks (*-solid) feed the @supports
-     no-backdrop-filter path so embedded / privacy contexts stay readable. */
-  :root {
-    --glass-ultra-bg: rgba(18, 22, 26, 0.62);
-    --glass-ultra-brd: rgba(255, 255, 255, 0.10);
-    --glass-ultra-solid: rgba(18, 22, 26, 0.97);
-    --glass-shadow: 0 8px 32px rgba(0, 0, 0, 0.35);
-  }
-  html[data-theme="light"] {
-    --glass-ultra-bg: rgba(255, 255, 255, 0.64);
-    --glass-ultra-brd: rgba(255, 255, 255, 0.55);
-    --glass-ultra-solid: rgba(255, 255, 255, 0.98);
-    --glass-shadow: 0 8px 32px rgba(10, 37, 64, 0.12);
-  }
+  /* The directory-local GLASS TOKEN BLOCK is gone. It existed only to re-declare
+     --glass-ultra-* / --glass-shadow because landing-glass.css is not linked on
+     directory pages; with glass removed sitewide in wave 1 and from .qf-modal
+     below, nothing consumes them. They were also the file's loophole: rgba()
+     literals slip past the hardcoded-colour guard, so a whole parallel palette
+     lived here unlinted. The modal now uses --surface / --border / --shadow-lg
+     like every other panel in the system. */
 
   /* ── D1: unified results toolbar — filters entry + count + sort as ONE cluster.
      Replaces the old separate results-bar + applied-chips rows. The mobile rail
      "Filters" toggle is relocated INTO this bar (see .rt-main .rail-toggle) so the
      filter entry point and the sort control read as one control group. */
-  .results-toolbar { display: flex; flex-direction: column; gap: 10px; margin: 0 0 16px; padding: 12px 14px; background: var(--surface-2); border: 1px solid var(--border); border-radius: 10px; }
+  .results-toolbar { display: flex; flex-direction: column; gap: 10px; margin: 0 0 16px; padding: 12px 14px; background: var(--surface-2); border: 1px solid var(--border); border-radius: 8px; }
   .rt-main { display: flex; align-items: center; gap: 10px 16px; flex-wrap: wrap; }
   .rt-main .rc { font-size: 15px; min-width: 0; margin-right: auto; }
   .rt-main .rc b { font-family: var(--font-mono); color: var(--accent); font-size: 20px; }
@@ -1601,13 +1607,13 @@ export const DIRECTORY_CSS = `
      + crawlers see every facet link; the fold script collapses it and reveals the
      toggle. True height animation via grid-template-rows 0fr↔1fr, reduced-motion
      guarded. Selected/again = accent text, never a bright fill. */
-  .facet-fold { display: grid; grid-template-rows: 1fr; transition: grid-template-rows 0.22s ease; }
+  .facet-fold { display: grid; grid-template-rows: 1fr; transition: grid-template-rows .2s ease; }
   .facet-fold[data-collapsed="1"] { grid-template-rows: 0fr; }
   .facet-fold > .facet-fold-inner { overflow: hidden; min-height: 0; }
   .facet-more { display: inline-flex; align-items: center; gap: 6px; margin: 8px 2px 2px; padding: 4px 6px; background: transparent; border: 0; color: var(--accent); font-family: var(--font-mono); font-size: 12px; cursor: pointer; }
   .facet-more:hover { text-decoration: underline; }
-  .facet-more:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
-  .facet-more .facet-more-ico { font-size: 9px; transition: transform 0.18s ease; }
+  .facet-more:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 6px; }
+  .facet-more .facet-more-ico { font-size: 9px; transition: transform .2s ease; }
   .facet-more[aria-expanded="true"] .facet-more-ico { transform: rotate(180deg); }
   @media (prefers-reduced-motion: reduce) { .facet-fold, .facet-more .facet-more-ico { transition: none; } }
 
@@ -1619,10 +1625,10 @@ export const DIRECTORY_CSS = `
   .facet-acc-btn { display: flex; align-items: center; justify-content: space-between; gap: 10px; width: 100%; padding: 0; margin: 0; background: transparent; border: 0; cursor: pointer; text-align: left; color: inherit; font: inherit; }
   .facet-acc-ttl { font-size: 12px; text-transform: uppercase; letter-spacing: 0.07em; color: var(--muted); font-family: var(--font-mono); }
   .facet-acc-btn:hover .facet-acc-ttl { color: var(--ink-soft); }
-  .facet-acc-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 4px; }
-  .facet-acc-ico { flex: 0 0 auto; font-size: 9px; color: var(--muted); transition: transform 0.18s ease; }
+  .facet-acc-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 6px; }
+  .facet-acc-ico { flex: 0 0 auto; font-size: 9px; color: var(--muted); transition: transform .2s ease; }
   .facet-group[data-acc="open"] .facet-acc-ico { transform: rotate(180deg); }
-  .facet-acc-body { display: grid; grid-template-rows: 1fr; transition: grid-template-rows 0.22s ease; margin-top: 8px; }
+  .facet-acc-body { display: grid; grid-template-rows: 1fr; transition: grid-template-rows .2s ease; margin-top: 8px; }
   .facet-group[data-acc="closed"] .facet-acc-body { grid-template-rows: 0fr; margin-top: 0; }
   .facet-acc-body > .facet-acc-inner { overflow: hidden; min-height: 0; }
   @media (prefers-reduced-motion: reduce) { .facet-acc-body, .facet-acc-ico { transition: none; } }
@@ -1630,12 +1636,14 @@ export const DIRECTORY_CSS = `
   /* ── D2: multi-select save — action-bar "Save selected (N)" + list-picker /
      empty-state modal. The (N) suffix only shows once ≥1 card is ticked. */
   .qf-ab-save[data-count="0"] .qf-ab-saven { display: none; }
-  .qf-modal-backdrop { position: fixed; inset: 0; z-index: 2147482600; display: flex; align-items: center; justify-content: center; padding: 20px; background: rgba(4, 7, 12, 0.55); -webkit-backdrop-filter: blur(4px); backdrop-filter: blur(4px); opacity: 0; visibility: hidden; transition: opacity 0.18s ease, visibility 0s linear 0.18s; }
-  .qf-modal-backdrop.open { opacity: 1; visibility: visible; transition: opacity 0.18s ease; }
-  .qf-modal { width: 100%; max-width: 440px; max-height: calc(100vh - 40px); overflow-y: auto; background: var(--glass-ultra-bg); -webkit-backdrop-filter: blur(20px) saturate(1.4); backdrop-filter: blur(20px) saturate(1.4); border: 1px solid var(--glass-ultra-brd); border-radius: 16px; box-shadow: var(--glass-shadow); padding: 22px; transform: translateY(10px) scale(0.98); transition: transform 0.18s ease; }
+  /* Scrim is a flat wash — no blur. The modal itself is a SOLID panel on the
+     surface token, so it is readable with no backdrop-filter support and its
+     text never sits on a blurred, moving background. */
+  .qf-modal-backdrop { position: fixed; inset: 0; z-index: 2147482600; display: flex; align-items: center; justify-content: center; padding: 20px; background: rgba(4, 7, 12, 0.55); opacity: 0; visibility: hidden; transition: opacity .2s ease, visibility 0s linear .2s; }
+  .qf-modal-backdrop.open { opacity: 1; visibility: visible; transition: opacity .2s ease; }
+  .qf-modal { width: 100%; max-width: 440px; max-height: calc(100vh - 40px); overflow-y: auto; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); box-shadow: var(--shadow-lg); padding: 22px; transform: translateY(10px) scale(0.98); transition: transform .2s ease; }
   .qf-modal-backdrop.open .qf-modal { transform: none; }
-  @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) { .qf-modal { background: var(--glass-ultra-solid); } }
-  @media (prefers-reduced-motion: reduce) { .qf-modal-backdrop, .qf-modal { transition: opacity 0.18s ease; } .qf-modal { transform: none; } }
+  @media (prefers-reduced-motion: reduce) { .qf-modal-backdrop, .qf-modal { transition: opacity .2s ease; } .qf-modal { transform: none; } }
   .qf-modal-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin: 0 0 12px; }
   .qf-modal-head h2 { margin: 0; font-size: 18px; line-height: 1.25; color: var(--ink); }
   .qf-modal-x { flex: 0 0 auto; background: transparent; border: 0; color: var(--muted); font-size: 22px; line-height: 1; cursor: pointer; padding: 0 6px; border-radius: 6px; }
@@ -1678,7 +1686,7 @@ export const DIRECTORY_CSS = `
     border-bottom: 1px solid var(--border);
   }
   .ci-grp .dir-chip { font-size: 13px; }
-  .ci-grp .dir-chip .muted-small { margin-left: 6px; opacity: 0.7; }
+  .ci-grp .dir-chip .muted-small { margin-left: 6px; }
 
   /* Decade jump links under the numbered pager on long hub series. Keeps every
      page of a 146-page city hub within two hops of page 1. */
@@ -1778,7 +1786,7 @@ export const DIRECTORY_CSS = `
      (optimistic) with a small spinner in place of the count pill, and the
      results dim. Appended at the END on purpose — see the note above. */
   .results-toolbar:focus { outline: none; }
-  .dir-layout[aria-busy="true"] .dir-results { opacity: 0.6; transition: opacity 0.15s ease; }
+  .dir-layout[aria-busy="true"] .dir-results { opacity: 0.6; transition: opacity .2s ease; }
   .facet-opt .cb { position: relative; }
   .facet-opt.is-loading .cb { color: transparent; }
   .facet-opt.is-loading .cb::after { content: ''; position: absolute; top: 0; right: 0; bottom: 0; left: 0; margin: auto; width: 10px; height: 10px; border: 2px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: qf-facet-spin 0.6s linear infinite; }
@@ -1841,6 +1849,63 @@ export const DIRECTORY_CSS = `
     .dir-chips--grid[data-rem3="1"] > .dir-chip:last-child { grid-column: auto; }
     .dir-chips--grid[data-odd="1"] > .dir-chip:last-child { grid-column: 1 / -1; }
   }
+
+  /* ── "Coming soon" compliance chip ───────────────────────────────────────
+     Recessed by SURFACE, not by opacity. The former inline style="opacity:0.55"
+     measured 3.0:1 — under AA on a label that names a capability. */
+  .dir-chip--soon { background: var(--surface-2); color: var(--muted); cursor: default; }
+
+  /* ── MONO METRICS: survive a wider monospace face ─────────────────────────
+     --font-mono is a PLATFORM STACK (ui-monospace, SFMono-Regular, Menlo,
+     monospace), so the face that actually renders differs per OS: macOS/Windows
+     resolve a ~0.60em advance, while Linux — which is what Replit and CI run —
+     falls all the way through to generic "monospace" and typically lands on
+     DejaVu Sans Mono, a visibly WIDER face. The directory renders USDOT and MC
+     numbers in mono on every listing card and every profile, so a layout that
+     assumes the narrow face overflows on the platform we actually deploy to.
+
+     Two defences, applied here rather than assuming a face:
+
+     1. tabular-nums on every column of FIGURES. Beyond alignment this pins all
+        ten digits to one advance, so a count's width depends only on its digit
+        COUNT — no per-value jitter, and the worst case is computable.
+     2. Give every mono run somewhere to go: the count pill may not be squeezed
+        (flex: 0 0 auto), its label may shrink (min-width: 0), and the ID line
+        may break rather than push its card. Fixed widths become MINIMUMS.
+
+     Appended at EOF on purpose — the guards are line-keyed, so a mid-file
+     insertion renumbers every later baseline entry. */
+  .dir-stat b,
+  .dir-card .cnt,
+  .carrier-card .meta,
+  .carrier-facts .f b,
+  .results-bar .rc b,
+  .rt-main .rc b,
+  .qf-ab-count b,
+  .facet-opt .cb,
+  .dir-pagenums a,
+  .dir-pagenums span,
+  .lookup-result .row .v,
+  .cp-contact-row .v,
+  .cp-monogram,
+  .sl-row .sub,
+  .sl-list > summary .n,
+  .qf-save-list .n,
+  .qf-modal-list .n { font-variant-numeric: tabular-nums; }
+
+  /* The facet count pill is the tightest mono box in the product: a 258px rail,
+     a long facet label and a 4-5 digit count. Let the label give, never the
+     pill, and never the rail's width. */
+  .facet-opt { min-width: 0; }
+  .facet-opt .lbl { min-width: 0; overflow-wrap: anywhere; }
+  .facet-opt .cb { flex: 0 0 auto; min-width: 20px; box-sizing: content-box; }
+  /* USDOT/MC line on a listing card: break inside the run before widening it. */
+  .carrier-card .meta { overflow-wrap: anywhere; }
+  /* Fixed square controls become minimums so a wider glyph grows them instead
+     of spilling out of them. */
+  .dir-pagenums a, .dir-pagenums span { width: auto; }
+  .cp-monogram { width: auto; min-width: 54px; }
+  @media (max-width: 640px) { .cp-monogram { min-width: 46px; } }
 `;
 
 /**
@@ -1873,6 +1938,42 @@ export const DIRECTORY_CSS = `
  * across every subsequent directory page. The page already loads /style.css and
  * /nav-unify.css from the same origin, so this adds no NEW connection and is
  * multiplexed alongside them.
+ *
+ * ─────────────────────────────────────────────────────────────────────────────
+ * WHY THIS STAYS A TEMPLATE LITERAL AND IS NOT EXTRACTED TO A .css FILE.
+ *
+ * The tempting move is to move this block into `src/server/public/directory.css`
+ * so `check-hardcoded-colors.mjs` and `check-spacing.mjs` — which walk
+ * `src/server/public/**` and therefore have never once seen these ~1,200 lines —
+ * would finally cover it. Three things make that a worse trade than it looks:
+ *
+ * 1. IT WOULD MINT A SECOND, CONTRADICTORY URL FOR THE SAME BYTES. `publicDir`
+ *    is mounted with `express.static`, and that mount deliberately serves .css
+ *    with `Cache-Control: no-cache` because those filenames are not hashed. A
+ *    file in that directory is therefore reachable at `/directory.css` with the
+ *    opposite cache policy to the `immutable` hashed URL above — two URLs, two
+ *    policies, one stylesheet. Suppressing that would mean editing the static
+ *    mount, i.e. changing the serving contract this comment exists to protect.
+ *
+ * 2. IT CONVERTS A COMPILE-TIME CONSTANT INTO A RUNTIME FILE READ. The hash is
+ *    computed from this string at module load. As a literal it cannot fail. As
+ *    `readFileSync(resolve(process.cwd(), …))` it can — and the failure mode is
+ *    an empty stylesheet hashed into a fresh URL and served `immutable` to every
+ *    crawled page until the next deploy. That is a bad risk to take for a lint
+ *    improvement, on the one asset whose mistakes are the most expensive.
+ *
+ * 3. THE GUARDS ARE LINE-KEYED, SO ADOPTION WOULD MEAN BASELINING THE DEBT.
+ *    Both guards tolerate existing violations via a `file:line` snapshot. Moving
+ *    1,200 unlinted lines under them imports every remaining violation as a new
+ *    baseline entry — the protocol's "growing baseline" case — which buys a
+ *    green check without fixing anything.
+ *
+ * The goal is coverage, not location, so the coverage was brought here instead:
+ * `directoryCssTokens.test.ts` asserts the same rules (no raw hex, the 6/8/12
+ * radius ramp, three shadows, two motion durations, no gradients, no
+ * backdrop-filter, no hover lift, no decorative keyframes) directly against this
+ * constant, plus a shrink-only ratchet on the off-grid spacing that was measured
+ * but deliberately not re-flowed. Serving path and cache contract unchanged.
  */
 export const DIRECTORY_CSS_HASH = createHash('sha256').update(DIRECTORY_CSS).digest('hex').slice(0, 16);
 
@@ -4889,8 +4990,11 @@ export function renderCompliancePage(summary: DirectorySummary): string {
   const availableChips = `
     <a class="dir-chip active" href="/directory?intermodal=1">Drayage / intermodal (${fmtNum(summary.intermodalTotal)})</a>
     <a class="dir-chip" href="/directory">All carriers (${fmtNum(summary.total)})</a>`;
+  // "· soon" already says these are not live, so the state does NOT need an
+  // opacity wash on top of it — style="opacity: 0.55" put this label at 3.0:1,
+  // under AA. The class below carries the recessed-but-readable treatment.
   const comingSoon = ['UIIA member', 'TWIC-ready', 'Hazmat', 'Reefer']
-    .map((n) => `<span class="dir-chip" style="opacity: 0.55; cursor: default;">${esc(n)} · soon</span>`)
+    .map((n) => `<span class="dir-chip dir-chip--soon">${esc(n)} · soon</span>`)
     .join('\n');
 
   const body = `
