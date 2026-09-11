@@ -389,9 +389,9 @@ function renderServicesHub(drayTotal: number): string {
 // ─── Category page: GET /services/:slug ────────────────────────────────────
 function renderServicePage(s: ServiceDef, sample: VisibleCarrier[], drayTotal: number): string {
   const sampleCards = sample.length
-    ? `<div class="dir-grid" style="grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));">${sample
-        .map(carrierCard)
-        .join('\n')}</div>`
+    ? // Stacked: carrierCard renders a WIDE ROW (logo | name | figures | arrow),
+      // which a 300px column squeezes into an unreadable tower.
+      `<div class="dir-grid" data-view="list">${sample.map(carrierCard).join('\n')}</div>`
     : `<div class="dir-empty">The carrier directory is being set up — carriers are loading. Check back shortly.</div>`;
 
   // Related services (all others).

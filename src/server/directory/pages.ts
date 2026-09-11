@@ -2029,15 +2029,20 @@ export const DIRECTORY_CSS = `
   .dsh-adv a { color: var(--accent-ink); text-decoration: underline; text-underline-offset: 3px; }
   .dsh-chipwrap { width: 100%; border-top: 1px solid var(--cta-sec-border); padding-top: 24px; }
   .dsh-chiplabel { margin: 0 0 12px; font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--accent-ink); }
-  .dsh-chips { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; }
-  .dsh-chip { font-size: 13px; padding: 8px 12px; border-radius: var(--radius-btn); border: 1px solid var(--cta-sec-border); background: var(--cta-sec-bg-hover); color: var(--accent-ink); text-decoration: none; white-space: nowrap; transition: border-color .2s ease; }
+  /* A GRID, not a wrap row. 8 chips of unequal label width wrap 3+3+2 here and
+     4+3+1 at another width — and a chip alone on the last line is the orphan the
+     global rule forbids. 8 divides cleanly by 4 and by 2, so both tracks are
+     orphan-free by construction at every viewport. */
+  .dsh-chips { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+  .dsh-chip { display: flex; align-items: center; justify-content: center; text-align: center; font-size: 13px; padding: 8px 12px; border-radius: var(--radius-btn); border: 1px solid var(--cta-sec-border); background: var(--cta-sec-bg-hover); color: var(--accent-ink); text-decoration: none; transition: border-color .2s ease; }
   .dsh-chip:hover { border-color: var(--accent-ink); }
   /* Trust line. 4 items — 4 and 2 both divide cleanly, so no track strands one. */
-  .dsh-trust { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px 24px; margin: 24px 0 0; padding: 0; list-style: none; }
+  .dsh-trust { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px 24px; margin: 24px 0 0; padding: 0; list-style: none; color: var(--accent-ink); }
   .dsh-trust-item { font-size: 12px; color: var(--accent-ink); display: flex; align-items: center; gap: 8px; }
   .dsh-trust-item::before { content: '✓'; font-size: 11px; }
   @media (max-width: 900px) {
     .dsh-title { font-size: 32px; }
+    .dsh-chips { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   }
   @media (max-width: 640px) {
     .dsh-card { max-width: 100%; border-radius: 0; padding: 32px 16px; }
@@ -2047,7 +2052,11 @@ export const DIRECTORY_CSS = `
     .dsh-input { border-radius: var(--radius-btn); height: 48px; }
     .dsh-btn { border-radius: var(--radius-btn); height: 48px; width: 100%; }
     .dsh-trust { flex-direction: column; align-items: flex-start; text-align: left; gap: 8px; }
-    .dsh-seg, .dsh-chips { justify-content: flex-start; }
+    /* The segment stays ONE row and scrolls inside itself. Five pills cannot be
+       wrapped into equal tracks without stranding one (5 = 2+2+1), and a
+       scrolling segmented control is the canonical phone form anyway. The
+       scroll is contained, so the page itself never scrolls sideways. */
+    .dsh-seg { flex-wrap: nowrap; overflow-x: auto; justify-content: flex-start; width: 100%; }
     .dsh-inner { align-items: flex-start; text-align: left; }
     .dsh-sub, .dsh-adv { text-align: left; }
   }
@@ -2058,23 +2067,34 @@ export const DIRECTORY_CSS = `
      head → rail → results source order the phone layout depends on. */
   .dir-grid[data-view="list"] { grid-template-columns: minmax(0, 1fr); gap: 12px; }
   .carrier-card--row { padding: 16px; }
-  .cc-main { display: grid; grid-template-columns: auto minmax(0, 1fr) auto auto; align-items: center; gap: 16px; }
+  /* FLEX-WRAP, NOT A FIXED GRID. The same card is also rendered inside narrow
+     columns (the profile's "Other carriers in …" module, /services samples), and
+     a 4-track grid there crushes the name into a one-word-per-line tower. With
+     flex the figures simply wrap onto their own line when the container is too
+     narrow — container-driven, so it is right at every width without a media
+     query and without container queries.
+     padding-right clears the absolutely-positioned selection checkbox in the
+     card's top-right corner, so the trailing arrow never sits under it. */
+  .cc-main { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 16px; padding-right: 24px; }
   /* The logo slot. A monogram paints the deterministic tint; a real logo paints
      white and contains itself, so a WIDE wordmark and a SQUARE glyph both sit
      correctly in the same tile without cropping. */
   .cc-logo { flex: 0 0 auto; width: 48px; height: 48px; border-radius: var(--radius-btn); background: var(--dir-logo-tint); color: var(--accent-ink); display: inline-flex; align-items: center; justify-content: center; font-family: var(--font-mono); font-size: 17px; font-weight: 700; letter-spacing: 0.04em; font-variant-numeric: tabular-nums; }
   .cc-logo--img { background: var(--surface); border: 1px solid var(--border); padding: 4px; }
   .cc-logo--img img { width: 100%; height: 100%; object-fit: contain; display: block; }
-  .cc-id { min-width: 0; }
+  .cc-id { flex: 1 1 220px; min-width: 0; }
   .cc-nameline { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
   .carrier-card--row h3 { margin: 0; }
   .cc-star { display: inline-flex; align-items: center; gap: 4px; font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--accent); border: 1px solid var(--accent); border-radius: var(--radius-chip); padding: 0 8px; white-space: nowrap; }
   .cc-star-ic { font-size: 11px; line-height: 1; }
-  .carrier-card--row .meta { display: flex; align-items: center; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
-  .dir-ico { flex: 0 0 auto; vertical-align: -1px; margin-right: 4px; }
+  /* NOT a flex container. A text node inside one becomes a single anonymous
+     flex item, so the pin gets stranded alone on line 1 the moment the address
+     wraps. Inline flow keeps the pin glued to the first word. */
+  .carrier-card--row .meta { margin-top: 4px; }
+  .dir-ico { vertical-align: -1px; margin-right: 4px; }
   /* Stats block: big figures, small-caps labels. Right-aligned so every row in
      the stack shares one figure column. */
-  .carrier-card--row .carrier-facts { margin-top: 0; gap: 24px; flex-wrap: nowrap; }
+  .carrier-card--row .carrier-facts { flex: 0 0 auto; margin-top: 0; gap: 24px; flex-wrap: nowrap; }
   .carrier-card--row .carrier-facts .f { align-items: flex-end; min-width: 48px; }
   .carrier-card--row .carrier-facts .f b { font-size: 20px; line-height: 1.15; color: var(--ink); }
   .carrier-card--row .carrier-facts .f span { margin-top: 4px; }
@@ -2082,28 +2102,60 @@ export const DIRECTORY_CSS = `
   .carrier-card--row:hover .cc-go { color: var(--accent); }
   .carrier-card--row .card-chips { margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--border); }
   .pill-auth { background: var(--surface-2); color: var(--ink-soft); border: 1px solid var(--border-strong); }
+  /* On a WIDE row the count-aware partition keeps its no-orphan row split (5 →
+     3+2, never 4+1) but sizes each column to its content, so the pills read as
+     badges instead of stretching into full-width buttons. Below 721px the card
+     is narrow again and the equal-column partition from the base rules wins. */
+  @media (min-width: 721px) {
+    .carrier-card--row .card-chips { justify-content: start; }
+    .carrier-card--row .card-chips[data-n="2"],
+    .carrier-card--row .card-chips[data-n="4"] { grid-template-columns: repeat(2, minmax(0, max-content)); }
+    .carrier-card--row .card-chips[data-n="3"],
+    .carrier-card--row .card-chips[data-n="5"],
+    .carrier-card--row .card-chips[data-n="6"] { grid-template-columns: repeat(3, minmax(0, max-content)); }
+  }
   @media (max-width: 720px) {
     /* Phone: the arrow goes (the whole row is the link) and the figures drop
        onto their own line so the name column keeps its full width. */
-    .cc-main { grid-template-columns: auto minmax(0, 1fr); gap: 12px; }
+    .cc-main { gap: 12px; align-items: flex-start; padding-right: 0; }
+    /* Clear the corner checkbox so the company name never runs under it. */
+    .cc-nameline { padding-right: 32px; }
     .cc-go { display: none; }
-    .carrier-card--row .carrier-facts { grid-column: 1 / -1; justify-content: flex-start; gap: 32px; margin-top: 4px; }
+    /* flex-basis 100% forces the figure row onto its own line under the name. */
+    .carrier-card--row .carrier-facts { flex: 1 0 100%; justify-content: flex-start; gap: 32px; margin-top: 0; }
     .carrier-card--row .carrier-facts .f { align-items: flex-start; }
     .cc-logo { width: 40px; height: 40px; font-size: 15px; }
+  }
+  @media (max-width: 560px) {
+    /* A 6-pill row at 343px gives each cell 105px, which breaks "Common +
+       Contract authority" over three lines. 6 is even, so two tracks are still
+       orphan-free (3 rows of 2) and each pill roughly doubles its width. */
+    .carrier-card--row .card-chips[data-n="6"] { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   }
 
   /* ── 3 · Carrier profile: deep-blue header card + contact strip ─────────── */
   .dir-hero--cp { padding-bottom: 32px; }
   .cp-herocard { background: var(--accent-fill); border-radius: var(--radius-lg); padding: 24px; margin-top: 12px; }
   .cp-herocard .cp-headrow { margin-top: 0; }
-  .cp-herocard .cp-nameline h1, .cp-herocard .cp-subtitle, .cp-herocard .cp-legalline { color: var(--accent-ink); }
-  .cp-herocard .cp-subtitle { display: flex; align-items: center; flex-wrap: wrap; gap: 4px; }
+  /* '.hero p.lead' and '.muted-small' win on specificity, and both resolve to a
+     grey that measures 1.4:1 (light) / 2.2:1 (dark) on this blue card. The
+     address line is the second most-read fact on the page, so it takes the
+     card's own ink at (0,3,1). */
+  .cp-herocard .cp-nameline h1 { color: var(--accent-ink); }
+  .dir-hero--cp .cp-herocard p.cp-subtitle,
+  .dir-hero--cp .cp-herocard p.cp-legalline { color: var(--accent-ink); }
+  /* .lead ships a marketing line-height; at the address's size that opened a
+     ~60px hole between it and the legal-name line. */
+  .dir-hero--cp .cp-herocard p.cp-subtitle { line-height: 1.3; }
+  /* Inline flow, not flex — see the .carrier-card--row .meta note above. */
+  .cp-herocard .cp-subtitle { margin-top: 8px; }
   .cp-herocard .cp-legalline { margin: 4px 0 0; }
   .cp-herocard .cp-claimline, .cp-herocard .cp-claimline a { color: var(--accent-ink); }
   .cp-herocard .cp-fmcsa { background: transparent; color: var(--accent-ink); border-color: var(--cta-sec-border); }
-  /* The monogram keeps its own tint on the blue card; a REAL logo gets a white
-     ground instead, because a supplied mark needs a neutral field to read on. */
-  .cp-herocard .cp-monogram { border-color: transparent; background: var(--dir-logo-tint); color: var(--accent-ink); }
+  /* THE TILE SITS ON WHITE INSIDE THE BLUE CARD. A tinted tile on a blue field
+     reads as a muddy dark square, and a supplied logo needs a neutral ground
+     anyway — so the tile inverts here: white plate, tint-coloured initials. */
+  .cp-herocard .cp-monogram { border-color: transparent; background: var(--surface); color: var(--dir-logo-tint); }
   .cp-herocard .cp-monogram--img { background: var(--surface); padding: 4px; }
   .cp-herocard .cp-monogram--img img { width: 100%; height: 100%; object-fit: contain; display: block; }
   /* The status badges carry --ink on a translucent tint, which on the blue card
@@ -4900,10 +4952,10 @@ export function renderCarrierProfile(opts: {
     !!r.city && !!r.state && !!citySlug && r.state === c.state && citySlugify(r.city) === citySlug;
   const relatedCity = related.filter(sameCity);
   const relatedNearby = related.filter((r) => !sameCity(r));
+  // Stacked, like every other carrier list: the card is a WIDE ROW now, and a
+  // 280px column squeezes its name/figures/pills into an unreadable tower.
   const relatedGrid = (list: VisibleCarrier[]): string =>
-    `<div class="dir-grid" style="grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));">${list
-      .map(carrierCard)
-      .join('\n')}</div>`;
+    `<div class="dir-grid" data-view="list">${list.map(carrierCard).join('\n')}</div>`;
   // Corridor heading names the actual scope the ring used, so the reason those
   // carriers are on the page is legible: the port group, or failing that the
   // state. Never "the area" when we can name it.
