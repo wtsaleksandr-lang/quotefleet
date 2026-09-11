@@ -70,6 +70,8 @@ import { registerUnsubscribeRoutes } from './routes/unsubscribe.js';
 import { registerOutreachUnsubscribeRoutes } from './routes/outreachUnsubscribe.js';
 import { registerInboundReviewRoutes } from './routes/inboundReview.js';
 import { registerInboundWebhookRoutes } from './routes/inboundWebhook.js';
+import { registerOpsHealthRoutes } from './routes/opsHealth.js';
+import { captureException } from './errorMonitoring.js';
 import { hostInfoMiddleware } from './hostInfo.js';
 import { applyAuthChrome, applyFullSiteHeader, verifySiteChromeSlots } from './siteChrome.js';
 import { applyFmcsaFreshness } from './directory/fmcsaFreshness.js';
@@ -269,6 +271,14 @@ export function createApp(): express.Express {
   registerOutreachUnsubscribeRoutes(app);
   registerInboundReviewRoutes(app);
   registerInboundWebhookRoutes(app);
+
+  // Ops observability: GET /api/ops/health (super-admin session OR bearer
+  // OPS_HEALTH_TOKEN) and the public POST /api/analytics/event conversion sink.
+  // Registered next to /api/health because it is the same concern one level
+  // deeper: /api/health answers "is the process up", this answers "is the
+  // process doing its job", which is the question nobody could answer while a
+  // branded subdomain 429'd and the ingest no-op'd for days.
+  registerOpsHealthRoutes(app);
 
   app.get('/api/health', async (_req, res) => {
     const time = new Date().toISOString();
@@ -624,6 +634,15 @@ export function createApp(): express.Express {
   app.use((err: unknown, req: express.Request, res: express.Response, _next: express.NextFunction) => {
     const reqId = (req as unknown as { id?: string }).id ?? '-';
     console.error(`[err] ${req.method} ${req.path} reqId=${reqId}:`, err);
+    // Ship it somewhere a human will actually see. No-op while SENTRY_DSN is
+    // unset (the state today), so this line changes nothing until the owner
+    // creates a DSN — at which point every 500 starts alerting with no further
+    // code change. `req.route?.path` not `req.path`, so a 330k-carrier
+    // directory does not create 330k distinct transaction names.
+    captureException(err, {
+      transaction: `${req.method} ${(req.route as { path?: string } | undefined)?.path ?? req.path}`,
+      tags: { reqId },
+    });
     if (res.headersSent) return;
     res.status(500).json({ error: 'Internal server error' });
   });

@@ -49,9 +49,47 @@ export interface Env {
    *  short-circuit with a 503 instead of running another API call.
    *  Per-tenant caps live on `tenants.aiDailyUsdCap`. */
   AI_DAILY_USD_CAP?: number;
-  /** If set, errors are reported here. Off by default to keep the dev
-   *  loop cheap. */
+  /**
+   * Sentry-compatible DSN. UNSET TODAY — while it is unset, server errors are
+   * logged to stdout and nothing alerts on them, which is exactly how a
+   * production feature managed to throw for days unnoticed. Setting it
+   * activates src/server/errorMonitoring.ts with no code change and no
+   * dependency (the module posts envelopes over plain HTTPS). Free tier is
+   * ~5k errors/month; only the account owner can create the project.
+   */
   SENTRY_DSN?: string;
+  /** Optional deploy identity stamped on every reported error. */
+  SENTRY_ENVIRONMENT?: string;
+  SENTRY_RELEASE?: string;
+  /**
+   * Cloudflare Web Analytics site token (32 hex chars) for the cookieless
+   * pageview beacon. UNSET → no beacon is emitted; everything else still works.
+   * Create the site in "JS snippet installation" mode, NOT edge auto-injection,
+   * or pageviews are double-counted — see src/server/analytics.ts.
+   */
+  CF_WEB_ANALYTICS_TOKEN?: string;
+  /**
+   * Single kill switch for the ENTIRE analytics layer — beacon, conversion
+   * script, everything. Set to 1 and restart; no deploy needed. Exists so the
+   * feature can be switched off in seconds without a code change.
+   */
+  ANALYTICS_DISABLED?: string;
+  /** Client-side console.debug of every conversion event. Dev aid. */
+  ANALYTICS_DEBUG?: string;
+  /**
+   * Bearer token that lets a HEADLESS monitor poll GET /api/ops/health. An
+   * external uptime service cannot hold an admin session, so without this the
+   * endpoint is only usable by a human — which is how "nobody noticed for days"
+   * happens. Unset → the endpoint is session-only (super-admin).
+   */
+  OPS_HEALTH_TOKEN?: string;
+  /** Tenant slug the synthetic branded-subdomain probe requests. Unset → the
+   *  oldest tenant. The probe is what catches a subdomain-only outage that an
+   *  apex check reports as healthy. */
+  OPS_SYNTHETIC_SLUG?: string;
+  /** '1' disables the outbound synthetic probe only; the rest of the health
+   *  report still runs. */
+  OPS_SYNTHETIC_DISABLED?: string;
   SUPER_ADMIN_EMAIL?: string;
   GOOGLE_MAPS_API_KEY?: string;
   MAPBOX_TOKEN?: string;
@@ -196,6 +234,14 @@ export function loadEnv(): Env {
     CLOUDFLARE_API_TOKEN: opt('CLOUDFLARE_API_TOKEN'),
     AI_DAILY_USD_CAP: opt('AI_DAILY_USD_CAP') ? Number(opt('AI_DAILY_USD_CAP')) : undefined,
     SENTRY_DSN: opt('SENTRY_DSN'),
+    SENTRY_ENVIRONMENT: opt('SENTRY_ENVIRONMENT'),
+    SENTRY_RELEASE: opt('SENTRY_RELEASE'),
+    CF_WEB_ANALYTICS_TOKEN: opt('CF_WEB_ANALYTICS_TOKEN'),
+    ANALYTICS_DISABLED: opt('ANALYTICS_DISABLED'),
+    ANALYTICS_DEBUG: opt('ANALYTICS_DEBUG'),
+    OPS_HEALTH_TOKEN: opt('OPS_HEALTH_TOKEN'),
+    OPS_SYNTHETIC_SLUG: opt('OPS_SYNTHETIC_SLUG'),
+    OPS_SYNTHETIC_DISABLED: opt('OPS_SYNTHETIC_DISABLED'),
     SUPER_ADMIN_EMAIL: opt('SUPER_ADMIN_EMAIL'),
     GOOGLE_MAPS_API_KEY: opt('GOOGLE_MAPS_API_KEY'),
     MAPBOX_TOKEN: opt('MAPBOX_TOKEN'),
