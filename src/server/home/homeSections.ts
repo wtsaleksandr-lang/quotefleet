@@ -14,13 +14,14 @@
  *      Flip HOME_LEGACY_SECTIONS_ENABLED to `true` and they render again, in
  *      their original position and order. That is the whole restore.
  *
- *   2. THE LOGO MARQUEE, WHICH SHIPS EMPTY ON PURPOSE.  HOME_PARTNER_LOGOS is
- *      `[]`. A marquee of other companies' marks is a claim about who works
- *      with us, so it stays empty until there is something true to put in it —
- *      a carrier that has genuinely claimed its profile, or an owner-curated
- *      partner. While it is empty NOTHING ships: not the section, not its
- *      stylesheet, not its script. Adding entries to that one array is the only
- *      change needed to turn it on.
+ *   2. THE LOGO MARQUEE, WHOSE DATA IS DERIVED.  HOME_PARTNER_LOGOS is built
+ *      from the curated carrier-logo registry (directory/carrierLogos.ts) —
+ *      the same list the directory's own logo slot reads — so the strip and a
+ *      carrier profile can never disagree about whose mark is whose. What the
+ *      tiles claim is what the heading says: these carriers are LISTED IN the
+ *      directory. They are not customers, partners or endorsers. An empty
+ *      registry still means NOTHING ships: not the section, not its
+ *      stylesheet, not its script.
  *
  *   3. THE ONE NUMBER ON THE PAGE, TAKEN FROM THE DATA.  The marquee heading
  *      states the size of the carrier directory, and it is read from the
@@ -36,6 +37,7 @@
 import { readFileSync } from 'node:fs';
 import { resolve as resolvePath } from 'node:path';
 import { esc, monogramInitials } from '../directory/pages.js';
+import { CURATED_CARRIER_LOGOS, carrierLogoPaths } from '../directory/carrierLogos.js';
 import { getPersistedCarrierTotal } from '../directory/queries.js';
 
 // ─── 1 · The hidden legacy sections ───────────────────────────────────────
@@ -109,25 +111,38 @@ function legacySectionsHtml(): string {
 export interface PartnerLogo {
   /** The company's own name. Used as the accessible label, and for the monogram. */
   name: string;
-  /** Path to a logo asset WE are licensed to display. Omit for a monogram tile. */
+  /** Same-origin path to the carrier's own mark. Omit for a monogram tile. */
   src?: string;
   /** Optional destination — typically that carrier's directory profile. */
   href?: string;
 }
 
 /**
- * THE MARQUEE'S DATA, AND IT IS EMPTY ON PURPOSE.
+ * THE MARQUEE'S DATA — DERIVED, NOT TYPED IN.
  *
- * Populate it later from carriers that have genuinely CLAIMED their profile
- * (directory/claims.ts) or from an owner-curated partner set — and only with
- * marks we are licensed to display. Every entry is a public statement that the
- * named company works with us, so an entry with no such relationship behind it
- * is a fabricated endorsement, not a placeholder.
+ * It is the curated carrier-logo registry (directory/carrierLogos.ts), mapped
+ * into tiles. That registry is the SAME list the directory's own logo slot
+ * reads through `carrierLogoUrl()`, which is the whole reason this is a
+ * derivation rather than a second hand-kept array: a homepage strip and a
+ * carrier profile that disagree about whose mark is whose is a
+ * misidentification, and two lists drift the first time one is edited alone.
  *
- * While this is `[]`, `renderLogoMarquee` returns the empty string and the
- * homepage ships no section, no stylesheet and no script for it.
+ * WHAT THESE TILES CLAIM. Exactly what the heading above them says: these
+ * carriers are LISTED IN the FMCSA-derived directory. They are not customers,
+ * partners or endorsers — no company here has any relationship with QuoteFleet
+ * — and no copy around this section may imply one. The marks stay the property
+ * of their owners and are shown to identify the carrier; the footer's
+ * data-source note carries that line and an address to request removal.
+ *
+ * A registry entry with no artwork maps to a tile with NO `src`, which renders
+ * the monogram fallback — see `PartnerLogo` above for why that is a real state
+ * and not a gap. An empty registry would still mean `renderLogoMarquee`
+ * returns '' and the homepage ships no section, stylesheet or script.
  */
-export const HOME_PARTNER_LOGOS: readonly PartnerLogo[] = [];
+export const HOME_PARTNER_LOGOS: readonly PartnerLogo[] = CURATED_CARRIER_LOGOS.map((c) => ({
+  name: c.displayName,
+  ...(c.logo ? { src: carrierLogoPaths(c.logo).wide } : {}),
+}));
 
 /** Injected into <head> only when the marquee actually renders. */
 export const MARQUEE_STYLESHEET = '/landing-logo-marquee.css';
