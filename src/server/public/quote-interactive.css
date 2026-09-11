@@ -75,11 +75,9 @@
   align-items: center;
   justify-content: center;
   padding: 16px;
-  background: rgba(6, 10, 18, 0.66);
+  background: rgb(6, 10, 18);
   opacity: 0;
   transition: opacity 0.18s ease;
-  -webkit-backdrop-filter: blur(2px);
-  backdrop-filter: blur(2px);
 }
 .qf-mapm-backdrop.is-open { opacity: 1; }
 .qf-mapm-panel {

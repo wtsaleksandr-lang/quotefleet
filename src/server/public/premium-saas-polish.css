@@ -62,8 +62,7 @@
   display: none;
   place-items: center;
   padding: 18px;
-  background: rgba(3, 8, 14, .68);
-  backdrop-filter: blur(8px);
+  background: rgb(3, 8, 14);
 }
 .qf-modal-backdrop.is-open { display: grid; }
 .qf-modal-card {

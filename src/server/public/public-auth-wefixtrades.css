@@ -557,21 +557,17 @@ body.qf-auth-wft .tab-pane.qf-pane-enter {
 
 /* DARK (default) — thin glass shell. */
 body.qf-auth-wft .card.elevated {
-  background: rgba(34, 40, 42, 0.62) !important;
+  background: rgb(34, 40, 42) !important;
   border: 1px solid rgba(255, 255, 255, 0.13) !important;
   border-radius: 20px !important;
-  -webkit-backdrop-filter: blur(16px) saturate(1.3) !important;
-  backdrop-filter: blur(16px) saturate(1.3) !important;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.30), inset 0 1px 0 rgba(255, 255, 255, 0.05) !important;
 }
 /* DARK plan tiles → glass + hover-lift. Selected outline preserved by the
    :has(input:checked) rule earlier in this sheet (higher source order there
    is unchanged; this only restyles the RESTING tile). */
 body.qf-auth-wft .plan-opt {
-  background: rgba(34, 40, 42, 0.55) !important;
+  background: rgb(34, 40, 42) !important;
   border: 1px solid rgba(255, 255, 255, 0.12) !important;
-  -webkit-backdrop-filter: blur(12px) saturate(1.25) !important;
-  backdrop-filter: blur(12px) saturate(1.25) !important;
   transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease !important;
 }
 body.qf-auth-wft .plan-opt:hover {
@@ -582,18 +578,14 @@ body.qf-auth-wft .plan-opt:hover {
 
 /* LIGHT — frosted white glass shell + tiles. */
 html[data-theme="light"] body.qf-auth-wft .card.elevated {
-  background: rgba(255, 255, 255, 0.70) !important;
+  background: rgb(255, 255, 255) !important;
   border: 1px solid rgba(15, 37, 64, 0.10) !important;
   border-radius: 20px !important;
-  -webkit-backdrop-filter: blur(16px) saturate(1.3) !important;
-  backdrop-filter: blur(16px) saturate(1.3) !important;
   box-shadow: 0 8px 32px rgba(10, 37, 64, 0.10) !important;
 }
 html[data-theme="light"] body.qf-auth-wft .plan-opt {
-  background: rgba(255, 255, 255, 0.66) !important;
+  background: rgb(255, 255, 255) !important;
   border: 1px solid rgba(15, 37, 64, 0.10) !important;
-  -webkit-backdrop-filter: blur(12px) saturate(1.25) !important;
-  backdrop-filter: blur(12px) saturate(1.25) !important;
 }
 html[data-theme="light"] body.qf-auth-wft .plan-opt:hover {
   box-shadow: 0 10px 28px rgba(10, 37, 64, 0.14) !important;

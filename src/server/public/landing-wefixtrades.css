@@ -40,8 +40,7 @@ body.qf-wft::before {
   position: sticky;
   top: 0;
   z-index: 50;
-  background: rgba(12,17,18,.94);
-  backdrop-filter: blur(14px);
+  background: rgb(12, 17, 18);
   border-bottom: 1px solid var(--qf-wft-line-strong);
 }
 

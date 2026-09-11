@@ -385,9 +385,7 @@ p { margin: 0; }
 /* ── Top nav (minimal — most navigation lives in the bottom dock) ── */
 .topnav {
   position: sticky; top: 0; z-index: 60;
-  background: rgba(34, 40, 42, 0.72);
-  backdrop-filter: blur(30px) saturate(1.2);
-  -webkit-backdrop-filter: blur(30px) saturate(1.2);
+  background: rgb(34, 40, 42);
   border-bottom: 1px solid var(--border);
 }
 .topnav-inner {
@@ -907,9 +905,7 @@ html[data-theme="light"] .hero h1 .accent {
   transform: translateX(-50%);
   z-index: 70;
   display: flex; gap: 4px;
-  background: rgba(27, 33, 35, 0.92);
-  backdrop-filter: blur(16px) saturate(150%);
-  -webkit-backdrop-filter: blur(16px) saturate(150%);
+  background: rgb(27, 33, 35);
   border: 1px solid var(--border-strong);
   border-radius: 12px;
   padding: var(--space-1);

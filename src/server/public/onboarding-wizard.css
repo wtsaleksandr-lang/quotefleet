@@ -172,8 +172,6 @@ html.qf-ob-open body {
   /* regularMaterial frosted sheet — high opacity (≥0.72) so question text sits
      safely on it. Inset top highlight reads as a lit glass edge. */
   background: var(--ob-shell-bg);
-  -webkit-backdrop-filter: blur(28px) saturate(1.4);
-  backdrop-filter: blur(28px) saturate(1.4);
   border: 1px solid var(--ob-shell-brd);
   border-radius: 24px;
   box-shadow: var(--ob-shell-shadow), inset 0 1px 0 var(--ob-hairline);
@@ -250,8 +248,6 @@ html.qf-ob-open body {
   height: 4px;
   border-radius: var(--radius-pill);
   background: var(--ob-ultra-bg);
-  -webkit-backdrop-filter: blur(16px);
-  backdrop-filter: blur(16px);
   border: 1px solid var(--ob-ultra-brd);
   overflow: hidden;
 }
@@ -319,8 +315,6 @@ html.qf-ob-open body {
   cursor: pointer;
   /* thinMaterial glass card (fill ≥0.5 so labels stay legible). */
   background: var(--ob-card-bg);
-  -webkit-backdrop-filter: blur(8px);
-  backdrop-filter: blur(8px);
   border: 1px solid var(--border);
   border-radius: 16px;
   padding: var(--space-2);
@@ -557,8 +551,6 @@ html.qf-ob-open body {
   border-radius: var(--radius-sm);
   border: 1px solid var(--border);
   background: var(--ob-thin-bg);
-  -webkit-backdrop-filter: blur(8px);
-  backdrop-filter: blur(8px);
   color: var(--ink);
   font-size: 13px;
   font-weight: 600;
@@ -591,8 +583,6 @@ html.qf-ob-open body {
   padding-top: var(--space-2);
   border-top: 1px solid var(--ob-ultra-brd);
   background: var(--ob-ultra-bg);
-  -webkit-backdrop-filter: blur(16px);
-  backdrop-filter: blur(16px);
 }
 .qf-ob-foot { background: var(--ob-ultra-solid); }
 .qf-ob-btn {
@@ -830,8 +820,6 @@ html.qf-ob-open body {
   z-index: 60;
   margin-top: var(--space-0-5);
   background: var(--ob-thin-bg);
-  -webkit-backdrop-filter: blur(20px) saturate(1.4);
-  backdrop-filter: blur(20px) saturate(1.4);
   border: 1px solid var(--ob-thin-brd);
   border-radius: 14px;
   box-shadow: var(--ob-float-shadow);

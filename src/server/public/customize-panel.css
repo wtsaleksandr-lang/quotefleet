@@ -1184,8 +1184,6 @@
   opacity: 0;
   z-index: 1;
   transition: opacity .16s ease;
-  backdrop-filter: blur(1.5px);
-  -webkit-backdrop-filter: blur(1.5px);
 }
 /* The mask matches each side's colour gradient so the faint backdrop blur fades
    out inward with the shade (no hard blur seam), leaving only a soft edge. */

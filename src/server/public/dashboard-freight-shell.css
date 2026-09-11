@@ -34,9 +34,8 @@ html[data-theme="light"] .sidebar {
   height: calc(100vh - 28px);
   border: 1px solid rgba(184, 207, 245, 0.72);
   border-radius: 24px;
-  background: rgba(255, 255, 255, 0.92);
+  background: rgb(255, 255, 255);
   box-shadow: 0 24px 70px rgba(37, 34, 99, 0.09);
-  backdrop-filter: blur(18px);
 }
 
 html[data-theme="light"] .sidebar .brand-block {

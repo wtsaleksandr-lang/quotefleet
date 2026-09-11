@@ -83,8 +83,6 @@ html[data-theme="light"] body.qf-wft .hero.visual-hero::before {
 /* Dark desktop pill: unify the blur toward the canonical ultraThin (20 / 1.4). */
 html:not([data-theme="light"]) body.qf-wft.landing-v2 .site-header-inner {
   background: var(--glass-ultra-bg) !important;
-  -webkit-backdrop-filter: blur(20px) saturate(1.4) !important;
-  backdrop-filter: blur(20px) saturate(1.4) !important;
   border: 1px solid var(--glass-ultra-brd) !important;
   box-shadow: var(--glass-shadow) !important;
 }
@@ -93,15 +91,11 @@ html:not([data-theme="light"]) body.qf-wft.landing-v2 .site-header-inner {
    the outer bar goes transparent so the pill floats (cleanup forced it white). */
 html[data-theme="light"] body.qf-wft.landing-v2 .site-header {
   background: transparent !important;
-  -webkit-backdrop-filter: none !important;
-  backdrop-filter: none !important;
   border-bottom: 0 !important;
   box-shadow: none !important;
 }
 html[data-theme="light"] body.qf-wft.landing-v2 .site-header-inner {
   background: var(--glass-ultra-bg) !important;
-  -webkit-backdrop-filter: blur(20px) saturate(1.4) !important;
-  backdrop-filter: blur(20px) saturate(1.4) !important;
   border: 1px solid var(--glass-ultra-brd) !important;
   box-shadow: var(--glass-shadow) !important;
 }
@@ -111,15 +105,11 @@ html[data-theme="light"] body.qf-wft.landing-v2 .site-header-inner {
 @media (max-width: 640px) {
   html[data-theme="light"] body.qf-wft.landing-v2 .site-header {
     background: var(--glass-ultra-bg) !important;
-    -webkit-backdrop-filter: blur(20px) saturate(1.4) !important;
-    backdrop-filter: blur(20px) saturate(1.4) !important;
     border-bottom: 1px solid var(--glass-ultra-brd) !important;
     box-shadow: none !important;
   }
   html[data-theme="light"] body.qf-wft.landing-v2 .site-header-inner {
     background: transparent !important;
-    -webkit-backdrop-filter: none !important;
-    backdrop-filter: none !important;
     border: 0 !important;
     box-shadow: none !important;
   }
@@ -128,16 +118,9 @@ html[data-theme="light"] body.qf-wft.landing-v2 .site-header-inner {
 /* Solutions dropdown panel → ultraThin frosted (light was solid --surface). */
 html[data-theme="light"] body.qf-wft .nav-dd-panel {
   background: var(--glass-ultra-bg) !important;
-  -webkit-backdrop-filter: blur(20px) saturate(1.4) !important;
-  backdrop-filter: blur(20px) saturate(1.4) !important;
   border: 1px solid var(--glass-ultra-brd) !important;
   box-shadow: var(--glass-shadow) !important;
 }
-html:not([data-theme="light"]) body.qf-wft .nav-dd-panel {
-  -webkit-backdrop-filter: blur(20px) saturate(1.4) !important;
-  backdrop-filter: blur(20px) saturate(1.4) !important;
-}
-
 /* Nav / dropdown solid fallback where backdrop-filter is unsupported. */
 html[data-theme="light"] body.qf-wft.landing-v2 .site-header-inner,
 html[data-theme="light"] body.qf-wft .nav-dd-panel {
@@ -164,15 +147,11 @@ html body.qf-wft .qf-finder {
   border-radius: 16px !important;
   background: var(--glass-thin-bg) !important;
   border: 1px solid var(--glass-thin-brd) !important;
-  -webkit-backdrop-filter: blur(16px) saturate(1.3) !important;
-  backdrop-filter: blur(16px) saturate(1.3) !important;
   box-shadow: var(--glass-shadow) !important;
 }
 html body.qf-wft .qf-dir-search {
   background: var(--glass-thin-bg) !important;
   border: 1px solid var(--glass-thin-brd) !important;
-  -webkit-backdrop-filter: blur(16px) saturate(1.3) !important;
-  backdrop-filter: blur(16px) saturate(1.3) !important;
   box-shadow: var(--glass-shadow) !important;
 }
 html body.qf-wft .qf-finder,
@@ -188,14 +167,10 @@ html body.qf-wft .qf-dir-search {
 html body.qf-wft .qf-aud-toggle {
   background: var(--glass-thin-bg) !important;
   border: 1px solid var(--glass-thin-brd) !important;
-  -webkit-backdrop-filter: blur(14px) saturate(1.25) !important;
-  backdrop-filter: blur(14px) saturate(1.25) !important;
 }
 html body.qf-wft .qf-aud-seg.is-active {
   color: var(--ink) !important;
   background: var(--glass-thin-bg) !important;
-  -webkit-backdrop-filter: blur(10px) saturate(1.2) !important;
-  backdrop-filter: blur(10px) saturate(1.2) !important;
   box-shadow: inset 0 0 0 1px var(--accent), 0 2px 8px rgba(10, 37, 64, 0.12) !important;
 }
 html body.qf-wft .qf-aud-seg.is-active:hover { color: var(--ink) !important; }
@@ -227,8 +202,6 @@ html[data-theme="light"] body.qf-wft .qf-ba-card,
 html[data-theme="light"] body.qf-wft .final-cta-card {
   background: var(--glass-card-bg) !important;
   border: 1px solid var(--glass-card-brd) !important;
-  -webkit-backdrop-filter: blur(16px) saturate(1.3) !important;
-  backdrop-filter: blur(16px) saturate(1.3) !important;
   box-shadow: var(--glass-shadow) !important;
   transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease !important;
 }

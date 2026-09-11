@@ -189,8 +189,6 @@
   justify-content: center;
   transition: width 0.35s ease, height 0.35s ease, background 0.35s ease,
     border-color 0.35s ease, box-shadow 0.35s ease;
-  backdrop-filter: blur(4px);
-  -webkit-backdrop-filter: blur(4px);
   position: relative;
 }
 .qfg-circle svg {
@@ -250,8 +248,6 @@
   left: 50%;
   transform: translateX(-50%) translateY(6px);
   background: rgba(255, 255, 255, 0.04);
-  backdrop-filter: blur(24px) saturate(1.2);
-  -webkit-backdrop-filter: blur(24px) saturate(1.2);
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 12px;
   padding: 10px 12px;

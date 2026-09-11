@@ -22,7 +22,6 @@
 .qf-public-wft .topnav {
   background: #22282A;
   border-bottom: 1px solid var(--qf-wft-line-strong);
-  backdrop-filter: blur(14px);
 }
 .qf-public-wft .topnav-inner {
   min-height: 42px;
@@ -353,11 +352,9 @@ html[data-theme="light"] body.qf-public-wft .pricing.pricing-2up::before {
 
 /* DARK (default) — regularMaterial glass slab. */
 .qf-public-wft .price-card {
-  background: rgba(34, 40, 42, 0.60) !important;
+  background: rgb(34, 40, 42) !important;
   border: 1px solid rgba(255, 255, 255, 0.13) !important;
   border-radius: 18px !important;
-  -webkit-backdrop-filter: blur(14px) saturate(1.4) !important;
-  backdrop-filter: blur(14px) saturate(1.4) !important;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.32), inset 0 1px 0 rgba(255, 255, 255, 0.05) !important;
 }
 .qf-public-wft .price-card.featured {
@@ -370,11 +367,9 @@ html[data-theme="light"] body.qf-public-wft .pricing.pricing-2up::before {
 
 /* LIGHT — frosted white glass. */
 html[data-theme="light"] body.qf-public-wft .price-card {
-  background: rgba(255, 255, 255, 0.68) !important;
+  background: rgb(255, 255, 255) !important;
   border: 1px solid rgba(15, 37, 64, 0.10) !important;
   border-radius: 18px !important;
-  -webkit-backdrop-filter: blur(14px) saturate(1.4) !important;
-  backdrop-filter: blur(14px) saturate(1.4) !important;
   box-shadow: 0 8px 32px rgba(10, 37, 64, 0.10) !important;
 }
 html[data-theme="light"] body.qf-public-wft .price-card.featured {

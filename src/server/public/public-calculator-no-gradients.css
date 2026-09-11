@@ -482,10 +482,8 @@ body[data-qf-preset="mono"] .qf-map-expand {
      ≥5:1 small-caps labels over the darkest map areas). Strong blur+saturate
      still gives it frosted-glass character; the hairline + soft shadow define the
      edge. (Was 0.42, which failed AA — Alex's contrast benchmark.) */
-  background: rgba(255, 255, 255, 0.92) !important;
+  background: rgb(255, 255, 255) !important;
   background-image: none !important;
-  -webkit-backdrop-filter: blur(18px) saturate(1.8);
-  backdrop-filter: blur(18px) saturate(1.8);
   border: 1px solid rgba(255, 255, 255, 0.65) !important;
   box-shadow: 0 2px 12px -2px rgba(15, 23, 42, 0.26);
   /* Rounded-RECTANGLE corners matching the theme's CTA / "INSTANT FREIGHT
@@ -627,10 +625,8 @@ body[data-qf-preset="ironhorse"] .qf-addr-title {
 /* Frosted card shell: translucent surface + real backdrop blur over the soft
    grey page, with a bright glassy hairline edge. */
 body[data-qf-preset="cupertino"] .qf-widget {
-  background: var(--w-surface-frost, rgba(255, 255, 255, 0.72)) !important;
+  background: var(--w-surface-frost, rgb(255, 255, 255)) !important;
   background-image: none !important;
-  -webkit-backdrop-filter: blur(var(--w-frost-blur, 30px)) saturate(180%);
-  backdrop-filter: blur(var(--w-frost-blur, 30px)) saturate(180%);
   border-color: rgba(255, 255, 255, 0.6) !important;
 }
 /* Quiet inner panels — the options/add-ons panel, the result card and the
@@ -638,10 +634,8 @@ body[data-qf-preset="cupertino"] .qf-widget {
 body[data-qf-preset="cupertino"] .qf-options-panel,
 body[data-qf-preset="cupertino"] .qf-result,
 body[data-qf-preset="cupertino"] .qf-oog-panel {
-  background: rgba(255, 255, 255, 0.55) !important;
+  background: rgb(255, 255, 255) !important;
   background-image: none !important;
-  -webkit-backdrop-filter: blur(18px) saturate(180%);
-  backdrop-filter: blur(18px) saturate(180%);
 }
 /* Map overlay badges (pickup/delivery address pills, distance/transit bar,
    expand button) — frosted white glass with soft rounded-rect corners, mirroring
@@ -649,10 +643,8 @@ body[data-qf-preset="cupertino"] .qf-oog-panel {
 body[data-qf-preset="cupertino"] .qf-ma-pt,
 body[data-qf-preset="cupertino"] .qf-map-overlay,
 body[data-qf-preset="cupertino"] .qf-map-expand {
-  background: rgba(255, 255, 255, 0.7) !important;
+  background: rgb(255, 255, 255) !important;
   background-image: none !important;
-  -webkit-backdrop-filter: blur(14px) saturate(180%);
-  backdrop-filter: blur(14px) saturate(180%);
   border-radius: 12px !important;
 }
 /* Sentence-case section titles: .qf-section-title / .qf-addr-title are force-

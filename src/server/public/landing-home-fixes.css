@@ -24,7 +24,6 @@ body.qf-wft .site-header {
   background: transparent !important;
   border: none !important;
   box-shadow: none !important;
-  backdrop-filter: none !important;
   padding: 12px 20px 0 !important;
 }
 
@@ -34,9 +33,7 @@ body.qf-wft .site-header-inner {
   padding: 10px 22px !important;
   gap: 24px !important;
   border-radius: 14px !important;
-  background: rgba(24, 29, 31, 0.72) !important;
-  backdrop-filter: blur(24px) saturate(1.2) !important;
-  -webkit-backdrop-filter: blur(24px) saturate(1.2) !important;
+  background: rgb(24, 29, 31) !important;
   border: 1px solid rgba(255, 255, 255, 0.10) !important;
   box-shadow: 0 6px 20px rgba(0, 0, 0, 0.18) !important;
 }
@@ -318,9 +315,7 @@ body.qf-wft .chat-art {
      later via @import) so the translucent frosted background actually wins. */
   body.qf-wft.landing-v2 .site-header {
     padding: 0 !important;
-    background: rgba(18, 22, 26, 0.66) !important;
-    backdrop-filter: blur(22px) saturate(1.7) !important;
-    -webkit-backdrop-filter: blur(22px) saturate(1.7) !important;
+    background: rgb(18, 22, 26) !important;
     border-bottom: 1px solid rgba(255, 255, 255, 0.08) !important;
   }
   body.qf-wft.landing-v2 .site-header-inner {
@@ -333,8 +328,6 @@ body.qf-wft .chat-art {
     border: 0 !important;
     border-radius: 0 !important;
     box-shadow: none !important;
-    backdrop-filter: none !important;
-    -webkit-backdrop-filter: none !important;
   }
 
   body.qf-wft .site-nav {
@@ -403,9 +396,7 @@ body.qf-wft .site-mobile-menu {
     margin: 8px 0 0;
     padding: 8px;
     border-radius: 14px;
-    background: rgba(24, 29, 31, 0.94);
-    backdrop-filter: blur(24px) saturate(1.2);
-    -webkit-backdrop-filter: blur(24px) saturate(1.2);
+    background: rgb(24, 29, 31);
     border: 1px solid rgba(255, 255, 255, 0.10);
     box-shadow: 0 12px 28px rgba(0, 0, 0, 0.32);
   }

@@ -1272,16 +1272,12 @@ html[data-theme="light"] body.qf-wft .qf-cta-secondary:hover {
 html[data-theme="light"] body.qf-wft .site-header,
 html[data-theme="light"] body.qf-wft.landing-v2 .site-header {
   background: #ffffff !important;
-  -webkit-backdrop-filter: none !important;
-  backdrop-filter: none !important;
   border-bottom: 1px solid var(--border) !important;
   box-shadow: 0 1px 0 var(--border) !important;
 }
 html[data-theme="light"] body.qf-wft .site-header-inner,
 html[data-theme="light"] body.qf-wft.landing-v2 .site-header-inner {
   background: #ffffff !important;
-  -webkit-backdrop-filter: none !important;
-  backdrop-filter: none !important;
   border: 1px solid var(--border) !important;
 }
 html[data-theme="light"] body.qf-wft .site-actions .signin {
@@ -1301,8 +1297,6 @@ html[data-theme="light"] body.qf-wft .site-actions .signin {
 html[data-theme="light"] body.qf-wft .nav-dd-panel {
   background: var(--surface) !important;
   border-color: var(--border) !important;
-  -webkit-backdrop-filter: none !important;
-  backdrop-filter: none !important;
   box-shadow: 0 18px 42px rgba(10, 37, 64, 0.14) !important;
 }
 html[data-theme="light"] body.qf-wft .nav-dd-panel a:hover,
@@ -1322,8 +1316,6 @@ html[data-theme="light"] body.qf-wft .nav-dd-head {
 html[data-theme="light"] body.qf-wft .site-mobile-menu:not([hidden]) {
   background: var(--surface) !important;
   border-color: var(--border) !important;
-  -webkit-backdrop-filter: none !important;
-  backdrop-filter: none !important;
   box-shadow: 0 18px 42px rgba(10, 37, 64, 0.14) !important;
 }
 /* The :not() chain matches (and out-specifies) the generic light-mode
@@ -1414,7 +1406,5 @@ html[data-theme="light"] body.qf-wft .qf-showcase-pills .qf-chip {
   background: var(--surface) !important;
   border: 1px solid var(--border) !important;
   color: var(--ink) !important;
-  -webkit-backdrop-filter: none !important;
-  backdrop-filter: none !important;
   box-shadow: 0 1px 2px rgba(10, 37, 64, 0.06) !important;
 }
