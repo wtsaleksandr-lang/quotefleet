@@ -170,3 +170,37 @@ body.landing-v2.qf-wft .site-actions .qf-theme-btn {
   margin-right: 8px;
   border-color: var(--border-strong);
 }
+
+/* ── THE HERO'S TOP DIVIDER, SUPPRESSED AGAIN ─────────────────────────────
+   The rule 100 lines up already says what has to happen and why:
+
+     "The hero is the first section — its 'top' divider would sit under the
+      floating header. Suppress it; the header already caps the top of the
+      frame."
+       → body.landing-v2.qf-wft main > section.hero::after { display: none }
+
+   That selector stopped matching in #535. The homepage hero was rebuilt as
+   `<section class="qf-hhero qf-aud-hero">` and DELIBERATELY dropped `.hero`
+   (seven sheets in this bundle re-declare `.hero` with !important and four are
+   injected after first paint, so the rebuild had to live somewhere they could
+   not reach). The suppression was keyed on the class that went away, so the
+   divider came back — and because the rebuilt hero is flush under the sticky
+   bar, it came back at exactly `header.bottom`.
+
+   Measured on the rendered page before this rule: a 1px band at y=83 running
+   x=8 → x=1432 at 1440 (`left/right: max(0px, calc(50% - 712px))`, hence flush
+   to the viewport at ≤1424), reading rgb(225,227,229) on the #F8FAFC ground in
+   light and rgb(29,33,44) on #0C111D in dark — i.e. exactly this rule's
+   rgba(0,0,0,0.09) and rgba(255,255,255,0.07). That band is the "thin border
+   line under the menu bar". The header itself has `border: 0` and
+   `box-shadow: none` computed on all four sides, and `--chrome-bg` has equalled
+   `--bg` since #539, so there was no step and no border to find there.
+
+   Keyed on `.qf-aud-hero` as well as `.qf-hhero` so a future rename of either
+   one still leaves the hero covered. NOT a change to the frame mechanism: the
+   dividers between every other section, and both vertical rails, are untouched.
+   ───────────────────────────────────────────────────────────────────────── */
+html body.landing-v2.qf-wft main > section.qf-hhero::after,
+html body.landing-v2.qf-wft main > section.qf-aud-hero::after {
+  display: none;
+}
