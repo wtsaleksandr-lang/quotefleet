@@ -1,14 +1,14 @@
 /* QuoteFleet embeddable widget styles. Self-contained inside iframe/direct hosted page. */
 :root {
   --w-bg: #ffffff;
-  --w-fg: #0c1424;
-  --w-muted: #5a6478;
-  --w-border: #e3e7ee;
-  --w-primary: #2563eb;
-  --w-primary-hover: #1e51d9;
-  --w-accent: #6E8BFF;
+  --w-fg: #020618;
+  --w-muted: #475467;
+  --w-border: #E2E8F0;
+  --w-primary: #3356EE;
+  --w-primary-hover: #2942D8;
+  --w-accent: #3356EE;
   --w-radius: 12px;
-  --w-shadow: 0 8px 24px -8px rgba(15, 23, 42, 0.12), 0 2px 6px rgba(15,23,42,0.04);
+  --w-shadow: 0 2px 6px rgba(0,0,0,.04);
   --w-error: #b91c1c;
   --w-success: #15803d;
 
@@ -44,7 +44,7 @@ body {
   padding: var(--space-2);
   font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, Arial, sans-serif;
   background: transparent;
-  color: var(--w-fg);
+  color: var(--w-text, var(--w-fg));
   font-size: 14px;
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
@@ -73,7 +73,7 @@ body {
   padding: var(--space-1-5);
   margin-bottom: var(--space-2);
   border: 1px solid var(--w-border);
-  border-radius: 10px;
+  border-radius: 12px;
   font-size: 12.5px;
   line-height: 1.4;
 }
@@ -115,38 +115,38 @@ a.qf-contact-value:hover { text-decoration: underline; }
 .qf-input, .qf-select {
   width: 100%;
   padding: var(--space-1-5);
-  font-size: 14px;
-  border: 1px solid var(--w-border);
-  border-radius: var(--w-radius-input, 9px);
-  background: white;
-  color: var(--w-fg);
-  transition: border-color 0.15s, box-shadow 0.15s;
+  font-size: 14px; min-height: 48px;
+  border: 1px solid var(--w-border-control, #CAD5E2);
+  border-radius: var(--w-radius-input, 8px);
+  background: var(--w-input-bg, #ffffff);
+  color: var(--w-input-text, var(--w-fg));
+  transition: border-color .2s ease, box-shadow .2s ease;
 }
-.qf-input:focus, .qf-select:focus { outline: 0; border-color: var(--w-primary); box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12); }
+.qf-input:focus, .qf-select:focus { outline: 0; border-color: var(--w-primary); box-shadow: 0 0 0 1px var(--w-primary); } /* 2px accent edge: 1px border + 1px shadow; box-shadow never reflows */
 
-.qf-tabs { display: flex; gap: var(--tap-gap); background: #f1f4f9; padding: var(--space-0-5); border-radius: 10px; margin-bottom: var(--space-2); overflow-x: auto; -webkit-overflow-scrolling: touch; }
-.qf-tabs button { flex: 1 0 auto; min-width: max-content; padding: var(--space-1-5); font-size: 13px; font-weight: 700; border: 0; background: transparent; color: var(--w-muted); border-radius: 7px; cursor: pointer; transition: all 0.15s; }
-.qf-tabs button.active { background: white; color: var(--w-fg); box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
+.qf-tabs { display: flex; gap: var(--tap-gap); background: var(--w-surface-sunken, #F2F4F7); padding: var(--space-0-5); border-radius: 8px; margin-bottom: var(--space-2); overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.qf-tabs button { flex: 1 0 auto; min-width: max-content; padding: var(--space-1-5); font-size: 13px; font-weight: 700; border: 0; background: transparent; color: var(--w-muted); border-radius: 6px; cursor: pointer; transition: var(--w-motion, all .3s ease); }
+.qf-tabs button.active { background: var(--w-accent-surface, #ffffff); color: var(--w-input-text, var(--w-fg)); box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
 
 .qf-accessorials { display: flex; flex-wrap: wrap; gap: var(--tap-gap); margin-top: var(--space-1); align-items: flex-start; }
-.qf-acc-chip { display: inline-flex; align-items: center; justify-content: center; gap: var(--space-0-5); padding: var(--space-1) var(--space-1-5); font-size: 12px; line-height: 1.2; border-radius: 999px; border: 1px solid var(--w-border); background: white; color: var(--w-muted); cursor: pointer; transition: all 0.15s; white-space: nowrap; }
-.qf-acc-chip.active { background: rgba(37,99,235,0.08); border-color: var(--w-primary); color: var(--w-primary); }
+.qf-acc-chip { display: inline-flex; align-items: center; justify-content: center; gap: var(--space-0-5); padding: var(--space-1) var(--space-1-5); font-size: 12px; line-height: 1.2; border-radius: 9999px; border: 2px solid var(--w-border); background: var(--w-input-bg, #ffffff); color: var(--w-muted); cursor: pointer; transition: var(--w-motion, all .3s ease); white-space: nowrap; }
+.qf-acc-chip.active { background: var(--w-input-bg, #ffffff); border-color: var(--w-primary); color: var(--w-primary); }
 
 .qf-flags { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--tap-gap); margin-top: var(--space-1-5); }
-.qf-flags label { display: inline-flex; align-items: center; gap: var(--space-1); min-width: 0; font-size: 12.5px; line-height: 1.15; color: var(--w-fg); font-weight: 650; }
+.qf-flags label { display: inline-flex; align-items: center; gap: var(--space-1); min-width: 0; font-size: 12.5px; line-height: 1.15; color: var(--w-input-text, var(--w-fg)); font-weight: 650; }
 .qf-flags label span:not(.qf-help) { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 /* Checkbox hit box held at the >=24px WCAG 2.2 floor (was 15px). The 42px
    label pill (public-calculator-ux.css) also stays fully clickable. */
 .qf-flags input { width: var(--tap-min); height: var(--tap-min); flex: 0 0 auto; }
 
-.qf-cta { display: inline-flex; align-items: center; justify-content: center; width: 100%; padding: var(--space-1-5) var(--space-2); font-size: 15px; font-weight: 750; border: 0; border-radius: 10px; background: var(--w-primary); color: white; cursor: pointer; transition: all 0.15s; box-shadow: 0 1px 0 rgba(255,255,255,0.15) inset; margin-top: var(--space-2); }
-.qf-cta:hover { background: var(--w-primary-hover); transform: translateY(-1px); }
+.qf-cta { display: inline-flex; align-items: center; justify-content: center; width: 100%; padding: var(--space-1-5) var(--space-2); font-size: 15px; font-weight: 750; border: 0; border-radius: 8px; min-height: 48px; background: var(--w-primary); color: var(--w-accent-text, #ffffff); cursor: pointer; transition: var(--w-motion, all .3s ease); margin-top: var(--space-2); }
+.qf-cta:hover { background: var(--w-primary-hover); }
 .qf-cta:disabled { background: #c8cfdb; cursor: not-allowed; transform: none; }
-.qf-cta.qf-secondary { background: white; color: var(--w-fg); border: 1px solid var(--w-border); }
-.qf-cta.qf-secondary:hover { background: #f1f4f9; }
+.qf-cta.qf-secondary { background: var(--w-surface, #ffffff); color: var(--w-text, var(--w-fg)); border: 1px solid var(--w-border); }
+.qf-cta.qf-secondary:hover { background: var(--w-surface-sunken, #F2F4F7); }
 
-.qf-result { background: linear-gradient(135deg, #f0f9ff 0%, #ecfeff 100%); border-radius: var(--w-radius); padding: var(--space-2); margin-top: var(--space-2); border: 1px solid #c8e8ff; }
-.qf-result .total { font-size: 36px; font-weight: 800; color: var(--w-fg); letter-spacing: -0.03em; line-height: 1; margin-bottom: var(--space-0-5); }
+.qf-result { background: var(--w-input-bg, #F8FAFC); border-radius: var(--w-radius); padding: var(--space-2); margin-top: var(--space-2); border: 1px solid var(--w-border); }
+.qf-result .total { font-size: 36px; font-weight: 800; color: var(--w-oncard-text, var(--w-fg)); letter-spacing: -0.03em; line-height: 1; margin-bottom: var(--space-0-5); }
 .qf-result .total .currency { font-size: 18px; color: var(--w-oncard-muted, var(--w-muted)); margin-right: var(--space-0-5); font-weight: 600; }
 .qf-result .meta { font-size: 13px; color: var(--w-oncard-muted, var(--w-muted)); margin-bottom: var(--space-1); }
 /* ETA pill: text = --w-oncard-accent (engine-guaranteed ≥AA on the result
@@ -154,7 +154,7 @@ a.qf-contact-value:hover { text-decoration: underline; }
    accent-hued fill pulls the background toward the text's own hue and shaves
    contrast below AA (ironhorse/cupertino/booking/tesla/stripe were 3.9–4.3).
    The pill shape reads from the hairline border + radius instead. */
-.qf-result .qf-eta { display: inline-flex; align-items: center; font-size: 12.5px; font-weight: 700; color: var(--w-oncard-accent, #0D3CFC); background: transparent; border: 1px solid var(--w-accent-pill-border, rgba(13,60,252,0.18)); border-radius: 999px; padding: var(--space-0-5) var(--space-1-5); margin: 0 0 var(--space-1-5); }
+.qf-result .qf-eta { display: inline-flex; align-items: center; font-size: 12.5px; font-weight: 700; color: var(--w-oncard-accent, #3356EE); background: transparent; border: 1px solid var(--w-accent-pill-border, rgba(51,86,238,0.18)); border-radius: 9999px; padding: var(--space-0-5) var(--space-1-5); margin: 0 0 var(--space-1-5); }
 .qf-route-map { display: block; width: 100%; aspect-ratio: 640 / 360; object-fit: cover; border: 1px solid var(--w-border); border-radius: var(--w-radius); margin-top: var(--space-1-5); }
 .qf-route-map[hidden] { display: none; }
 .qf-view-quote { display: block; text-align: center; text-decoration: none; margin-bottom: var(--space-1-5); }
@@ -191,15 +191,15 @@ body[data-qf-cta-hover="fill"] .qf-cta:not(.qf-secondary):hover { background: va
 .qf-success { background: #dcfce7; color: var(--w-success); border-radius: 8px; padding: var(--space-1-5) var(--space-2); font-size: 13px; margin-top: var(--space-1-5); }
 .qf-footer { margin-top: var(--space-2); font-size: 11.5px; color: var(--w-footer-text, var(--w-muted)); text-align: center; }
 .qf-footer a { color: var(--w-footer-text, var(--w-muted)); }
-.qf-spinner { display: inline-block; width: 14px; height: 14px; border: 2px solid rgba(255,255,255,0.4); border-top-color: white; border-radius: 50%; animation: qf-spin 0.8s linear infinite; }
+.qf-spinner { display: inline-block; width: 14px; height: 14px; border: 2px solid rgba(255,255,255,0.4); border-top-color: var(--w-accent-text, #ffffff); border-radius: 50%; animation: qf-spin 0.8s linear infinite; }
 @keyframes qf-spin { to { transform: rotate(360deg); } }
 
 .qf-typeahead { position: relative; }
 .qf-suggestions { position: absolute; top: 100%; left: 0; right: 0; z-index: 50; margin-top: var(--space-0-5); background: var(--w-bg); border: 1px solid var(--w-border); border-radius: 8px; box-shadow: 0 6px 20px rgba(15, 23, 42, 0.12); max-height: 280px; overflow-y: auto; display: none; }
 .qf-suggestions.open { display: block; }
-.qf-suggestion { padding: var(--space-1) var(--space-1-5); font-size: 13.5px; cursor: pointer; border-bottom: 1px solid var(--w-border); color: var(--w-fg); }
+.qf-suggestion { padding: var(--space-1) var(--space-1-5); font-size: 13.5px; cursor: pointer; border-bottom: 1px solid var(--w-border); color: var(--w-input-text, var(--w-fg)); }
 .qf-suggestion:last-child { border-bottom: 0; }
-.qf-suggestion:hover, .qf-suggestion.active { background: rgba(37, 99, 235, 0.06); color: var(--w-primary); }
+.qf-suggestion:hover, .qf-suggestion.active { background: var(--w-input-bg-hover, #F2F4F7); color: var(--w-primary); }
 .qf-suggestion .meta { display: block; font-size: 11.5px; color: var(--w-muted); margin-top: 0; }
 
 /* Custom branded <select> replacement (rounded, themeable dropdown). The button
@@ -218,18 +218,18 @@ body[data-qf-cta-hover="fill"] .qf-cta:not(.qf-secondary):hover { background: va
    the visual chip stays small while the hit box meets the minimum. Colours
    are unchanged (owned by the theme/contrast engine). */
 .qf-help { position: relative; isolation: isolate; display: inline-flex; align-items: center; justify-content: center; width: var(--tap-min); height: var(--tap-min); min-width: var(--tap-min); margin-left: var(--space-0-5); border: 0; background: transparent; color: #8a94a6; font-size: 9px; font-weight: 750; cursor: pointer; user-select: none; vertical-align: middle; line-height: 1; transition: color 0.12s; touch-action: manipulation; }
-.qf-help::before { content: ''; position: absolute; z-index: -1; left: 50%; top: 50%; width: 16px; height: 16px; transform: translate(-50%, -50%); border-radius: 999px; border: 1px solid #dbe1ea; background: #f8fafc; transition: background 0.12s, border-color 0.12s; }
+.qf-help::before { content: ''; position: absolute; z-index: -1; left: 50%; top: 50%; width: 16px; height: 16px; transform: translate(-50%, -50%); border-radius: 9999px; border: 1px solid #dbe1ea; background: #f8fafc; transition: background 0.12s, border-color 0.12s; }
 .qf-help:hover, .qf-help.open { color: #5f6c80; }
 .qf-help:hover::before, .qf-help.open::before { background: #eef2f7; border-color: #cfd7e3; }
-.qf-tip-bubble { position: absolute; z-index: 2147483600; max-width: 240px; background: #0c1424; color: #fff; padding: var(--space-1) var(--space-1-5); border-radius: 8px; font-size: 12.5px; line-height: 1.45; box-shadow: 0 6px 24px rgba(0, 0, 0, 0.20); pointer-events: none; opacity: 0; transform: translateY(4px); transition: opacity 0.12s ease, transform 0.12s ease; }
+.qf-tip-bubble { position: absolute; z-index: 2147483600; max-width: 240px; background: #0c1424; color: var(--w-accent-text, #ffffff); padding: var(--space-1) var(--space-1-5); border-radius: 8px; font-size: 12.5px; line-height: 1.45; box-shadow: 0 6px 24px rgba(0, 0, 0, 0.20); pointer-events: none; opacity: 0; transform: translateY(4px); transition: opacity 0.12s ease, transform 0.12s ease; }
 .qf-tip-bubble.show { opacity: 1; transform: translateY(0); }
 .qf-tip-bubble::before { content: ''; position: absolute; top: -5px; left: var(--qf-tip-arrow, 12px); width: 10px; height: 10px; background: #0c1424; transform: rotate(45deg); }
 
 .qf-chat { margin-top: var(--space-2); border: 1px solid var(--w-border); border-radius: 10px; background: var(--w-bg); padding: var(--space-1-5); }
 .qf-chat-msgs { max-height: 280px; overflow-y: auto; display: flex; flex-direction: column; gap: var(--space-1); margin-bottom: var(--space-1); padding: var(--space-0-5); }
 .qf-chat-bubble { padding: var(--space-1) var(--space-1-5); border-radius: 12px; font-size: 13px; line-height: 1.45; max-width: 85%; word-wrap: break-word; }
-.qf-chat-bubble.user { align-self: flex-end; background: var(--w-primary, #2563eb); color: #fff; border-bottom-right-radius: 4px; }
-.qf-chat-bubble.assistant { align-self: flex-start; background: var(--w-surface-2, #f1f4f9); color: var(--w-fg); border-bottom-left-radius: 4px; }
+.qf-chat-bubble.user { align-self: flex-end; background: var(--w-primary, #3356EE); color: var(--w-accent-text, #ffffff); border-bottom-right-radius: 6px; }
+.qf-chat-bubble.assistant { align-self: flex-start; background: var(--w-surface-2, #F2F4F7); color: var(--w-surface-2-text, var(--w-fg)); border-bottom-left-radius: 6px; }
 .qf-chat-bubble.thinking { align-self: flex-start; font-size: 12px; color: var(--w-muted); font-style: italic; }
 .qf-chat-input-row { display: flex; gap: var(--tap-gap); align-items: stretch; }
 .qf-chat-input-row input { flex: 1; min-width: 0; }
@@ -237,7 +237,7 @@ body[data-qf-cta-hover="fill"] .qf-cta:not(.qf-secondary):hover { background: va
    that was pushing it below the input, and stretch it to the input's height so
    the two are the same height and vertically centered on desktop + mobile. */
 .qf-chat-send { margin-top: 0; padding: var(--space-1) var(--space-2); font-size: 13px; flex-shrink: 0; width: auto; align-self: stretch; }
-.qf-chat-toggle button { width: 100%; margin-top: var(--space-1); background: transparent; color: var(--w-primary, #2563eb); border: 1px dashed var(--w-border-strong, #c8cfdb); }
+.qf-chat-toggle button { width: 100%; margin-top: var(--space-1); background: transparent; color: var(--w-primary, #3356EE); border: 1px dashed var(--w-border-strong, #c8cfdb); }
 
 @media (max-width: 640px) {
   body { padding: var(--space-1); }
@@ -258,7 +258,7 @@ body[data-qf-cta-hover="fill"] .qf-cta:not(.qf-secondary):hover { background: va
 
 /* LTL size & handling panel */
 .qf-ltl-flags { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-.qf-ltl-class { display: inline-flex; align-items: center; margin-top: var(--space-1); font-size: 12.5px; font-weight: 700; color: #0D3CFC; background: rgba(13,60,252,0.08); border: 1px solid rgba(13,60,252,0.18); border-radius: 999px; padding: var(--space-0-5) var(--space-1-5); }
+.qf-ltl-class { display: inline-flex; align-items: center; margin-top: var(--space-1); font-size: 12.5px; font-weight: 700; color: #0D3CFC; background: rgba(13,60,252,0.08); border: 1px solid rgba(13,60,252,0.18); border-radius: 9999px; padding: var(--space-0-5) var(--space-1-5); }
 .qf-ltl-class strong { font-weight: 800; margin: 0 var(--space-0-5); }
 
 @media (max-width: 380px) {
@@ -316,7 +316,7 @@ body[data-qf-cta-hover="fill"] .qf-cta:not(.qf-secondary):hover { background: va
   cursor: pointer;
 }
 .qf-disclaimer-toggle:hover { text-decoration: underline; }
-.qf-disclaimer-toggle:focus-visible { outline: 2px solid var(--w-accent, var(--w-primary)); outline-offset: 2px; border-radius: 4px; }
+.qf-disclaimer-toggle:focus-visible { outline: 2px solid var(--w-accent, var(--w-primary)); outline-offset: 2px; border-radius: 6px; }
 .qf-disclaimer-toggle[hidden] { display: none; }
 
 /* Pickup + Delivery side-by-side (Alex: keep on one line, both viewports).
@@ -362,9 +362,9 @@ body[data-qf-cta-hover="fill"] .qf-cta:not(.qf-secondary):hover { background: va
 .qf-map-modal { position: fixed; inset: 0; z-index: 1000; display: flex; align-items: center; justify-content: center; }
 .qf-map-modal[hidden] { display: none; }
 .qf-map-modal-backdrop { position: absolute; inset: 0; background: rgba(15,23,42,0.6); }
-.qf-map-modal-panel { position: relative; width: min(92vw, 720px); max-height: 88vh; background: var(--w-bg); border-radius: 14px; overflow: hidden; box-shadow: 0 20px 60px rgba(15,23,42,0.35); display: flex; flex-direction: column; }
-.qf-map-modal-head { display: flex; align-items: center; justify-content: space-between; padding: var(--space-1-5) var(--space-2); border-bottom: 1px solid var(--w-border); font-weight: 750; color: var(--w-fg); }
-.qf-map-modal-x { position: absolute; top: var(--space-1); right: var(--space-1); z-index: 3; display: flex; align-items: center; justify-content: center; width: 32px; height: 32px; border: 0; border-radius: 999px; background: rgba(15,23,42,0.6); color: rgba(255,255,255,0.95); font-size: 15px; cursor: pointer; }
+.qf-map-modal-panel { position: relative; width: min(92vw, 720px); max-height: 88vh; background: var(--w-bg); border-radius: 12px; overflow: hidden; box-shadow: 0 20px 60px rgba(15,23,42,0.35); display: flex; flex-direction: column; }
+.qf-map-modal-head { display: flex; align-items: center; justify-content: space-between; padding: var(--space-1-5) var(--space-2); border-bottom: 1px solid var(--w-border); font-weight: 750; color: var(--w-text, var(--w-fg)); }
+.qf-map-modal-x { position: absolute; top: var(--space-1); right: var(--space-1); z-index: 3; display: flex; align-items: center; justify-content: center; width: 32px; height: 32px; border: 0; border-radius: 9999px; background: rgba(15,23,42,0.6); color: rgba(255,255,255,0.95); font-size: 15px; cursor: pointer; }
 .qf-map-viewport { position: relative; overflow: hidden; touch-action: none; cursor: grab; background: var(--w-bg); }
 /* Reserve room in the modal's top address bar so the close button never overlaps it. */
 .qf-map-viewport .qf-map-addr { padding-right: var(--space-6); }
@@ -372,10 +372,10 @@ body[data-qf-cta-hover="fill"] .qf-cta:not(.qf-secondary):hover { background: va
 .qf-map-modal-img { display: block; width: 100%; height: auto; transform-origin: center center; will-change: transform; user-select: none; }
 .qf-map-zoom { position: absolute; right: var(--space-2); bottom: var(--space-2); display: flex; flex-direction: column-reverse; gap: var(--space-0-5); }
 /* Apple-style frosted-glass zoom controls — small, stacked, translucent, blurred. */
-.qf-map-zoom button { width: 28px; height: 28px; border-radius: 9px; border: 1px solid rgba(255,255,255,0.55); background: rgba(255,255,255,0.5); backdrop-filter: blur(12px) saturate(1.5); -webkit-backdrop-filter: blur(12px) saturate(1.5); color: #0c1424; font-size: 15px; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 8px rgba(15,23,42,0.2); }
+.qf-map-zoom button { width: 28px; height: 28px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.55); background: rgba(255,255,255,0.5); backdrop-filter: blur(12px) saturate(1.5); -webkit-backdrop-filter: blur(12px) saturate(1.5); color: #0c1424; font-size: 15px; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 8px rgba(15,23,42,0.2); }
 
 /* Full-address autosuggest: bold primary line + muted secondary line. */
-.qf-sugg-main { display: block; font-size: 13.5px; font-weight: 650; color: var(--w-fg); }
+.qf-sugg-main { display: block; font-size: 13.5px; font-weight: 650; color: var(--w-input-text, var(--w-fg)); }
 /* Selected addresses embedded over the top of the map (Alex): two columns side
    by side (in line on every viewport), ellipsis-truncated. Dots match the A/B
    markers (home green / coral-red). */
@@ -392,7 +392,7 @@ body[data-qf-cta-hover="fill"] .qf-cta:not(.qf-secondary):hover { background: va
 .qf-ma-link { position: relative; flex: 1 1 auto; min-width: 30px; align-self: center; height: 14px; display: flex; align-items: center; justify-content: center; }
 .qf-ma-link::before { content: ""; position: absolute; left: 0; right: 0; top: 50%; border-top: 1.5px dashed rgba(255,255,255,0.5); }
 .qf-ma-truck { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); display: inline-flex; color: rgba(255,255,255,0.95); filter: drop-shadow(0 1px 1px rgba(15,23,42,0.5)); animation: qf-ma-truck-glide 5.5s ease-in-out infinite; will-change: left, opacity; }
-.qf-ma-dot { width: 8px; height: 8px; border-radius: 999px; flex: 0 0 auto; }
+.qf-ma-dot { width: 8px; height: 8px; border-radius: 9999px; flex: 0 0 auto; }
 .qf-ma-a { background: #36c98b; }
 .qf-ma-b { background: #f97373; }
 .qf-ma-txt { font-size: 10px; font-weight: 600; color: rgba(255,255,255,0.96); line-height: 1.45; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; text-shadow: 0 1px 2px rgba(15,23,42,0.55); }
@@ -414,11 +414,11 @@ body[data-qf-map-tone="dark"] .qf-map-addr { background: linear-gradient(rgba(15
 .qf-timeline[hidden] { display: none; }
 .qf-timeline.show { opacity: 1; transform: none; }
 .qf-tl-row { display: flex; align-items: center; gap: var(--space-1); }
-.qf-tl-dot { width: 10px; height: 10px; border-radius: 999px; flex: 0 0 auto; }
+.qf-tl-dot { width: 10px; height: 10px; border-radius: 9999px; flex: 0 0 auto; }
 .qf-tl-a { background: #36c98b; }
 .qf-tl-b { background: #f97373; }
-.qf-tl-bar { position: relative; flex: 1; height: 3px; border-radius: 999px; background: rgba(15,23,42,.12); }
-.qf-tl-fill { position: absolute; left: 0; top: 0; height: 100%; width: 0; border-radius: 999px; background: linear-gradient(90deg, #36c98b, #0D3CFC); transition: width 1.25s ease; }
+.qf-tl-bar { position: relative; flex: 1; height: 3px; border-radius: 9999px; background: rgba(15,23,42,.12); }
+.qf-tl-fill { position: absolute; left: 0; top: 0; height: 100%; width: 0; border-radius: 9999px; background: var(--w-oncard-accent, #3356EE); transition: width 1.25s ease; }
 .qf-tl-truck { position: absolute; top: 50%; left: 0; transform: translate(-50%, -50%); color: var(--w-oncard-accent, #0D3CFC); transition: left 1.25s ease; }
 .qf-timeline.show .qf-tl-fill { width: 100%; }
 .qf-timeline.show .qf-tl-truck { left: 100%; }
@@ -443,13 +443,13 @@ body[data-qf-map-tone="dark"] .qf-map-addr { background: linear-gradient(rgba(15
 .qf-share-title { font-size: 12px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; color: var(--w-muted); margin-bottom: var(--space-1); }
 .qf-share-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-1); }
 .qf-share-actions .qf-cta { margin-top: 0; min-height: 44px; font-size: 14px; text-decoration: none; }
-.qf-share-panel { margin-top: var(--space-1-5); padding: var(--space-1-5); border: 1px solid var(--w-border); border-radius: var(--w-radius); background: color-mix(in srgb, var(--w-fg) 4%, transparent); }
+.qf-share-panel { margin-top: var(--space-1-5); padding: var(--space-1-5); border: 1px solid var(--w-border); border-radius: var(--w-radius); background: color-mix(in srgb, var(--w-text, var(--w-fg)) 4%, transparent); }
 .qf-share-input { width: 100%; min-height: 44px; resize: vertical; }
 .qf-share-panel .qf-share-send { margin-top: var(--space-1); }
 .qf-share-hint { margin-top: var(--space-1); font-size: 11px; line-height: 1.4; color: var(--w-muted); }
-.qf-share-status { display: none; margin-top: var(--space-1); font-size: 12.5px; line-height: 1.4; font-weight: 650; color: var(--w-fg); }
-.qf-share-status[data-kind="ok"] { color: color-mix(in srgb, var(--w-fg) 40%, #2f9e44); }
-.qf-share-status[data-kind="err"] { color: color-mix(in srgb, var(--w-fg) 40%, #e5484d); }
+.qf-share-status { display: none; margin-top: var(--space-1); font-size: 12.5px; line-height: 1.4; font-weight: 650; color: var(--w-text, var(--w-fg)); }
+.qf-share-status[data-kind="ok"] { color: color-mix(in srgb, var(--w-text, var(--w-fg)) 40%, #2f9e44); }
+.qf-share-status[data-kind="err"] { color: color-mix(in srgb, var(--w-text, var(--w-fg)) 40%, #e5484d); }
 @media (max-width: 390px) {
   .qf-share-actions { grid-template-columns: 1fr; }
 }
@@ -654,3 +654,54 @@ body[data-qf-cta-hover="ring"] .qf-cta:not(.qf-secondary):hover { background: va
    CSS transition is used (matching the modal's instant snap), so a
    prefers-reduced-motion viewer gets an immediate, non-animated update for free. */
 .qf-map-card.qf-map-base .qf-map-img { transform-origin: center center; will-change: transform; }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   DESIGN WAVE — widget token namespace (appended at EOF so the line-numbered
+   spacing/colour guard baselines above stay stable; see
+   docs/design-refactor/baseline-protocol.md rule 1).
+
+   ISOLATION CONTRACT: the widget is embedded into third-party carrier pages,
+   so `--w-*` is a CLOSED namespace. It deliberately does NOT read the site's
+   `:root` tokens (a host page could override them) and never writes outside
+   itself. These are the STATIC pre-theme defaults + var() fallbacks; the 12
+   tenant presets supply their own values at runtime via applyTheme().
+
+   --w-text vs --w-fg: applyTheme() emits `--w-text` but NOT `--w-fg` (see the
+   WidgetThemeTokens contract in src/server/widgetThemes.ts), so `--w-fg` can
+   never follow a preset -- it is a STATIC light-mode ink, paired with the
+   equally static `--w-bg`. Use `--w-text` (shell), `--w-input-text` (input /
+   options / result surfaces) or `--w-surface-2-text` (tinted panels) and keep
+   `--w-fg` only as the final fallback in a var() chain. Bare `var(--w-fg)` on
+   a themed surface paints dark ink on dark presets -- the bug this wave
+   retired. Enforced by src/server/widgetTokenIsolation.test.ts.
+   ══════════════════════════════════════════════════════════════════════════ */
+:root {
+  /* Pre-theme default for the one token applyTheme actually remaps. Declaring
+     it means `var(--w-text, …)` no longer silently falls through to --w-fg. */
+  --w-text: #020618;
+  --w-text-secondary: #314158;
+  --w-surface: #ffffff;
+  --w-surface-alt: #F8FAFC;
+  --w-surface-sunken: #F2F4F7;
+  --w-border-control: #CAD5E2;
+  /* Exactly three elevations. */
+  --w-shadow-sm: 0 2px 6px rgba(0,0,0,.04);
+  --w-shadow-lg: 0 8px 24px rgba(0,0,0,.04);
+  --w-shadow-accent: 0 4px 24px rgba(165,176,204,.20);
+  --w-motion: all .3s ease;
+  --w-motion-fast: .2s ease;
+}
+
+/* Figures are tabular so digits never jitter as values update. The widget
+   loads NO monospace face and no --font-mono: USDOT/MC credential meta renders
+   in the tenant's theme sans, and .qf-cred-meta wraps rather than sizing to a
+   fixed advance width, so a wider platform face cannot overflow it. */
+.qf-result .total,
+.qf-total-box .total,
+.qf-ltl-sum-val,
+.qf-cred-auth,
+.qf-map-ov-val,
+.qf-tl-labels,
+.qf-result .line .amt {
+  font-variant-numeric: tabular-nums;
+}

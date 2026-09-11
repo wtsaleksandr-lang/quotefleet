@@ -81,8 +81,8 @@
   box-sizing: border-box;
   border: 1px solid var(--w-border);
   border-radius: 12px;
-  background: color-mix(in srgb, var(--w-fg) 3%, transparent);
-  color: var(--w-fg);
+  background: color-mix(in srgb, var(--w-text, var(--w-fg)) 3%, transparent);
+  color: var(--w-text, var(--w-fg));
   font-size: 12.5px;
   font-weight: 650;
   line-height: 1.25;
@@ -139,7 +139,7 @@
   padding: var(--space-1-5) var(--space-2);
   border: 0;
   background: transparent;
-  color: var(--w-fg);
+  color: var(--w-input-text, var(--w-fg));
   font-size: 13px;
   font-weight: 800;
   text-align: left;
@@ -194,7 +194,7 @@
   display: flex;
   flex-direction: column;
   background: var(--w-bg);
-  color: var(--w-fg);
+  color: var(--w-fg); /* static-pair: sits on the equally-static --w-bg, not a themed surface */
   border: 1px solid var(--w-border);
   border-bottom: 0;
   border-radius: 20px 20px 0 0;
@@ -221,7 +221,7 @@
   appearance: none;
   border: 0;
   background: transparent;
-  color: var(--w-fg);
+  color: var(--w-fg); /* static-pair: sits on the equally-static --w-bg, not a themed surface */
   font-size: 24px;
   cursor: pointer;
   border-radius: 8px;
@@ -378,7 +378,7 @@ body.qf-modal-open { overflow: hidden; }
   box-sizing: border-box;
   border: 1px solid var(--w-border);
   border-radius: 10px;
-  background: color-mix(in srgb, var(--w-fg) 4%, transparent);
+  background: color-mix(in srgb, var(--w-text, var(--w-fg)) 4%, transparent);
   color: var(--w-text, var(--w-fg));
   font-size: 12px;
   font-weight: 600;
@@ -482,7 +482,7 @@ body.qf-modal-open { overflow: hidden; }
   cursor: pointer;
   transition: color 0.15s, border-color 0.15s, background 0.15s;
 }
-.qf-ltl-remove:hover { color: var(--w-text, var(--w-fg)); border-color: var(--w-muted); background: color-mix(in srgb, var(--w-fg) 8%, transparent); }
+.qf-ltl-remove:hover { color: var(--w-text, var(--w-fg)); border-color: var(--w-muted); background: color-mix(in srgb, var(--w-text, var(--w-fg)) 8%, transparent); }
 
 .qf-ltl-row-a { display: grid; grid-template-columns: 1.6fr 1fr; gap: var(--space-0-5); }
 .qf-ltl-row-b { display: flex; flex-wrap: wrap; align-items: flex-end; gap: var(--space-0-5); margin-top: var(--space-0-5); }
@@ -512,7 +512,7 @@ body.qf-modal-open { overflow: hidden; }
   cursor: pointer;
   transition: color 0.15s, border-color 0.15s, background 0.15s;
 }
-.qf-ltl-add:hover { color: var(--w-text, var(--w-fg)); border-color: var(--w-muted); background: color-mix(in srgb, var(--w-fg) 4%, transparent); }
+.qf-ltl-add:hover { color: var(--w-text, var(--w-fg)); border-color: var(--w-muted); background: color-mix(in srgb, var(--w-text, var(--w-fg)) 4%, transparent); }
 .qf-ltl-add span { font-size: 14px; font-weight: 700; line-height: 1; }
 
 /* Live summary strip — weight (both units) · pieces · computed class · stacking.
@@ -1134,7 +1134,7 @@ html, body { overscroll-behavior: auto; }
      the enlarge-modal already paints on .qf-map-viewport when it opens; the
      inline surface needs it now that it is draggable too. Token-only, so it
      stays correct in light and dark. */
-  background: color-mix(in srgb, var(--w-fg) 8%, var(--w-bg));
+  background: color-mix(in srgb, var(--w-fg) 8%, var(--w-bg)); /* static-pair: sits on the equally-static --w-bg, not a themed surface */
 }
 /* widget.js toggles .qf-map-grabbing for the duration of a pointer drag. :active
    alone is not enough once the pointer is captured. */
