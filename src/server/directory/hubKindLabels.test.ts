@@ -154,7 +154,10 @@ describe('inland hub page (INLMSP) — no seaport vocabulary', () => {
 
   it('says what it is: an intermodal hub, in the intro, <title> and FAQ', () => {
     expect(html).toContain('whose nearest intermodal hub is Minneapolis/St. Paul Intermodal');
-    expect(html).toContain('<title>Minneapolis/St. Paul Intermodal Intermodal Hub Drayage &amp; Trucking Carriers — 120 Near St. Paul | QuoteFleet</title>');
+    // The hub's own name already says "Intermodal", so the title does not
+    // append "Intermodal Hub" again (it read "… Intermodal Intermodal Hub …").
+    expect(html).toContain('<title>Minneapolis/St. Paul Intermodal Drayage &amp; Trucking Carriers — 120 Near St. Paul | QuoteFleet</title>');
+    expect(html).not.toContain('Intermodal Intermodal');
     expect(html).toContain('rail ramps and intermodal terminals');
     expect(html).toContain('intermodal containers');
   });

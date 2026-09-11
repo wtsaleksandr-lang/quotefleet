@@ -312,7 +312,9 @@ describe('renderDirectoryResults — RFQ CTA reflects the recipient cap', () => 
   it('still surfaces the TRUE filtered total in the info count (not the cap)', () => {
     expect(html).toContain('data-total="300"');
     expect(html).toContain('<b class="qf-ab-n">300</b>');
-    expect(html).toContain('carriers filtered');
+    // "carriers" and "filtered" are separate spans so the phone-collapsed bar
+    // can drop the noun ("300 / filtered") — the sentence still reads whole.
+    expect(html).toContain('<span class="qf-ab-lblw">carriers</span> <span class="qf-ab-lbls">filtered</span>');
   });
 });
 
