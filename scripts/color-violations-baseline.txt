@@ -101,11 +101,3 @@ src/server/public/vertical-pages-wefixtrades.css:18:3	color: #FFFFFF
 src/server/public/vertical-pages-wefixtrades.css:21:3	color: #FFFFFF
 src/server/public/vertical-pages-wefixtrades.css:43:3	color: #FFFFFF
 src/server/public/vertical-pages-wefixtrades.css:67:3	color: #FFFFFF
-src/server/public/widget-style.css:121:3	background: white
-src/server/public/widget-style.css:129:26	background: white
-src/server/public/widget-style.css:132:241	background: white
-src/server/public/widget-style.css:142:231	color: white
-src/server/public/widget-style.css:145:24	background: white
-src/server/public/widget-style.css:194:117	color: white
-src/server/public/widget-style.css:224:98	color: #fff
-src/server/public/widget-style.css:231:85	color: #fff

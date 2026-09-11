@@ -1099,23 +1099,8 @@ src/server/public/vertical-pages-wefixtrades.css:33	spacing	padding: 42px 28px
 src/server/public/vertical-pages-wefixtrades.css:5	spacing	padding: 76px 28px 58px
 src/server/public/vertical-pages-wefixtrades.css:80	radius	border-radius: 4px
 src/server/public/widget-hazmat-pill.css:126	radius	border-radius: 999px
-src/server/public/widget-style.css:128	radius	border-radius: 7px
-src/server/public/widget-style.css:132	radius	border-radius: 999px
-src/server/public/widget-style.css:157	radius	border-radius: 999px
 src/server/public/widget-style.css:209	spacing	left: -9999px
-src/server/public/widget-style.css:221	radius	border-radius: 999px
 src/server/public/widget-style.css:226	spacing	top: -5px
-src/server/public/widget-style.css:231	radius	border-bottom-right-radius: 4px
-src/server/public/widget-style.css:232	radius	border-bottom-left-radius: 4px
-src/server/public/widget-style.css:261	radius	border-radius: 999px
-src/server/public/widget-style.css:319	radius	border-radius: 4px
-src/server/public/widget-style.css:365	radius	border-radius: 14px
-src/server/public/widget-style.css:367	radius	border-radius: 999px
-src/server/public/widget-style.css:375	radius	border-radius: 9px
-src/server/public/widget-style.css:395	radius	border-radius: 999px
-src/server/public/widget-style.css:417	radius	border-radius: 999px
-src/server/public/widget-style.css:420	radius	border-radius: 999px
-src/server/public/widget-style.css:421	radius	border-radius: 999px
 src/server/public/widget-ux-fixes.css:1346	radius	border-radius: 999px
 src/server/public/widget-ux-fixes.css:162	radius	border-radius: 999px
 src/server/public/widget-ux-fixes.css:459	radius	border-radius: 7px
