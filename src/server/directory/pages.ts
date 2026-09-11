@@ -2507,6 +2507,31 @@ function jsonLdFaq(faqs: Array<{ q: string; a: string }>): string {
   });
 }
 
+/**
+ * Structured data for one carrier profile.
+ *
+ * ─── WHY THERE IS NO `areaServed` HERE ────────────────────────────────────
+ * There used to be: `areaServed: "<HQ city>, <state>"`, emitted on every
+ * carrier that had a city or a state — i.e. on ~330,000 pages. It asserted, in
+ * machine-readable form, that each carrier's SERVICE AREA is the single city it
+ * is headquartered in. That is simply false for a motor carrier: an active
+ * FMCSA common/contract authority is INTERSTATE operating authority, so a
+ * carrier domiciled in Houston lawfully runs nationwide. We were publishing a
+ * wrong business fact about a third of a million companies we do not own, on
+ * the strength of an address field in FMCSA data that says nothing about where
+ * they haul.
+ *
+ * The fix is to assert only what the source supports, NOT to swap a narrow
+ * false claim for a broad one. "areaServed: United States" would be the same
+ * mistake with a bigger footprint — FMCSA's L&I record does not say a given
+ * carrier actually serves the country, only that it holds authority.
+ *
+ * So: the physical address stays (it IS a fact FMCSA publishes, and
+ * `address` is a LOCATION claim, not a service-area claim), and the operating
+ * authority is emitted as an `additionalProperty` — the literal L&I
+ * common/contract status, which is exactly what the data supports and what the
+ * human-readable profile already shows in its "Operating authority" row.
+ */
 function jsonLdCarrier(c: VisibleCarrier): string {
   const addr = {
     '@type': 'PostalAddress',
@@ -2532,7 +2557,20 @@ function jsonLdCarrier(c: VisibleCarrier): string {
     ...(!c.contactHidden && c.phone ? { telephone: c.phone } : {}),
     ...(!c.contactHidden && c.email ? { email: c.email } : {}),
     address: addr,
-    ...(c.city || c.state ? { areaServed: [c.city, c.state].filter(Boolean).join(', ') } : {}),
+    // FMCSA's actual answer — the L&I common/contract authority status — in
+    // place of the invented HQ-city service area. Omitted entirely when the
+    // carrier has no authority type on file, rather than guessed at.
+    ...(c.authorityType
+      ? {
+          additionalProperty: [
+            {
+              '@type': 'PropertyValue',
+              name: 'FMCSA operating authority',
+              value: authorityLabel(c.authorityType),
+            },
+          ],
+        }
+      : {}),
     knowsAbout: c.intermodal ? ['Container drayage', 'Intermodal trucking'] : ['Freight trucking'],
   });
 }
