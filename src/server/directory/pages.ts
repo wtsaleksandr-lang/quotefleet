@@ -55,6 +55,7 @@ import {
 } from './containerPorts.js';
 import { CA_PROVINCE_CODES } from './caProvinces.js';
 import { hubRobotsDirective } from './indexQualityFloor.js';
+import { curatedSquareLogoForUsdot } from './carrierLogos.js';
 import {
   NATIONAL_DRIVER_OOS_RATE,
   NATIONAL_VEHICLE_OOS_RATE,
@@ -602,19 +603,32 @@ export function monogramInitials(name: string): string {
  *   • a carrier that claims /claim/:slug and uploads one, and
  *   • a small hand-curated set of large, unambiguous carriers.
  *
- * Both land on ONE nullable field, and this reader is the plug point: give
- * VisibleCarrier a `logoUrl` (a `carrier_overrides` column merged exactly like
- * `aboutOverride` already is) and every tile in the directory picks it up with
- * no markup or CSS change. Until that column exists this returns null for every
- * carrier and every tile is a monogram — which is the honest state today.
+ * BOTH ARE NOW WIRED, and they are checked in that order.
+ *
+ *   1. `logoUrl` on the carrier — the runtime, per-carrier path. Give
+ *      VisibleCarrier a `logoUrl` (a `carrier_overrides` column merged exactly
+ *      like `aboutOverride` already is) and every tile picks it up with no
+ *      markup or CSS change. A carrier's own upload OUTRANKS our curation of
+ *      it, which is why it is first.
+ *   2. The curated registry in carrierLogos.ts, keyed by USDOT — the reviewed,
+ *      version-controlled set. Same list the homepage marquee renders from, so
+ *      the two surfaces cannot disagree about whose mark is whose.
+ *
+ * Anything else is still a monogram, which remains the honest default for the
+ * other ~331,000 carriers.
  */
 export function carrierLogoUrl(c: VisibleCarrier): string | null {
   const raw = (c as VisibleCarrier & { logoUrl?: string | null }).logoUrl;
-  if (typeof raw !== 'string') return null;
-  const url = raw.trim();
-  // https:// or a same-origin path ONLY. A claim form is user input, so a
-  // `javascript:` / `data:` URI must never reach an src attribute from here.
-  return /^(https:\/\/[^\s"'<>]+|\/[^\s"'<>]*)$/.test(url) ? url : null;
+  if (typeof raw === 'string') {
+    const url = raw.trim();
+    // https:// or a same-origin path ONLY. A claim form is user input, so a
+    // `javascript:` / `data:` URI must never reach an src attribute from here.
+    if (/^(https:\/\/[^\s"'<>]+|\/[^\s"'<>]*)$/.test(url)) return url;
+    // A malformed override is not a reason to fall through to the curated mark
+    // for a DIFFERENT-looking carrier — but it is the same USDOT either way, so
+    // the curated entry is still the right answer. Fall through.
+  }
+  return curatedSquareLogoForUsdot(c.usdot);
 }
 
 /**

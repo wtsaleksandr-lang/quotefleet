@@ -35,6 +35,7 @@ import {
   verifyHomeSectionSlots,
   type PartnerLogo,
 } from './homeSections.js';
+import { CURATED_CARRIER_LOGOS, carrierLogoPaths, curatedWideLogoForUsdot } from '../directory/carrierLogos.js';
 
 const publicDir = resolve(process.cwd(), 'src/server/public');
 const read = (p: string) => readFileSync(resolve(process.cwd(), p), 'utf8');
@@ -203,13 +204,29 @@ describe('homepage: the logo marquee', () => {
     { name: 'Second Example Logistics', href: '/directory' },
   ];
 
-  it('ships EMPTY, because a partner logo is a claim we cannot yet make', () => {
-    expect(HOME_PARTNER_LOGOS).toHaveLength(0);
-    expect(renderLogoMarquee(HOME_PARTNER_LOGOS, 331482)).toBe('');
+  it('is DERIVED from the curated registry, so it cannot drift from the directory', () => {
+    // The one invariant that matters: the strip and the directory's own logo
+    // slot read the same list. A second hand-kept array is how a company ends
+    // up with one mark on the homepage and a different one on its profile.
+    expect(HOME_PARTNER_LOGOS).toHaveLength(CURATED_CARRIER_LOGOS.length);
+    expect(HOME_PARTNER_LOGOS.map((l) => l.name)).toEqual(
+      CURATED_CARRIER_LOGOS.map((c) => c.displayName),
+    );
+    for (const c of CURATED_CARRIER_LOGOS) {
+      const tile = HOME_PARTNER_LOGOS.find((l) => l.name === c.displayName);
+      // A curated carrier with artwork carries the WIDE crop of exactly the
+      // mark the directory resolves for the same USDOT; one without carries no
+      // src at all and falls through to the monogram.
+      expect(tile?.src ?? null).toBe(c.logo ? carrierLogoPaths(c.logo).wide : null);
+      if (c.logo) expect(curatedWideLogoForUsdot(c.usdot)).toBe(tile?.src);
+    }
   });
 
-  it('puts no section, no stylesheet and no script on the page while it is empty', () => {
-    const html = served();
+  it('still ships NOTHING — no section, stylesheet or script — when the list is empty', () => {
+    // The empty-means-absent contract is what lets the registry be emptied
+    // (a takedown request, say) without leaving a headed, tile-less strip.
+    expect(renderLogoMarquee([], 331482)).toBe('');
+    const html = served({ logos: [] });
     expect(html).not.toContain('qf-marquee');
     expect(html).not.toContain(MARQUEE_STYLESHEET);
     expect(html).not.toContain(MARQUEE_SCRIPT);
