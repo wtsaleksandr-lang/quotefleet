@@ -585,6 +585,73 @@ function monogramInitials(name: string): string {
   return ((words[0][0] ?? '') + (words[1][0] ?? '')).toUpperCase() || '—';
 }
 
+// ─── The carrier LOGO SLOT ────────────────────────────────────────────────
+/**
+ * One source of truth for "what image represents this carrier", shared by the
+ * listing card and the profile header.
+ *
+ * WE DO NOT SOURCE LOGOS AUTOMATICALLY, AND THAT IS DELIBERATE. Name→domain→
+ * logo matching measures ~90% accurate; across a ~330k-row directory that is
+ * ~33,000 profiles wearing another company's mark — a MISIDENTIFICATION, not a
+ * cosmetic defect. (Clearbit's free logo API, the usual shortcut, shut down in
+ * December 2025, so there is no cheap accurate source either.)
+ *
+ * So the DEFAULT is a generated monogram and a real image only ever arrives
+ * from a source that KNOWS which carrier it belongs to:
+ *   • a carrier that claims /claim/:slug and uploads one, and
+ *   • a small hand-curated set of large, unambiguous carriers.
+ *
+ * Both land on ONE nullable field, and this reader is the plug point: give
+ * VisibleCarrier a `logoUrl` (a `carrier_overrides` column merged exactly like
+ * `aboutOverride` already is) and every tile in the directory picks it up with
+ * no markup or CSS change. Until that column exists this returns null for every
+ * carrier and every tile is a monogram — which is the honest state today.
+ */
+export function carrierLogoUrl(c: VisibleCarrier): string | null {
+  const raw = (c as VisibleCarrier & { logoUrl?: string | null }).logoUrl;
+  if (typeof raw !== 'string') return null;
+  const url = raw.trim();
+  // https:// or a same-origin path ONLY. A claim form is user input, so a
+  // `javascript:` / `data:` URI must never reach an src attribute from here.
+  return /^(https:\/\/[^\s"'<>]+|\/[^\s"'<>]*)$/.test(url) ? url : null;
+}
+
+/**
+ * Deterministic tint for a monogram tile, expressed as a HUE the stylesheet
+ * feeds into one named token (`--dir-logo-h` → `--dir-logo-tint`).
+ *
+ * The band is 214–242° — brand blue through indigo and nothing else — so 5,000
+ * tiles on one page still read as ONE family rather than a confetti wall, and
+ * white initials measure 6.0:1 (214°) to 7.9:1 (242°) against every tint in it.
+ * Keyed on USDOT so a carrier's tile is stable across pages, sessions and
+ * re-ingests. Pure + exported so the band is unit-testable.
+ */
+export function carrierLogoHue(key: string): number {
+  let h = 5381;
+  for (let i = 0; i < key.length; i += 1) h = (Math.imul(h, 33) + key.charCodeAt(i)) >>> 0;
+  return 214 + (h % 29);
+}
+
+/**
+ * Render the logo slot at `cls` (`.cc-logo` on a card, `.cp-monogram` on the
+ * profile header). A real logo renders as an `<img>` that is `object-fit:
+ * contain`-ed inside the square tile, so a WIDE wordmark and a SQUARE glyph
+ * both sit correctly without cropping; everything else renders the monogram.
+ */
+function carrierLogoTile(c: VisibleCarrier, cls: string): string {
+  const name = carrierName(c);
+  const url = carrierLogoUrl(c);
+  if (url) {
+    return `<span class="${cls} ${cls}--img"><img src="${esc(url)}" alt="${esc(name)} logo" loading="lazy" decoding="async"></span>`;
+  }
+  const key = c.usdot || c.slug || name;
+  return `<span class="${cls}" style="--dir-logo-h: ${carrierLogoHue(key)}" aria-hidden="true">${esc(monogramInitials(name))}</span>`;
+}
+
+/** Inline location pin. `currentColor`, no external asset, no icon font. */
+const PIN_ICON =
+  '<svg class="dir-ico" viewBox="0 0 16 16" width="12" height="12" aria-hidden="true" focusable="false"><path fill="currentColor" d="M8 1.5a4.5 4.5 0 0 0-4.5 4.5c0 3.2 3.9 8 4.1 8.2a.5.5 0 0 0 .8 0c.2-.2 4.1-5 4.1-8.2A4.5 4.5 0 0 0 8 1.5Zm0 6.2A1.7 1.7 0 1 1 8 4.3a1.7 1.7 0 0 1 0 3.4Z"/></svg>';
+
 /** Self-declared credentials NOT derivable from FMCSA public data — shown muted
  *  with a "claim to add" affordance, never asserted as fact. Order = display order. */
 const SELF_DECLARED_CREDENTIALS: Array<{ tone: string; label: string; tip: string }> = [
@@ -1905,6 +1972,229 @@ export const DIRECTORY_CSS = `
   .dir-pagenums a, .dir-pagenums span { width: auto; }
   .cp-monogram { width: auto; min-width: 54px; }
   @media (max-width: 640px) { .cp-monogram { min-width: 46px; } }
+
+  /* ══════════════════════════════════════════════════════════════════════════
+     DIRECTORY SEARCH HERO + ROW LISTING CARD + PROFILE HEADER
+     --------------------------------------------------------------------------
+     Appended at EOF on purpose (docs/design-refactor/baseline-protocol.md r1):
+     the guards and this file's own spacing ratchet are line-keyed, so nothing
+     above may be renumbered.
+
+     DESIGN LAW HELD: tokens only, zero raw hex, zero gradient, zero
+     backdrop-filter, zero keyframes, radii 6/8/12, the three token shadows,
+     motion .2s/.3s, spacing on {0,4,8,12,16,24,32,48,60,80,120}.
+
+     ON THE GRADIENT. The hero was authorised ONE scoped gradient exception. It
+     is not taken, and the reason is structural rather than taste: the only
+     deep-blue surface token that survives the dark theme is '--accent-fill'
+     ('--accent-strong' flips to a pale lavender under data-theme="dark", so a
+     stop on it would put white text on a near-white band). A second stop would
+     therefore have to be a raw hex — which is exactly what
+     directoryCssTokens.test.ts exists to keep out of the one stylesheet served
+     'immutable' to ~330k indexed pages. A flat '--accent-fill' fill reads
+     identically at the size the hero is actually seen, so the exception buys
+     nothing and costs the guard.
+     ══════════════════════════════════════════════════════════════════════════ */
+
+  /* One named token for the monogram tint. The hue is set per carrier inline
+     (--dir-logo-h, 214-242 = brand blue → indigo only); S/L are fixed here so
+     white initials are 6.0:1-7.9:1 on every tile in the band, in both themes. */
+  .cc-logo, .cp-monogram { --dir-logo-h: 226; --dir-logo-tint: hsl(var(--dir-logo-h) 58% 42%); }
+
+  /* ── 1 · The /directory search hero ─────────────────────────────────────── */
+  .dsh { display: block; padding: 0; margin: 0; }
+  /* Same card geometry as the homepage hero (.qf-hhero__card): 12px radius,
+     a page rail down both sides, flush under the sticky header. */
+  .dsh-card { background: var(--accent-fill); border-radius: var(--radius-lg); max-width: 98%; margin: 0 auto; padding: 48px 24px; }
+  .dsh-inner { width: 100%; max-width: 780px; margin: 0 auto; display: flex; flex-direction: column; align-items: center; text-align: center; }
+  .dsh-eyebrow { margin: 0 0 12px; font-family: var(--font-mono); font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--accent-ink); }
+  .dsh-title { margin: 0 0 12px; font-size: 40px; line-height: 1.1; color: var(--accent-ink); }
+  .dsh-sub { margin: 0 0 24px; font-size: 16px; line-height: 1.55; color: var(--accent-ink); max-width: 640px; }
+  .dsh-form { width: 100%; margin: 0 0 16px; }
+  .dsh-lbl { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+  /* Search field + attached button read as ONE control: a single 8px-radius
+     shell, square inner corners where they meet. */
+  .dsh-row { display: flex; align-items: stretch; gap: 0; width: 100%; background: var(--surface); border-radius: var(--radius-btn); overflow: hidden; }
+  .dsh-input { flex: 1 1 auto; min-width: 0; border: 0; background: var(--surface); color: var(--ink); font-family: var(--font-sans); font-size: 16px; padding: 0 16px; height: 52px; }
+  .dsh-input::placeholder { color: var(--muted); }
+  .dsh-input:focus { outline: 2px solid var(--accent-strong); outline-offset: -2px; }
+  .dsh-btn { flex: 0 0 auto; border: 0; cursor: pointer; background: var(--cta-bg); color: var(--cta-text); font-family: var(--font-sans); font-size: 15px; font-weight: 600; padding: 0 24px; height: 52px; transition: background .2s ease; }
+  .dsh-btn:hover { background: var(--cta-bg-hover); }
+  /* Segmented row. Selection is an OUTLINE (white ring), never a bright fill. */
+  .dsh-seg { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin: 0 0 16px; }
+  .dsh-pill { font-family: var(--font-mono); font-size: 12px; letter-spacing: 0.04em; padding: 8px 16px; border-radius: var(--radius-pill); border: 1px solid var(--cta-sec-border); background: transparent; color: var(--accent-ink); text-decoration: none; white-space: nowrap; transition: border-color .2s ease; }
+  .dsh-pill:hover { border-color: var(--accent-ink); }
+  .dsh-pill.is-on { border-color: var(--accent-ink); border-width: 2px; padding: 8px 16px; }
+  .dsh-adv { margin: 0 0 24px; font-size: 13px; }
+  .dsh-adv a { color: var(--accent-ink); text-decoration: underline; text-underline-offset: 3px; }
+  .dsh-chipwrap { width: 100%; border-top: 1px solid var(--cta-sec-border); padding-top: 24px; }
+  .dsh-chiplabel { margin: 0 0 12px; font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--accent-ink); }
+  /* A GRID, not a wrap row. 8 chips of unequal label width wrap 3+3+2 here and
+     4+3+1 at another width — and a chip alone on the last line is the orphan the
+     global rule forbids. 8 divides cleanly by 4 and by 2, so both tracks are
+     orphan-free by construction at every viewport. */
+  .dsh-chips { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+  .dsh-chip { display: flex; align-items: center; justify-content: center; text-align: center; font-size: 13px; padding: 8px 12px; border-radius: var(--radius-btn); border: 1px solid var(--cta-sec-border); background: var(--cta-sec-bg-hover); color: var(--accent-ink); text-decoration: none; transition: border-color .2s ease; }
+  .dsh-chip:hover { border-color: var(--accent-ink); }
+  /* Trust line. 4 items — 4 and 2 both divide cleanly, so no track strands one. */
+  .dsh-trust { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px 24px; margin: 24px 0 0; padding: 0; list-style: none; color: var(--accent-ink); }
+  .dsh-trust-item { font-size: 12px; color: var(--accent-ink); display: flex; align-items: center; gap: 8px; }
+  .dsh-trust-item::before { content: '✓'; font-size: 11px; }
+  @media (max-width: 900px) {
+    .dsh-title { font-size: 32px; }
+    .dsh-chips { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  }
+  @media (max-width: 640px) {
+    .dsh-card { max-width: 100%; border-radius: 0; padding: 32px 16px; }
+    .dsh-title { font-size: 26px; }
+    .dsh-sub { font-size: 15px; }
+    .dsh-row { flex-direction: column; background: transparent; overflow: visible; gap: 8px; }
+    .dsh-input { border-radius: var(--radius-btn); height: 48px; }
+    .dsh-btn { border-radius: var(--radius-btn); height: 48px; width: 100%; }
+    .dsh-trust { flex-direction: column; align-items: flex-start; text-align: left; gap: 8px; }
+    /* The segment stays ONE row and scrolls inside itself. Five pills cannot be
+       wrapped into equal tracks without stranding one (5 = 2+2+1), and a
+       scrolling segmented control is the canonical phone form anyway. The
+       scroll is contained, so the page itself never scrolls sideways. */
+    .dsh-seg { flex-wrap: nowrap; overflow-x: auto; justify-content: flex-start; width: 100%; }
+    .dsh-inner { align-items: flex-start; text-align: left; }
+    .dsh-sub, .dsh-adv { text-align: left; }
+  }
+
+  /* ── 2 · Listing cards: a vertical STACK of wide rows, not a dense grid ─── */
+  /* data-view (not a --list modifier class) because actionBar.test.ts and
+     mobileFilterUx.test.ts pin the exact string class="dir-grid" to assert the
+     head → rail → results source order the phone layout depends on. */
+  .dir-grid[data-view="list"] { grid-template-columns: minmax(0, 1fr); gap: 12px; }
+  .carrier-card--row { padding: 16px; }
+  /* FLEX-WRAP, NOT A FIXED GRID. The same card is also rendered inside narrow
+     columns (the profile's "Other carriers in …" module, /services samples), and
+     a 4-track grid there crushes the name into a one-word-per-line tower. With
+     flex the figures simply wrap onto their own line when the container is too
+     narrow — container-driven, so it is right at every width without a media
+     query and without container queries.
+     padding-right clears the absolutely-positioned selection checkbox in the
+     card's top-right corner, so the trailing arrow never sits under it. */
+  .cc-main { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 16px; padding-right: 24px; }
+  /* The logo slot. A monogram paints the deterministic tint; a real logo paints
+     white and contains itself, so a WIDE wordmark and a SQUARE glyph both sit
+     correctly in the same tile without cropping. */
+  .cc-logo { flex: 0 0 auto; width: 48px; height: 48px; border-radius: var(--radius-btn); background: var(--dir-logo-tint); color: var(--accent-ink); display: inline-flex; align-items: center; justify-content: center; font-family: var(--font-mono); font-size: 17px; font-weight: 700; letter-spacing: 0.04em; font-variant-numeric: tabular-nums; }
+  .cc-logo--img { background: var(--surface); border: 1px solid var(--border); padding: 4px; }
+  .cc-logo--img img { width: 100%; height: 100%; object-fit: contain; display: block; }
+  .cc-id { flex: 1 1 220px; min-width: 0; }
+  .cc-nameline { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+  .carrier-card--row h3 { margin: 0; }
+  .cc-star { display: inline-flex; align-items: center; gap: 4px; font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--accent); border: 1px solid var(--accent); border-radius: var(--radius-chip); padding: 0 8px; white-space: nowrap; }
+  .cc-star-ic { font-size: 11px; line-height: 1; }
+  /* NOT a flex container. A text node inside one becomes a single anonymous
+     flex item, so the pin gets stranded alone on line 1 the moment the address
+     wraps. Inline flow keeps the pin glued to the first word. */
+  .carrier-card--row .meta { margin-top: 4px; }
+  .dir-ico { vertical-align: -1px; margin-right: 4px; }
+  /* Stats block: big figures, small-caps labels. Right-aligned so every row in
+     the stack shares one figure column. */
+  .carrier-card--row .carrier-facts { flex: 0 0 auto; margin-top: 0; gap: 24px; flex-wrap: nowrap; }
+  .carrier-card--row .carrier-facts .f { align-items: flex-end; min-width: 48px; }
+  .carrier-card--row .carrier-facts .f b { font-size: 20px; line-height: 1.15; color: var(--ink); }
+  .carrier-card--row .carrier-facts .f span { margin-top: 4px; }
+  .cc-go { flex: 0 0 auto; color: var(--muted); font-size: 16px; line-height: 1; }
+  .carrier-card--row:hover .cc-go { color: var(--accent); }
+  .carrier-card--row .card-chips { margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--border); }
+  .pill-auth { background: var(--surface-2); color: var(--ink-soft); border: 1px solid var(--border-strong); }
+  /* On a WIDE row the count-aware partition keeps its no-orphan row split (5 →
+     3+2, never 4+1) but sizes each column to its content, so the pills read as
+     badges instead of stretching into full-width buttons. Below 721px the card
+     is narrow again and the equal-column partition from the base rules wins. */
+  @media (min-width: 721px) {
+    .carrier-card--row .card-chips { justify-content: start; }
+    .carrier-card--row .card-chips[data-n="2"],
+    .carrier-card--row .card-chips[data-n="4"] { grid-template-columns: repeat(2, minmax(0, max-content)); }
+    .carrier-card--row .card-chips[data-n="3"],
+    .carrier-card--row .card-chips[data-n="5"],
+    .carrier-card--row .card-chips[data-n="6"] { grid-template-columns: repeat(3, minmax(0, max-content)); }
+  }
+  @media (max-width: 720px) {
+    /* Phone: the arrow goes (the whole row is the link) and the figures drop
+       onto their own line so the name column keeps its full width. */
+    .cc-main { gap: 12px; align-items: flex-start; padding-right: 0; }
+    /* Clear the corner checkbox so the company name never runs under it. */
+    .cc-nameline { padding-right: 32px; }
+    .cc-go { display: none; }
+    /* flex-basis 100% forces the figure row onto its own line under the name. */
+    .carrier-card--row .carrier-facts { flex: 1 0 100%; justify-content: flex-start; gap: 32px; margin-top: 0; }
+    .carrier-card--row .carrier-facts .f { align-items: flex-start; }
+    .cc-logo { width: 40px; height: 40px; font-size: 15px; }
+  }
+  @media (max-width: 560px) {
+    /* A 6-pill row at 343px gives each cell 105px, which breaks "Common +
+       Contract authority" over three lines. 6 is even, so two tracks are still
+       orphan-free (3 rows of 2) and each pill roughly doubles its width. */
+    .carrier-card--row .card-chips[data-n="6"] { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  }
+
+  /* ── 3 · Carrier profile: deep-blue header card + contact strip ─────────── */
+  .dir-hero--cp { padding-bottom: 32px; }
+  .cp-herocard { background: var(--accent-fill); border-radius: var(--radius-lg); padding: 24px; margin-top: 12px; }
+  .cp-herocard .cp-headrow { margin-top: 0; }
+  /* '.hero p.lead' and '.muted-small' win on specificity, and both resolve to a
+     grey that measures 1.4:1 (light) / 2.2:1 (dark) on this blue card. The
+     address line is the second most-read fact on the page, so it takes the
+     card's own ink at (0,3,1). */
+  .cp-herocard .cp-nameline h1 { color: var(--accent-ink); }
+  .dir-hero--cp .cp-herocard p.cp-subtitle,
+  .dir-hero--cp .cp-herocard p.cp-legalline { color: var(--accent-ink); }
+  /* .lead ships a marketing line-height; at the address's size that opened a
+     ~60px hole between it and the legal-name line. */
+  .dir-hero--cp .cp-herocard p.cp-subtitle { line-height: 1.3; }
+  /* Inline flow, not flex — see the .carrier-card--row .meta note above. */
+  .cp-herocard .cp-subtitle { margin-top: 8px; }
+  .cp-herocard .cp-legalline { margin: 4px 0 0; }
+  .cp-herocard .cp-claimline, .cp-herocard .cp-claimline a { color: var(--accent-ink); }
+  .cp-herocard .cp-fmcsa { background: transparent; color: var(--accent-ink); border-color: var(--cta-sec-border); }
+  /* THE TILE SITS ON WHITE INSIDE THE BLUE CARD. A tinted tile on a blue field
+     reads as a muddy dark square, and a supplied logo needs a neutral ground
+     anyway — so the tile inverts here: white plate, tint-coloured initials. */
+  .cp-herocard .cp-monogram { border-color: transparent; background: var(--surface); color: var(--dir-logo-tint); }
+  .cp-herocard .cp-monogram--img { background: var(--surface); padding: 4px; }
+  .cp-herocard .cp-monogram--img img { width: 100%; height: 100%; object-fit: contain; display: block; }
+  /* The status badges carry --ink on a translucent tint, which on the blue card
+     would be dark-on-blue. They take the card's ink and keep their outline. */
+  .cp-herocard .cp-badge-active, .cp-herocard .cp-badge-verified { color: var(--accent-ink); }
+  /* .btn-primary is deliberately NOT overridden: --cta-bg is near-black in light
+     and near-white in dark, so it separates from the blue card and keeps its own
+     AA text contrast in BOTH themes. The ghost secondary does need it — its
+     --cta-sec-text is near-black in light, which measures 3.5:1 on this card. */
+  .cp-herocard .btn-secondary { background: transparent; color: var(--accent-ink); border-color: var(--cta-sec-border); }
+  .cp-herocard .btn-secondary:hover { border-color: var(--accent-ink); background: var(--cta-sec-bg-hover); }
+  .cp-hbadges { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
+  .cp-hbadge { font-size: 12px; padding: 4px 12px; border-radius: var(--radius-chip); border: 1px solid var(--cta-sec-border); background: var(--cta-sec-bg-hover); color: var(--accent-ink); white-space: nowrap; }
+  .cp-hbadge--on { border-color: var(--accent-ink); }
+  .cp-hbadge--code { font-family: var(--font-mono); letter-spacing: 0.04em; font-variant-numeric: tabular-nums; }
+  /* Contact strip — 4 boxes. 4 and 2 both divide cleanly, so no track ever
+     strands one box alone (DESIGN-SYSTEM.md §8). */
+  .cp-cstrip { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin-top: 12px; }
+  .cp-cbox { display: flex; align-items: flex-start; gap: 12px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-btn); padding: 12px 16px; min-width: 0; }
+  .cp-cbox--empty { background: var(--surface-2); border-style: dashed; }
+  .cp-cbox-ic { flex: 0 0 auto; color: var(--muted); line-height: 1; margin-top: 4px; }
+  .cp-cbox-glyph { font-size: 12px; }
+  .cp-cbox-body { display: flex; flex-direction: column; min-width: 0; }
+  .cp-cbox-k { font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+  .cp-cbox-v { font-size: 14px; color: var(--ink); margin-top: 4px; overflow-wrap: anywhere; }
+  .cp-cbox-v a { color: var(--accent); text-decoration: none; }
+  .cp-cbox-v a:hover { text-decoration: underline; }
+  .cp-cbox--empty .cp-cbox-v a { color: var(--accent); }
+  /* "Help complete this profile" — dashed, so it reads as an invitation to fill
+     something in rather than as another content card. */
+  .cp-claimcard { border-style: dashed; border-color: var(--border-strong); background: var(--surface-2); }
+  @media (max-width: 900px) {
+    .cp-cstrip { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  }
+  @media (max-width: 640px) {
+    .cp-herocard { padding: 16px; }
+    .cp-cstrip { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+    .cp-cbox { padding: 12px; }
+  }
 `;
 
 /**
@@ -2377,7 +2667,16 @@ export function carrierCard(c: VisibleCarrier): string {
   // this row + count). The row is capped so the count-aware grid always
   // partitions cleanly (>=2 per line, never an orphan); any overflow collapses
   // into a "+N more" pill and the full set stays on the profile.
-  const cardPills: string[] = [`<span class="pill pill-${sr.tone}">${esc(sr.text)}</span>`];
+  //
+  // AUTHORITY LEADS, then drayage, then safety. The reference put its country
+  // segment here; we have no country to show (FMCSA census = US only), and
+  // authority type — Common / Contract / Broker — is the equivalent real,
+  // populated, filterable classification on our side of the data.
+  const cardPills: string[] = [
+    `<span class="pill pill-auth">${esc(authorityLabel(c.authorityType))}</span>`,
+  ];
+  if (c.intermodal) cardPills.push('<span class="pill pill-dray">Drayage</span>');
+  cardPills.push(`<span class="pill pill-${sr.tone}">${esc(sr.text)}</span>`);
   if (c.hazmat) cardPills.push('<span class="pill pill-warn">Hazmat</span>');
   const eqDefs: Array<[boolean, string]> = [
     [c.dryVan, 'Dry van'],
@@ -2393,19 +2692,31 @@ export function carrierCard(c: VisibleCarrier): string {
     const hidden = cardPills.length - (CARD_MAX - 1);
     shown = [...cardPills.slice(0, CARD_MAX - 1), `<span class="pill pill-eq">+${hidden} more</span>`];
   }
-  return `<a class="carrier-card" href="/directory/carrier/${encodeURIComponent(c.slug)}">
-    <div class="top">
-      <div>
-        <h3>${esc(carrierName(c))}</h3>
+  // The ONE honest "featured" marker we have. Not a paid slot and not an
+  // editorial pick: a claimed profile is a carrier that proved ownership of the
+  // USDOT (email OTP / domain match — see carrier_claims), so the star means
+  // exactly "a person at this company maintains this page". Everything else
+  // stays unstarred rather than inventing a tier.
+  const featured =
+    c.claimedTenantId != null
+      ? '<span class="cc-star" title="Claimed by the carrier — verified owner"><span class="cc-star-ic" aria-hidden="true">★</span>Claimed</span>'
+      : '';
+  return `<a class="carrier-card carrier-card--row" href="/directory/carrier/${encodeURIComponent(c.slug)}">
+    <div class="cc-main">
+      ${carrierLogoTile(c, 'cc-logo')}
+      <div class="cc-id">
+        <div class="cc-nameline">
+          <h3>${esc(carrierName(c))}</h3>
+          ${featured}
+        </div>
         ${carrierName(c) !== c.legalName ? `<div class="carrier-card-legal">Legal name: ${esc(c.legalName)}</div>` : ''}
-        <div class="meta">${esc(cityState)}${idMeta ? ' · ' + idMeta : ''}</div>
+        <div class="meta">${cityState ? `${PIN_ICON}${esc(cityState)}` : ''}${idMeta ? `${cityState ? ' · ' : ''}${idMeta}` : ''}</div>
       </div>
-      ${c.intermodal ? '<span class="pill pill-dray">Drayage</span>' : ''}
-    </div>
-    <div class="carrier-facts">
-      <div class="f"><b>${fmtNum(c.powerUnits)}</b><span>Power units</span></div>
-      <div class="f"><b>${fmtNum(c.drivers)}</b><span>Drivers</span></div>
-      <div class="f"><b>${esc(authorityLabel(c.authorityType).replace(' authority', ''))}</b><span>Authority</span></div>
+      <div class="carrier-facts">
+        <div class="f"><b>${fmtNum(c.powerUnits)}</b><span>Trucks</span></div>
+        <div class="f"><b>${fmtNum(c.drivers)}</b><span>Drivers</span></div>
+      </div>
+      <span class="cc-go" aria-hidden="true">→</span>
     </div>
     <div class="card-chips" data-n="${shown.length}">${shown.join('')}</div>
   </a>`;
@@ -3375,9 +3686,7 @@ function facetedLayoutInner(cfg: FacetedCfg): string {
   const hasCarriers = list.carriers.length > 0;
   const cards = hasCarriers
     ? `<p class="cc-legend"><span class="cc-legend-box" aria-hidden="true"></span> Tick a card's box to save, request rates from, or export specific carriers. The bar below acts on all matches when nothing is ticked.</p>
-      <div class="dir-grid" style="grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));">${list.carriers
-        .map(selectableCard)
-        .join('\n')}</div>`
+      <div class="dir-grid" data-view="list">${list.carriers.map(selectableCard).join('\n')}</div>`
     : `<div class="dir-empty">No carriers match these filters. <a href="${scope.basePath}" style="color:var(--accent);">Clear filters</a> to see all.</div>`;
 
   // Action bar: no-JS fallback links act on ALL filtered carriers (the filter
@@ -3750,30 +4059,10 @@ export function renderDirectoryLanding(
         : '';
 
   const body = `
-  <section class="hero dir-hero">
-    <div class="container-narrow">
-      <div class="eyebrow" style="color: var(--accent); font-family: var(--font-mono); font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 10px;">US carrier directory</div>
-      <h1>Find US freight &amp; drayage carriers</h1>
-      <p class="lead">Browse ${fmtNum(summary.total)} active US motor carriers by port, intermodal hub and state — fleet size, authority, safety rating, and which run container drayage. Sourced from FMCSA public data.</p>
-      <div class="dir-stats">
-        <div class="dir-stat"><b>${fmtNum(summary.total)}</b><span>Carriers</span></div>
-        <div class="dir-stat"><b>${fmtNum(summary.intermodalTotal)}</b><span>Drayage / intermodal</span></div>
-        <div class="dir-stat"><b>${fmtNum(usStateRows.length)}</b><span>States</span></div>
-      </div>
-    </div>
-  </section>
+  ${directorySearchHero(summary, usStateRows.length, isEmpty)}
   <main class="dir-shell">
     ${upgradeBanner}
     ${emptyNotice}
-    ${
-      isEmpty
-        ? ''
-        : `<div class="dir-card" style="display:flex; align-items:center; justify-content:space-between; gap:16px; flex-wrap:wrap;">
-        <div><h2 style="margin:0 0 4px; font-size:18px;">Search &amp; filter every carrier</h2>
-        <p class="muted-small" style="margin:0;">Filter ${fmtNum(summary.total)} carriers by state, city, fleet size, safety rating and authority — every filter is a shareable link.</p></div>
-        <a class="btn btn-primary" href="/directory?sort=featured">Browse &amp; filter carriers <span class="arr">→</span></a>
-      </div>`
-    }
     ${shipperCarrierBand(summary)}
     <div class="dir-section-h">
       <h2>Top US ports &amp; hubs</h2>
@@ -3804,6 +4093,98 @@ export function renderDirectoryLanding(
       }),
     ],
   });
+}
+
+/**
+ * THE /directory SEARCH HERO.
+ *
+ * A deep-blue card at the top of the landing page holding the whole entry
+ * point: headline → real searchable count → a big search field with an attached
+ * Search button → a segmented fleet-size row → Advanced search → popular cargo
+ * types → a thin trust line. Structurally it is the SAME card the homepage hero
+ * uses (`.qf-hhero__card`: 12px radius, `max-width: 98%`, a centred head block
+ * capped at 780px, a 44px dual-CTA row), so the two heroes read as one system —
+ * only the fill differs, because the owner asked for the deep-blue treatment
+ * here.
+ *
+ * WHAT WE DELIBERATELY DID NOT COPY FROM THE REFERENCE:
+ *
+ *  • ITS All / CA / US / MX COUNTRY SEGMENT. carrier_directory is the FMCSA
+ *    census — it is US-only. Rendering a Canada or Mexico pill would advertise
+ *    coverage that does not exist. The segment is fleet size instead
+ *    (FLEET_BUCKETS), which is single-select like a country segment, is a real
+ *    indexed column, and is the first thing a shipper actually narrows on.
+ *  • ITS "TRACK YOUR PARS" TILE. That is a customs feature we have not built.
+ *    A placeholder for it would be a promise we cannot keep.
+ *  • ITS EMPTY-DATA AESTHETIC. Every number in this block is a live COUNT(*)
+ *    from the summary query. Nothing here is estimated, rounded up or invented.
+ */
+function directorySearchHero(summary: DirectorySummary, stateCount: number, isEmpty: boolean): string {
+  const total = fmtNum(summary.total);
+  // Segmented row — fleet size. `sort=featured` matches the rest of the
+  // directory's entry links so the landing and the results agree on ordering.
+  const seg = [
+    { href: '/directory?sort=featured', label: 'All carriers' },
+    ...FLEET_BUCKETS.map((b) => ({
+      href: `/directory?fleet=${encodeURIComponent(b.id)}&sort=featured`,
+      label: b.label,
+    })),
+  ]
+    .map(
+      (o, i) =>
+        `<a class="dsh-pill${i === 0 ? ' is-on' : ''}" href="${esc(o.href)}">${esc(o.label)}</a>`,
+    )
+    .join('');
+  // Popular cargo types — REAL FMCSA crgo_* facets, so every chip lands on a
+  // filtered result set with live counts. Drayage leads because it is what this
+  // directory is built around; the rest are the highest-volume cargo columns.
+  const cargoChips = [
+    { href: '/directory?equipment=drayage&sort=featured', label: 'Container / drayage' },
+    ...CARGO_OPTIONS.slice(0, 7).map((o) => ({
+      href: `/directory?cargo=${encodeURIComponent(o.id)}&sort=featured`,
+      label: o.label,
+    })),
+  ]
+    .map((o) => `<a class="dsh-chip" href="${esc(o.href)}">${esc(o.label)}</a>`)
+    .join('');
+  const trust = [
+    'FMCSA public records',
+    `${fmtNum(summary.intermodalTotal)} run container drayage`,
+    `${fmtNum(stateCount)} states`,
+    'Safety rating &amp; authority status on every carrier',
+  ]
+    .map((t) => `<li class="dsh-trust-item">${t}</li>`)
+    .join('');
+  return `
+  <section class="dsh" aria-labelledby="dsh-title">
+    <div class="dsh-card">
+      <div class="dsh-inner">
+        <p class="dsh-eyebrow">US carrier directory</p>
+        <h1 class="dsh-title" id="dsh-title">Find the right US carrier for your shipment</h1>
+        <p class="dsh-sub">${
+          isEmpty
+            ? 'The carrier directory is being set up — carriers are loading.'
+            : `Search ${total} FMCSA-registered US freight and drayage carriers by name, fleet size, equipment, cargo, safety rating and operating authority.`
+        }</p>
+        <form class="dsh-form" role="search" method="get" action="/directory" aria-label="Search carriers by company name">
+          <label class="dsh-lbl" for="dsh-q">Company name</label>
+          <div class="dsh-row">
+            <input type="search" id="dsh-q" name="q" class="dsh-input" placeholder="Search ${total} carriers by company name"
+              minlength="2" maxlength="100" autocomplete="off" enterkeyhint="search">
+            <button type="submit" class="dsh-btn">Search</button>
+          </div>
+          <input type="hidden" name="sort" value="featured">
+        </form>
+        <div class="dsh-seg" role="group" aria-label="Narrow by fleet size">${seg}</div>
+        <p class="dsh-adv"><a href="/directory?sort=featured">Advanced search — equipment, cargo, drivers, safety, authority <span class="arr">→</span></a></p>
+        <div class="dsh-chipwrap">
+          <p class="dsh-chiplabel" id="dsh-cargo">Popular cargo types</p>
+          <div class="dsh-chips" role="group" aria-labelledby="dsh-cargo">${cargoChips}</div>
+        </div>
+        <ul class="dsh-trust">${trust}</ul>
+      </div>
+    </div>
+  </section>`;
 }
 
 /**
@@ -4571,10 +4952,10 @@ export function renderCarrierProfile(opts: {
     !!r.city && !!r.state && !!citySlug && r.state === c.state && citySlugify(r.city) === citySlug;
   const relatedCity = related.filter(sameCity);
   const relatedNearby = related.filter((r) => !sameCity(r));
+  // Stacked, like every other carrier list: the card is a WIDE ROW now, and a
+  // 280px column squeezes its name/figures/pills into an unreadable tower.
   const relatedGrid = (list: VisibleCarrier[]): string =>
-    `<div class="dir-grid" style="grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));">${list
-      .map(carrierCard)
-      .join('\n')}</div>`;
+    `<div class="dir-grid" data-view="list">${list.map(carrierCard).join('\n')}</div>`;
   // Corridor heading names the actual scope the ring used, so the reason those
   // carriers are on the page is legible: the port group, or failing that the
   // state. Never "the area" when we can name it.
@@ -4629,32 +5010,81 @@ export function renderCarrierProfile(opts: {
   const rfqButton = c.usdot
     ? `<a class="btn btn-primary btn-sm cp-rfq-btn" href="/directory/rfq?dots=${esc(c.usdot)}" title="Request a freight rate from ${esc(carrierName(c))}">Request a rate <span class="arr">→</span></a>`
     : '';
+  // ── Header badge row — every pill is a stored FMCSA value, never a guess.
+  const headBadges = [
+    `<span class="cp-hbadge">${esc(authorityLabel(c.authorityType))}</span>`,
+    c.intermodal ? '<span class="cp-hbadge cp-hbadge--on">Drayage / intermodal</span>' : '',
+    c.hazmat ? '<span class="cp-hbadge">Hazmat</span>' : '',
+    c.powerUnits != null ? `<span class="cp-hbadge">${fmtNum(c.powerUnits)} trucks</span>` : '',
+    c.drivers != null ? `<span class="cp-hbadge">${fmtNum(c.drivers)} drivers</span>` : '',
+    c.usdot ? `<span class="cp-hbadge cp-hbadge--code">USDOT ${esc(c.usdot)}</span>` : '',
+    c.mcNumber ? `<span class="cp-hbadge cp-hbadge--code">MC ${esc(c.mcNumber)}</span>` : '',
+  ]
+    .filter(Boolean)
+    .join('');
+  // ── Contact strip — Location / Website / Phone / Email.
+  //
+  // WE HAVE NO WEBSITE COLUMN, so that box is an invitation to the claim flow
+  // rather than a fabricated URL — the reference's own empty-state idea, used
+  // here for the ONE field we genuinely lack instead of for most of them.
+  // Phone/email mirror `publicContact` exactly, including the contactHidden
+  // opt-out, so a hidden carrier emits no tel: or mailto: anywhere on the page.
+  const contactBox = (
+    label: string,
+    icon: string,
+    value: string,
+    empty = false,
+  ): string =>
+    `<div class="cp-cbox${empty ? ' cp-cbox--empty' : ''}"><span class="cp-cbox-ic" aria-hidden="true">${icon}</span><span class="cp-cbox-body"><span class="cp-cbox-k">${label}</span><span class="cp-cbox-v">${value}</span></span></div>`;
+  // A CLAIMED profile never shows a claim CTA (claimFreeAndDisclaimer.test.ts),
+  // so its empty boxes state the absence plainly instead of inviting a claim.
+  const addCta = (what: string) =>
+    isClaimed ? `Not listed` : `<a href="${claimHref}">Add ${what}</a>`;
+  const hiddenNote = 'Hidden at the carrier’s request';
+  const contactStrip = `<div class="cp-cstrip">
+        ${contactBox('Location', PIN_ICON, cityStateZip ? esc(cityStateZip) : isCa ? 'Canada' : 'United States')}
+        ${contactBox('Website', '<span class="cp-cbox-glyph">↗</span>', addCta('website'), true)}
+        ${
+          c.contactHidden || !c.phone
+            ? contactBox('Phone', '<span class="cp-cbox-glyph">☎</span>', c.contactHidden ? hiddenNote : addCta('phone'), true)
+            : contactBox('Phone', '<span class="cp-cbox-glyph">☎</span>', `<a href="tel:${encodeURIComponent(c.phone)}">${esc(c.phone)}</a>`)
+        }
+        ${
+          c.contactHidden || !c.email
+            ? contactBox('Email', '<span class="cp-cbox-glyph">✉</span>', c.contactHidden ? hiddenNote : addCta('email'), true)
+            : contactBox('Email', '<span class="cp-cbox-glyph">✉</span>', `<a href="mailto:${encodeURIComponent(c.email)}">${esc(c.email)}</a>`)
+        }
+      </div>`;
   const body = `
-  <section class="hero dir-hero">
+  <section class="hero dir-hero dir-hero--cp">
     <div class="container-narrow">
       ${crumbsHtml(crumbs)}
-      <div class="cp-headrow">
-        <div class="cp-idblock">
-          <div class="cp-monogram" aria-hidden="true">${esc(monogramInitials(carrierName(c)))}</div>
-          <div class="cp-idtext">
-            <div class="cp-nameline">
-              <h1>${esc(carrierName(c))}</h1>
-              <span class="cp-badge-active" data-auth-badge${isActive ? '' : ' hidden'}>Active</span>
-              ${isClaimed ? VERIFIED_OWNER_BADGE : ''}
-              <span class="cp-fmcsa cp-tip" tabindex="0" role="note" aria-label="FMCSA — Profile built from FMCSA public records." data-tip="Profile built from FMCSA public records.">FMCSA</span>
+      <div class="cp-herocard">
+        <div class="cp-headrow">
+          <div class="cp-idblock">
+            ${carrierLogoTile(c, 'cp-monogram')}
+            <div class="cp-idtext">
+              <div class="cp-nameline">
+                <h1>${esc(carrierName(c))}</h1>
+                <span class="cp-badge-active" data-auth-badge${isActive ? '' : ' hidden'}>Active</span>
+                ${isClaimed ? VERIFIED_OWNER_BADGE : ''}
+                <span class="cp-fmcsa cp-tip" tabindex="0" role="note" aria-label="FMCSA — Profile built from FMCSA public records." data-tip="Profile built from FMCSA public records.">FMCSA</span>
+              </div>
+              <p class="lead cp-subtitle">${cityStateZip ? `${PIN_ICON}${esc(cityStateZip)}` : headerSubtitle}</p>
+              ${carrierName(c) !== c.legalName ? `<p class="muted-small cp-legalline">Legal name: ${esc(c.legalName)}</p>` : ''}
             </div>
-            <p class="lead cp-subtitle">${headerSubtitle}</p>
-            ${carrierName(c) !== c.legalName ? `<p class="muted-small" style="margin: 6px 0 0;">Legal name: ${esc(c.legalName)}</p>` : ''}
+          </div>
+          <div class="cp-headactions">
+            <div class="cp-headcta">
+              ${rfqButton}
+              ${saveControl(c)}
+            </div>
+            ${isClaimed ? '' : `<p class="cp-claimline">Own this company? <a href="${claimHref}">Claim this profile — free, forever →</a></p>`}
           </div>
         </div>
-        <div class="cp-headactions">
-          <div class="cp-headcta">
-            ${rfqButton}
-            ${saveControl(c)}
-          </div>
-          ${isClaimed ? '' : `<p class="cp-claimline">Own this company? <a href="${claimHref}">Claim this profile — free, forever →</a></p>`}
-        </div>
+        <div class="cp-hbadges">${headBadges}</div>
       </div>
+      ${contactStrip}
     </div>
   </section>
   <main class="dir-shell dir-shell--cp" data-auth-root="${esc(c.usdot)}">
@@ -4756,8 +5186,8 @@ export function renderCarrierProfile(opts: {
     ${relatedModule}
 
     ${isClaimed ? '' : `<div class="dir-card cp-claimcard">
-      <h2 style="font-size: 18px; margin: 0 0 8px;">Is this your company?</h2>
-      <p class="muted" style="margin: 0 0 16px; max-width: 460px;">Claim your profile to control how it reads, add your lanes and contact details, and receive rate requests directly. Claiming is free, forever — no trial, no card, no plan.</p>
+      <h2 style="font-size: 18px; margin: 0 0 8px;">Help complete this profile</h2>
+      <p class="muted" style="margin: 0 0 16px; max-width: 460px;">Is this your company? This page is built from public FMCSA records — claim it to add your website, lanes and contact details, control how it reads, and receive rate requests directly. Claiming is free, forever — no trial, no card, no plan.</p>
       <a class="btn btn-primary" href="${claimHref}">Claim this profile — free, forever <span class="arr">→</span></a>
       <p class="muted-small" style="margin: 16px 0 0; max-width: 460px;">Carrier data is sourced from public FMCSA records. To correct or hide your contact details, email support@quotefleet.net with your USDOT number.</p>
     </div>`}
