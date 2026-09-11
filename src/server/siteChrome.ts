@@ -131,6 +131,7 @@
  */
 import { readFileSync } from 'node:fs';
 import { resolve as resolvePath } from 'node:path';
+import { analyticsTags } from './analytics.js';
 
 export const OOG_QUOTE_HREF = '/tools/heavy-haul-quote';
 export const HEADER_OOG_CTA = `<a class="site-oog" href="${OOG_QUOTE_HREF}">OOG quote</a>`;
@@ -626,6 +627,23 @@ export const PREMIUM_FOOTER = `<footer class="premium-footer"><div class="premiu
 
 // Burger + Solutions-dropdown behaviour, mirrored from landing.html so the
 // injected header is interactive. Idempotent #year setter included.
+//
+// ANALYTICS RIDES ALONG HERE, ON PURPOSE. This constant is the one thing every
+// full-chrome surface interpolates at the end of <body>: the static
+// marketing/legal pages via applySiteChrome, the dynamic ones via
+// renderMarketingShell, and the entire directory / RFQ / claim / glossary /
+// OS-OW tree via directory/pages.ts's `layout()` and the tool-page shells. One
+// append therefore reaches every page a visitor can convert on, and no page
+// template needed editing to get it.
+//
+// It also reaches the widget through NONE of those paths — /w/:slug and
+// widget.html are served by res.sendFile with no chrome at all — which is the
+// requirement, because the widget renders inside third-party carrier sites and
+// must never carry our tracking into their pages. See analytics.ts.
+//
+// The value is resolved once at module load. Restarting the process (which is
+// what changing a Replit Secret does) re-reads it, so the ANALYTICS_DISABLED
+// kill switch still needs no deploy.
 export const HEADER_SCRIPTS = `<script>
   (function () {
     var y = document.getElementById('year'); if (y) y.textContent = new Date().getFullYear();
@@ -671,7 +689,7 @@ export const HEADER_SCRIPTS = `<script>
     }
   })();
 </script>
-<script src="/nav-auth.js" defer></script>`;
+<script src="/nav-auth.js" defer></script>${analyticsTags()}`;
 
 /** The two chrome variants a static page can ask for. */
 export type SiteChromeVariant = 'full' | 'auth';
@@ -755,6 +773,17 @@ export function applySiteChrome(html: string, opts: SiteChromeOptions = {}): str
       out = out.replace('</head>', () => '  <link rel="stylesheet" href="/nav-unify.css">\n</head>');
     }
     out = out.replace('</body>', () => `${HEADER_SCRIPTS}\n</body>`);
+  } else {
+    // The 'auth' variant (/login, /signup, /reset-password) deliberately takes
+    // no HEADER_SCRIPTS — its compact bar has no burger and no dropdowns to
+    // bind. But SIGNUP IS A CONVERSION, and the whole point of this work is to
+    // measure the funnel end to end; a funnel that stops one step short of the
+    // step that produces revenue is not worth instrumenting. So the analytics
+    // tags — and only those — are injected here too. Exactly once either way:
+    // the full variant gets them inside HEADER_SCRIPTS, this variant gets them
+    // on their own, and neither path runs for the other.
+    const tags = analyticsTags();
+    if (tags) out = out.replace('</body>', () => `${tags}\n</body>`);
   }
   return out;
 }

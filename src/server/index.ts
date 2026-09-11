@@ -23,6 +23,8 @@ import { startDirectoryRefreshCron } from './directoryRefreshCron.js';
 import { runCronSafely } from './cronSafety.js';
 import { ensureJobRunsTable } from './jobHealth.js';
 import { ensureOpsAlertsTable } from './opsAlerts.js';
+import { ensureConversionCountersTable } from './conversionCounters.js';
+import { initErrorMonitoring, captureException } from './errorMonitoring.js';
 import { startJobHealthWatchdogCron } from './jobHealthWatchdogCron.js';
 import { startOpsDigestCron } from './opsDigestCron.js';
 import { startCardExpiryCron } from './cardExpiryCron.js';
@@ -62,8 +64,17 @@ import {
 //     every route (including the zero-logic /healthz) and crash-loop under
 //     Replit's restart — the exact outage this file's guards exist to prevent.
 // Registered BEFORE main() so it covers all DB/cron/background work.
+// Error monitoring is initialised HERE, before the process hooks below, so the
+// very first thing it can report is a startup fault. It is a no-op while
+// SENTRY_DSN is unset (the state today) — it logs one line saying monitoring is
+// off and returns. Nothing is signed up for, nothing is spent.
+initErrorMonitoring();
 process.on('unhandledRejection', (reason) => {
   console.error('[server] UNHANDLED REJECTION (non-fatal, surviving):', reason);
+  // A swallowed background rejection was one of the two ways production could
+  // be broken with zero observable evidence. Surviving it is correct; being
+  // silent about it was not.
+  captureException(reason, { transaction: 'unhandledRejection', level: 'error' });
 });
 process.on('uncaughtException', (err) => {
   if (decideUncaughtExceptionAction(isServerListening()) === 'survive') {
@@ -71,8 +82,10 @@ process.on('uncaughtException', (err) => {
       '[server] UNCAUGHT EXCEPTION after listen (non-fatal, surviving — background fault must not crash a serving process):',
       err,
     );
+    captureException(err, { transaction: 'uncaughtException(survived)', level: 'error' });
     return;
   }
+  captureException(err, { transaction: 'uncaughtException(fatal)', level: 'fatal' });
   console.error(
     '[server] UNCAUGHT EXCEPTION during startup (fatal, exiting for clean restart):',
     err,
@@ -160,6 +173,14 @@ async function runPostListenJobs(): Promise<void> {
     // soon as the port is open, which is why it heals here rather than lazily.
     void ensureOpsAlertsTable().catch((err) => {
       console.error('[server] ops_alerts ledger self-heal failed (non-fatal):', err);
+    });
+    // conversion_counters rollup — same reasoning again: a brand-new table
+    // nothing else touches, no shared lock, non-blocking and non-fatal. The
+    // public /api/analytics/event sink can be hit the moment the port opens, and
+    // a conversion that loses the race is swallowed (the UPSERT simply fails and
+    // is logged) rather than delaying a healthz probe or failing a page.
+    void ensureConversionCountersTable().catch((err) => {
+      console.error('[server] conversion_counters self-heal failed (non-fatal):', err);
     });
     // seasonal_restrictions — a brand-new table nothing else touches, so it
     // takes no shared lock and cannot queue behind the carrier_directory chain.
