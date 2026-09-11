@@ -59,9 +59,16 @@ Both are keyed on **`file:line`**. That key is positional, so:
 - **Spacing** (`padding` / `margin` / `gap` / `inset` / `top`-`left`):
   `{0, 4, 8, 12, 16, 24, 32, 48, 60, 80, 120}` — the 8px grid. Unchanged by the
   redesign.
-- **Radius** (`border-*-radius`): `{0, 6, 10, 12, 16, 20, 24, 9999}` — a separate
-  category added in wave 0, because a corner radius tracks a control's optical
-  size rather than the layout grid. Do not merge the two sets.
+- **Radius** (`border-*-radius`): a separate category added in wave 0, because a
+  corner radius tracks a control's optical size rather than the layout grid. Do
+  not merge the two sets.
+  - **Target (use these): `{0, 6, 8, 12, 9999}`.** The measured reference has
+    exactly three radii plus the pill idiom, and they are concentric — a 12px
+    shell with 4px of padding gives 8px inner children. `8` was added to the
+    guard in wave 2, when `--radius-btn` / `--radius-control` became 8px.
+  - **Legacy (tolerated, do not use in new CSS): `{10, 16, 20, 24}`.** Still in
+    `RADIUS_ALLOWED` only so the component waves can drain them incrementally
+    instead of mass-failing CI; each should leave the set as it empties.
 - **Tap targets**: `>= 24px` hard floor on interactive selectors, `44px` target
   (24–43 warns only). Unchanged.
 - **Body line-height**: unitless `1.4`–`1.6`. Unchanged.

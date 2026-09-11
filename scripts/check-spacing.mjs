@@ -52,11 +52,16 @@ const ALLOWED = new Set([0, 4, 8, 12, 16, 24, 32, 48, 60, 80, 120]);
 // Radii are NOT spacing. The 8px grid above governs rhythm along an axis
 // (margin/padding/gap/inset) — a corner radius is a shape constant that has to
 // track the control's optical size, not the layout grid. The design system's
-// radius ramp is 6 / 10 / 16 / 24 / 9999 (pill); 12 and 20 are retained because
-// existing components use them legally. Folding 6 and 10 into ALLOWED instead
-// would silently legalise 6px and 10px margins/padding/gaps and weaken the
-// 8px grid rule for every layout property — hence the separate set.
-const RADIUS_ALLOWED = new Set([0, 6, 10, 12, 16, 20, 24, 9999]);
+// radius ramp is 6 / 8 / 12 / 9999 (pill) as of wave 2 — the measured target
+// has exactly three radii plus the pill idiom, and they are concentric: a 12px
+// shell with 4px of padding gives 8px inner children. 8 was added in wave 2
+// (--radius-btn / --radius-control are now 8px, so components need to be able
+// to write the literal); 10 / 16 / 20 / 24 are LEGACY and stay allowed only
+// until the component waves drain them — do not use them in new CSS.
+// Folding 6 and 10 into ALLOWED instead would silently legalise 6px and 10px
+// margins/padding/gaps and weaken the 8px grid rule for every layout
+// property — hence the separate set.
+const RADIUS_ALLOWED = new Set([0, 6, 8, 12, 10, 16, 20, 24, 9999]);
 
 const TAP_MIN = 24;
 const TAP_TARGET = 44;
@@ -330,7 +335,7 @@ for (const v of fresh) {
   console.error(`  ${v.file}:${v.line}  [${v.kind}]  ${v.sel}  {${v.snippet}}  — ${v.detail}`);
 }
 console.error("\nFix: snap the value onto the 8px ramp {0,4,8,12,16,24,32,48,60,80,120}");
-console.error("Radii use their OWN ramp {0,6,10,12,16,20,24,9999} — see RADIUS_ALLOWED.");
+console.error("Radii use their OWN ramp — target {0,6,8,12,9999}; {10,16,20,24} are legacy. See RADIUS_ALLOWED.");
 console.error("via var(--space-*), or bump the interactive box to >=24px (44 preferred).");
 console.error("See design-tokens/spacing.json + the design-guardrails spec.");
 process.exit(1);
