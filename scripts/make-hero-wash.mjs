@@ -57,35 +57,37 @@
    had no visible corners. The lift here is capped so the palest pixel stays
    near 0.785, a ~1.20:1 step, and the edge bands go much further.
 
-   `grain` — THE TEXTURE LAYER, and why it is a SEPARATE, TILED asset.
-   Grain baked into the wash cannot survive: `cover` DOWNSCALES the 2560px
-   field to ~1411px at a 1440 viewport, and the browser's resampler averages
-   per-pixel noise straight out of existence. So the grain ships as its own
-   256×256 tile laid over the wash at `background-repeat: repeat` and its
-   NATURAL size — 1:1 device pixels, no resampling, identical at every card
-   width, and small because 256×256 of 16-level grey is a handful of distinct
-   RGBA values that WebP lossless stores as a palette.
+   `lines` — THE TEXTURE LAYER: FINE WHITE STREAKS, not dots.
+   This replaced an isotropic film grain. The ask was a brushed / scanline
+   surface — light striations you notice as texture, never as scratches — so
+   the field is built from ROWS rather than from pixels: one strength drawn per
+   row (most of them zero), broken along x by low-frequency noise so each
+   streak is a run of soft dashes instead of an unbroken band, plus a little
+   fine dust on top to keep the flat areas from reading as plastic and to do
+   the anti-banding job the old grain did.
 
-   Each pixel is a uniform grey over a constant low alpha, so compositing gives
-   `c·(1−a) + g·a`: a symmetric ±(a·255)/2 perturbation around a slightly
-   shifted mean. One asset serves both themes — on a light ground the speckles
-   read as darkening, on a dark ground as lightening, at the same amplitude.
-   ALPHA is the whole tuning knob. Measured off the reference treatment the
-   owner cited, visible film grain sits at ~2.7 LSB mean-absolute / ~4.3 RMS
-   deviation from the local mean; `GRAIN_ALPHA` below is set to land in that
-   band and no higher. Past it the surface stops reading as texture and starts
-   reading as dirt, and it costs text contrast for nothing. As shipped the tile
-   measures 3.37 mean-absolute / 3.85 RMS once composited — just inside the
-   reference, with the contrast headroom kept.
+   WHY IT IS STILL A SEPARATE, TILED ASSET. Texture baked into the wash cannot
+   survive: `cover` DOWNSCALES the 2560px field to ~1411px at a 1440 viewport,
+   and the browser's resampler averages per-pixel detail straight out of
+   existence. The tile is laid over the wash at `background-repeat: repeat` and
+   its NATURAL 256×256 — 1:1 device pixels, no resampling, identical at every
+   card width. 256 rather than 192 because a horizontal texture repeats in the
+   axis you can see: a taller tile is a longer period, and with only ~34% of
+   rows carrying a streak the repeat is not findable by eye.
+
+   EVERY PIXEL IS WHITE; only the ALPHA varies. That is what makes it "white
+   lines" and it is also what makes the contrast argument easy: the layer can
+   only ever LIGHTEN the ground. In light theme it therefore cannot cost the
+   dark ink anything at all — the worst case for `--ink` / `--muted` is a pixel
+   with NO streak on it, i.e. the bare wash. In dark theme it is the only thing
+   that can cost the light ink, and it is bounded by `STREAK_ALPHA` alone. One
+   colour × 16 alphas = 16 distinct RGBA values, so WebP still palettes it.
 
    A note on the encode, because it is counter-intuitive: Chromium's canvas
-   WebP encoder is LOSSY even at quality 1 — it re-quantises the 16 written
-   greys down to 9 unevenly-spaced ones. That is harmless here (the measured
+   WebP encoder is LOSSY even at quality 1. That is harmless here (the measured
    amplitude is unchanged and there is no blocking; the tile carries no detail
-   to lose) and it is by far the cheapest option — 17.5 KB against 42.5 KB for
-   a truly lossless PNG of the same noise. Noise is incompressible, so the tile
-   size is set by its AREA: 192² is the largest period that stays cheap, and at
-   this amplitude the repeat is not findable by eye.
+   to lose) and it is by far the cheapest option for noise, which is otherwise
+   incompressible.
 
    `facet` — THE DIRECTORY HERO. A top-left → bottom-right DIAGONAL with a
    faint angular facet texture over it. One variant only, because the surface
@@ -118,11 +120,15 @@ const OUT = path.join(HERE, '..', 'src', 'server', 'public', 'brand');
 
 const QUALITY = 0.9;
 
-/* Grain alpha, 0-255. 13/255 ≈ 5.1% → a ±6.5-level uniform perturbation,
-   ~3.75 RMS from the local mean. The reference treatment measures ~4.3 RMS;
-   we sit just inside it so the texture reads without eating text contrast. */
-const GRAIN_ALPHA = 13;
-const GRAIN_LEVELS = 16;   // 16 greys + one alpha = 16 RGBA values → palette-coded
+/* Streak alpha ceiling, 0-255. Pure WHITE pixels at a varying alpha, so the
+   texture can only ever LIGHTEN the ground: in light theme that means it
+   cannot cost dark-ink contrast at all, and in dark theme the ceiling below is
+   what bounds the loss. 14/255 ≈ 5.5%, i.e. a +13-level lift at the brightest
+   pixel of the brightest streak; measured on the rendered dark card that takes
+   the worst-case ground from luminance 0.0187 to 0.0246, against a 0.0384
+   ceiling for `--muted`. */
+const STREAK_ALPHA = 14;
+const STREAK_LEVELS = 16;  // 16 alphas × ONE colour = 16 RGBA values → palette-coded
 
 const VARIANTS = [
   /* HOMEPAGE — `field: 'wash'`, centre-lit vignette. Anchors, in order:
@@ -135,14 +141,14 @@ const VARIANTS = [
      dark values up ~5, so the anchors are pre-compensated by that shift and
      the `--measure` envelope below is the pre-composite one. */
   { name: 'hero-wash-light', home: true, field: 'wash', W: 2560, H: 1100,
-    pale: [225, 236, 254], base: [204, 223, 252], deep: [141, 178, 242] },
+    pale: [214, 229, 252], base: [186, 210, 249], deep: [112, 152, 233] },
   /* Dark sibling. The ceiling here is the one that matters: dark `--muted`
      (#90A1B9) needs the ground to stay UNDER luminance 0.0386, so the whole
      field is capped there rather than only its centre column. */
   { name: 'hero-wash-dark', home: true, field: 'wash', W: 2560, H: 1100,
-    pale: [24, 32, 47], base: [26, 36, 58], deep: [31, 48, 93] },
-  /* The tiled texture. Theme-agnostic; see the `grain` note above. */
-  { name: 'hero-grain', home: true, field: 'grain', W: 192, H: 192, maxQuality: true },
+    pale: [20, 27, 42], base: [22, 32, 56], deep: [26, 46, 98] },
+  /* The tiled texture. Theme-agnostic; see the `lines` note above. */
+  { name: 'hero-grain', home: true, field: 'lines', W: 256, H: 256, maxQuality: true },
 
   /* DIRECTORY — signed off; excluded from the default set on purpose. */
   { name: 'dir-hero-wash', home: false, field: 'facet', W: 2560, H: 1000,
@@ -166,7 +172,7 @@ function resolveChromium() {
 
 /* Runs inside the page: everything below here is browser-side. */
 const draw = (cfg) => {
-  const { W, H, pale, base, deep, quality, field, grainAlpha, grainLevels, maxQuality } = cfg;
+  const { W, H, pale, base, deep, quality, field, streakAlpha, streakLevels, maxQuality } = cfg;
   const canvas = document.createElement('canvas');
   canvas.width = W;
   canvas.height = H;
@@ -223,13 +229,47 @@ const draw = (cfg) => {
     return hash(i * 2.13 + half, j * 3.71 + half) - 0.5;
   };
 
-  /* ── The grain tile. Uniform grey, constant alpha; see the header. ────── */
-  if (field === 'grain') {
+  /* ── The streak tile. WHITE pixels, varying alpha; see the header. ─────── */
+  if (field === 'lines') {
+    /* One strength per ROW, drawn once so every pixel on that row shares it —
+       that is what makes the texture read as a LINE rather than as dust. Most
+       rows are empty: `1 - ROW_HIT` of them draw below the threshold and stay
+       fully transparent, so the streaks are sparse enough that the 256px
+       vertical period is not findable. The exponent biases the surviving rows
+       toward the faint end, so a handful read clearly and the rest are barely
+       there — which is what a brushed surface looks like. */
+    const ROW_HIT = 0.34;
+    const rowStrength = new Float32Array(H);
+    const rowPhase = new Float32Array(H);
+    for (let y = 0; y < H; y++) {
+      const r = rnd();
+      rowStrength[y] = r < 1 - ROW_HIT ? 0 : Math.pow((r - (1 - ROW_HIT)) / ROW_HIT, 1.5);
+      rowPhase[y] = rnd() * 64;
+    }
+
     let q = 0;
-    for (let i = 0; i < W * H; i++) {
-      const g = Math.round((Math.floor(rnd() * grainLevels) / (grainLevels - 1)) * 255);
-      d[q] = g; d[q + 1] = g; d[q + 2] = g; d[q + 3] = grainAlpha;
-      q += 4;
+    for (let y = 0; y < H; y++) {
+      const s = rowStrength[y];
+      const ph = rowPhase[y];
+      for (let x = 0; x < W; x++) {
+        /* BROKEN ALONG X, on purpose. An unbroken full-width band at a 256px
+           period is a scanline artefact; low-frequency noise along the row cuts
+           each streak into soft dashes of a few dozen pixels, so the repeat
+           never lines up into a visible grid. */
+        let a = 0;
+        if (s > 0) {
+          const m = vnoise(x / 41 + ph, y * 0.021 + 3.7);
+          a = s * smooth(0.30, 0.88, m);
+        }
+        /* A little fine dust on top keeps the flat areas from reading as
+           plastic and does the anti-banding job the old grain did. */
+        a += rnd() * 0.085;
+        a = clamp01(a);
+        const lvl = Math.round(a * (streakLevels - 1));
+        d[q] = 255; d[q + 1] = 255; d[q + 2] = 255;
+        d[q + 3] = Math.round((lvl / (streakLevels - 1)) * streakAlpha);
+        q += 4;
+      }
     }
     ctx.putImageData(img, 0, 0);
     return canvas.toDataURL('image/webp', maxQuality ? 1 : quality);
@@ -345,13 +385,13 @@ await page.goto('about:blank');
 
 for (const variant of targets) {
   const dataUrl = await page.evaluate(draw, {
-    quality: QUALITY, grainAlpha: GRAIN_ALPHA, grainLevels: GRAIN_LEVELS, ...variant,
+    quality: QUALITY, streakAlpha: STREAK_ALPHA, streakLevels: STREAK_LEVELS, ...variant,
   });
   const buf = Buffer.from(dataUrl.split(',')[1], 'base64');
   const file = path.join(OUT, `${variant.name}.webp`);
   fs.writeFileSync(file, buf);
   console.log(`${variant.name}.webp  ${variant.W}x${variant.H}  ${(buf.length / 1024).toFixed(1)} KB`);
-  if (doMeasure && variant.field !== 'grain') {
+  if (doMeasure && variant.field !== 'lines') {
     for (const line of await page.evaluate(measure, dataUrl)) console.log(`   ${line}`);
   }
 }
