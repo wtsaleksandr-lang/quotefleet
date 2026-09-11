@@ -291,7 +291,9 @@ const SERVICE_CSS = `
   .svc-crumb { font-size: 12px; font-family: var(--font-mono); color: var(--muted); display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
   .svc-crumb a { color: var(--muted); text-decoration: none; }
   .svc-crumb a:hover { color: var(--accent); }
-  .svc-crumb .sep { opacity: 0.5; }
+  /* No opacity wash on the crumb separator — 0.5 put --muted at 2.3:1 (light)
+     / 2.7:1 (dark), under AA. Same fix as .dir-crumbs .sep in pages.ts. */
+  .svc-crumb .sep { color: var(--muted); }
   .svc-crumb span[aria-current] { color: var(--ink-soft); }
   .svc-intro { max-width: 760px; }
   .svc-intro p { line-height: 1.65; margin: 0 0 14px; }
