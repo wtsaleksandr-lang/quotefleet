@@ -424,6 +424,14 @@ export const SELF_HEAL_TABLE_STATEMENTS: readonly string[] = [
   `ALTER TABLE "carrier_directory" ADD COLUMN IF NOT EXISTS "bond_on_file" boolean NOT NULL DEFAULT false`,
   `ALTER TABLE "carrier_directory" ADD COLUMN IF NOT EXISTS "fmcsa_registered_since" timestamp`,
   `ALTER TABLE "carrier_directory" ADD COLUMN IF NOT EXISTS "safety_rating_date" timestamp`,
+  // 0074_carrier_claims.sql (carrier_directory half) — the ONE verified profile
+  // claim, mirrored from carrier_claims by the claim flow only. Never in the
+  // ingest's CARRIER_UPSERT_SET (a re-ingest can never un-claim a profile).
+  // NULLABLE with NO DEFAULT — null = unclaimed, and it is the catalog-only DDL
+  // on the 330k-row table. Same lock_timeout guard as the waves above.
+  `ALTER TABLE "carrier_directory" ADD COLUMN IF NOT EXISTS "claimed_tenant_id" integer`,
+  `ALTER TABLE "carrier_directory" ADD COLUMN IF NOT EXISTS "claimed_at" timestamp`,
+  `ALTER TABLE "carrier_directory" ADD COLUMN IF NOT EXISTS "claim_method" text`,
   `CREATE UNIQUE INDEX IF NOT EXISTS "carrier_directory_usdot_idx" ON "carrier_directory" ("usdot")`,
   `CREATE UNIQUE INDEX IF NOT EXISTS "carrier_directory_slug_idx" ON "carrier_directory" ("public_slug")`,
   `CREATE INDEX IF NOT EXISTS "carrier_directory_state_idx" ON "carrier_directory" ("state")`,
@@ -1184,6 +1192,37 @@ export const SELF_HEAL_TABLE_STATEMENTS: readonly string[] = [
     "submitted_at" timestamp DEFAULT now() NOT NULL,
     CONSTRAINT "indexnow_submissions_kind_ref_pk" PRIMARY KEY("kind","ref")
   )`,
+
+  // ── 0074_carrier_claims.sql — free-forever directory PROFILE CLAIMS ───────
+  // One row per attempt by a tenant to prove it owns a carrier_directory
+  // profile (email code / domain match / manual). Only the SHA-256 of the code
+  // is stored, never the code. Healed HERE for the usual reason (Replit skips
+  // db:migrate and its publish tool can propose dropping tables it does not
+  // know about). A phantom-drop loses the claim HISTORY only — the verified
+  // outcome itself lives on carrier_directory.claimed_* (healed above) and
+  // tenants.is_directory_owner (healed here; the tenants table always predates
+  // this step). MUST stay byte-for-byte equivalent to
+  // drizzle/0074_carrier_claims.sql + schema.ts `carrierClaims` /
+  // `tenants.isDirectoryOwner` / `tenants.signupSource`.
+  `CREATE TABLE IF NOT EXISTS "carrier_claims" (
+    "id" serial PRIMARY KEY NOT NULL,
+    "usdot" integer NOT NULL,
+    "tenant_id" integer NOT NULL,
+    "user_id" integer NOT NULL,
+    "method" text NOT NULL,
+    "status" text DEFAULT 'pending' NOT NULL,
+    "otp_hash" text,
+    "otp_expires_at" timestamp,
+    "attempts" integer DEFAULT 0 NOT NULL,
+    "note" text,
+    "created_at" timestamp DEFAULT now() NOT NULL,
+    "verified_at" timestamp,
+    "rejected_reason" text
+  )`,
+  `CREATE INDEX IF NOT EXISTS "carrier_claims_usdot_idx" ON "carrier_claims" ("usdot")`,
+  `CREATE INDEX IF NOT EXISTS "carrier_claims_tenant_idx" ON "carrier_claims" ("tenant_id")`,
+  `ALTER TABLE "tenants" ADD COLUMN IF NOT EXISTS "is_directory_owner" boolean NOT NULL DEFAULT false`,
+  `ALTER TABLE "tenants" ADD COLUMN IF NOT EXISTS "signup_source" text`,
 
   // SEASONAL (SPRING THAW) WEIGHT RESTRICTIONS — one row per state, holding the
   // snapshot last read from that state's own DOT publication. Defined in

@@ -56,8 +56,12 @@ export function isTenantBillingSuspended(tenant: Tenant): boolean {
 }
 
 export interface TrialState {
-  /** 'trial' | 'trial_expired' | 'paid' | 'unknown' */
-  status: 'trial' | 'trial_expired' | 'paid' | 'unknown';
+  /** 'trial' | 'trial_expired' | 'paid' | 'directory' | 'unknown'.
+   *  'directory' = a free-forever directory-profile owner who has NOT started
+   *  the quote-tool trial (isDirectoryOwner && trialEndsAt null). Nothing has
+   *  expired for them; the dashboard shows the "30 days free" upsell instead
+   *  of any trial-ended copy. */
+  status: 'trial' | 'trial_expired' | 'paid' | 'directory' | 'unknown';
   /** Whether this tenant can accept new leads right now. */
   acceptingLeads: boolean;
   /** Effective plan powering feature access ('free' | 'vital' | 'pro'). */
@@ -108,6 +112,25 @@ export async function getTrialState(tenant: Tenant): Promise<TrialState> {
       daysLeft: 0,
       trialEndsAt: trialEnd ? trialEnd.toISOString() : null,
       paymentPastDue,
+    };
+  }
+
+  // Free-forever directory-profile account that never started the quote-tool
+  // trial: NOT expired — there was never a trial. Keyed on the claim-created
+  // account (signupSource 'claim') so an ABANDONED, still-unverified claimant
+  // is covered too, not only a verified owner. Checked before the
+  // trial_expired fallthrough so no banner/API ever tells them "your trial
+  // has ended". Once they activate the 30-day trial, trialEndsAt is set and
+  // the ordinary branches above take over.
+  if ((tenant.signupSource === 'claim' || tenant.isDirectoryOwner) && trialEnd == null) {
+    return {
+      status: 'directory',
+      acceptingLeads: false,
+      plan: 'free',
+      daysLeft: 0,
+      trialEndsAt: null,
+      paymentPastDue,
+      reason: 'Free directory profile. Start the 30-day quote-tool trial to capture leads.',
     };
   }
 

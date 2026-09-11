@@ -386,6 +386,57 @@ export function passwordResetEmail(opts: {
   };
 }
 
+/**
+ * Directory profile-claim ownership code. Sent to the FMCSA census email ON
+ * THE RECORD (not to the claimant), so whoever controls the company's mailbox
+ * is the one who can complete the claim. The code is the whole proof — it is
+ * never repeated anywhere else and dies after `ttlMinutes`.
+ */
+export function claimCodeEmail(opts: {
+  code: string;
+  company: string;
+  ttlMinutes?: number;
+}): { subject: string; text: string; html: string } {
+  const ttl = opts.ttlMinutes ?? 15;
+  const subject = `Your QuoteFleet ownership code for ${opts.company}`;
+  const text =
+    `Hi,\n\n` +
+    `Someone is claiming the ${opts.company} profile on the QuoteFleet carrier directory. ` +
+    `If that is you (or a colleague), enter this code on the claim page:\n\n` +
+    `${opts.code}\n\n` +
+    `It expires in ${ttl} minutes. Claiming is free and always will be.\n\n` +
+    `If you did not start this, ignore this email — nothing changes without the code.\n\n` +
+    `— QuoteFleet (a product of MR Holdings & Trade LLC)\n` +
+    `https://quotefleet.net`;
+
+  const inner =
+    eyebrow('Ownership code') +
+    heading(`Claim ${opts.company}`) +
+    paragraph(
+      `Someone is claiming the <strong style="color:${BRAND.ink};">${escape(opts.company)}</strong> ` +
+        `profile on the QuoteFleet carrier directory. Enter this code on the claim page ` +
+        `within <strong>${ttl} minutes</strong>:`,
+    ) +
+    `<p style="margin:0 0 22px 0;font-family:'JetBrains Mono','SF Mono',Menlo,Consolas,monospace;font-size:28px;letter-spacing:0.24em;line-height:1.2;color:${BRAND.ink};background:${BRAND.bg};border:1px solid ${BRAND.border};border-radius:6px;padding:12px 16px;display:inline-block;">${escape(opts.code)}</p>` +
+    paragraph('Claiming is free and always will be. No trial, no card, no plan.');
+
+  const footerNote = `
+    <strong style="color:${BRAND.inkSoft};">Didn't start this?</strong>
+    Ignore this email — nothing changes without the code. We sent it to the
+    email on the company's FMCSA record.
+  `;
+
+  return {
+    subject,
+    text,
+    html: shell({
+      preheader: `Your ownership code for ${opts.company} — expires in ${ttl} minutes`,
+      inner,
+      footerNote,
+    }),
+  };
+}
+
 /* ──────────────────────────────────────────────────────────────────────
  * Shared content building blocks — used by every transactional template
  * below so they stay brand-consistent (blue accent, same spacing scale,

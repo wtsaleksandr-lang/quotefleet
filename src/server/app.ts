@@ -23,6 +23,7 @@ import { registerOAuthRoutes } from './routes/oauth.js';
 import { registerPublicRoutes } from './routes/public.js';
 import { registerTenantRoutes } from './routes/tenant.js';
 import { registerAdminRoutes } from './routes/admin.js';
+import { registerClaimRoutes } from './routes/claim.js';
 import { registerAiRoutes } from './routes/ai.js';
 import { registerAutocompleteRoutes } from './routes/autocomplete.js';
 import { registerIngestRoutes } from './routes/ingest.js';
@@ -200,6 +201,9 @@ export function createApp(): express.Express {
   registerPartnersRoutes(app);
   registerTenantRoutes(app);
   registerAdminRoutes(app);
+  // Free-forever directory profile claims: /claim, /claim/:slug, /api/claim/*,
+  // /api/admin/claims*, /api/tenant/trial/activate. See routes/claim.ts.
+  registerClaimRoutes(app);
   registerAiRoutes(app);
   registerAutocompleteRoutes(app);
   registerIngestRoutes(app);

@@ -128,8 +128,21 @@ export const tenants = pgTable(
      *  is derived weekly from the EIA national diesel price via the standard
      *  DOE-index formula). Opt-in; existing tenants stay on 'manual'. */
     fscMode: text('fsc_mode').notNull().default('manual'),
-    /** Trial end timestamp. Null = not on trial (paid or grandfathered). */
+    /** Trial end timestamp. Null = not on trial (paid or grandfathered), OR a
+     *  free-forever directory-profile owner who has not started the quote-tool
+     *  trial yet (see `isDirectoryOwner`). */
     trialEndsAt: timestamp('trial_ends_at', { mode: 'date' }),
+    /** True when this tenant was created by (or later completed) a verified
+     *  carrier-directory profile claim. Claiming is FREE FOREVER — no trial, no
+     *  card, no plan. With `trialEndsAt` null the tenant reads as
+     *  `status:'directory'` (trialGating.ts), never "trial expired". The
+     *  quote-tool upsell (POST /api/tenant/trial/activate) starts a 30-day
+     *  trial (CLAIM_OWNER_TRIAL_DAYS) instead of the usual 14. Self-healed in
+     *  migrate.ts (0074_carrier_claims.sql). */
+    isDirectoryOwner: boolean('is_directory_owner').notNull().default(false),
+    /** How the tenant came to exist: 'claim' (directory profile claim) or null
+     *  for the regular signup / OAuth paths. Analytics only; never gates. */
+    signupSource: text('signup_source'),
     /** Marketplace exposure: carrier opts in to having their PUBLIC rate
      *  profile (carrier name, locations, equipment, current rates) visible
      *  to shippers/forwarders browsing the rates dashboard. Default OFF.
@@ -1954,6 +1967,16 @@ export const carrierDirectory = pgTable(
     nearestPortCode: text('nearest_port_code'),
     /** Unique URL slug for the public carrier page (slug(name)-usdot). */
     publicSlug: text('public_slug').notNull(),
+    // ── PROFILE CLAIM (0074_carrier_claims.sql) ─────────────────────────────
+    //    Set ONLY by a VERIFIED claim (src/server/directory/claims.ts). Like
+    //    `contact_hidden`, these are NEVER in CARRIER_UPSERT_SET, so a re-ingest
+    //    can never un-claim a profile. Nullable, no default: null = unclaimed.
+    //    Self-healed in migrate.ts.
+    /** The tenant that proved ownership of this profile. */
+    claimedTenantId: integer('claimed_tenant_id'),
+    claimedAt: timestamp('claimed_at', { mode: 'date' }),
+    /** How ownership was proven: 'email_otp' | 'domain_match' | 'manual'. */
+    claimMethod: text('claim_method'),
     createdAt: timestamp('created_at', { mode: 'date' }).notNull().defaultNow(),
     updatedAt: timestamp('updated_at', { mode: 'date' }).notNull().defaultNow(),
   },
@@ -2454,6 +2477,54 @@ export const carrierOverrides = pgTable('carrier_overrides', {
 });
 
 // ────────────────────────────────────────────────────────────────────
+// CARRIER_CLAIMS — one row per attempt by a tenant to prove it OWNS a
+// carrier_directory profile. Claiming is FREE FOREVER (no trial / card / plan);
+// what is protected is the "Verified owner" badge + the right to edit the
+// public card, so every claim must carry proof:
+//   email_otp    — a 6-digit code sent to the FMCSA census email on the record.
+//                  We store ONLY the SHA-256 hash (never the code); 15-min TTL;
+//                  `attempts` caps guessing at CLAIM_OTP_MAX_ATTEMPTS.
+//   domain_match — the claimant's provider-/magic-link-verified email shares
+//                  a NON-freemail domain with the census email → verified at
+//                  once, no code.
+//   manual       — the record has no email; support verifies out of band and
+//                  an admin flips the row via PATCH /api/admin/claims/:id.
+// A VERIFIED row is mirrored onto carrier_directory.claimed_* (the read path
+// the profile renders from). Logic: src/server/directory/claims.ts.
+// ────────────────────────────────────────────────────────────────────
+export const carrierClaims = pgTable(
+  'carrier_claims',
+  {
+    id: serial('id').primaryKey(),
+    /** USDOT as an integer (carrier_directory.usdot is the same digits as text). */
+    usdot: integer('usdot').notNull(),
+    // No FK constraints — deliberately mirrors 0074_carrier_claims.sql + the
+    // boot self-heal (plain integer columns) so Replit's publish tool never
+    // proposes an ADD CONSTRAINT the SQL does not carry.
+    tenantId: integer('tenant_id').notNull(),
+    userId: integer('user_id').notNull(),
+    /** 'email_otp' | 'domain_match' | 'manual' */
+    method: text('method').notNull(),
+    /** 'pending' | 'verified' | 'rejected' | 'expired' */
+    status: text('status').notNull().default('pending'),
+    /** SHA-256 hex of the 6-digit code (email_otp only). Never the raw code. */
+    otpHash: text('otp_hash'),
+    otpExpiresAt: timestamp('otp_expires_at', { mode: 'date' }),
+    /** Wrong-code submissions so far; the row locks at the cap. */
+    attempts: integer('attempts').notNull().default(0),
+    /** Free-text context (e.g. the claimant email used, support notes). */
+    note: text('note'),
+    createdAt: timestamp('created_at', { mode: 'date' }).notNull().defaultNow(),
+    verifiedAt: timestamp('verified_at', { mode: 'date' }),
+    rejectedReason: text('rejected_reason'),
+  },
+  (t) => [
+    index('carrier_claims_usdot_idx').on(t.usdot),
+    index('carrier_claims_tenant_idx').on(t.tenantId),
+  ]
+);
+
+// ────────────────────────────────────────────────────────────────────
 // DIRECTORY_TERMINALS — canonical, PLATFORM-LEVEL reference list of major
 // North-American intermodal terminal metros (coastal SEAPORT gateways +
 // inland RAIL intermodal metros). Distinct from the tenant-scoped `terminals`
@@ -2646,6 +2717,8 @@ export type CarrierDirectoryRow = typeof carrierDirectory.$inferSelect;
 export type NewCarrierDirectoryRow = typeof carrierDirectory.$inferInsert;
 export type CarrierOverrideRow = typeof carrierOverrides.$inferSelect;
 export type NewCarrierOverrideRow = typeof carrierOverrides.$inferInsert;
+export type CarrierClaimRow = typeof carrierClaims.$inferSelect;
+export type NewCarrierClaimRow = typeof carrierClaims.$inferInsert;
 export type CallbackRequest = typeof callbackRequests.$inferSelect;
 export type NewCallbackRequest = typeof callbackRequests.$inferInsert;
 export type Conversation = typeof conversations.$inferSelect;

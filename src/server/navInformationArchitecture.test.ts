@@ -186,6 +186,23 @@ describe('ONE DESTINATION, ONE HOME', () => {
   });
 });
 
+describe('the free profile claim is reachable on a phone', () => {
+  // The header's "Claim your listing — free" button is hidden at the burger
+  // breakpoint, so before this the drawer and footer offered only /signup (the
+  // paid trial) and a phone visitor had no route to the free claim at all.
+  it('the mobile drawer links /claim', () => {
+    expect(SITE_MOBILE_MENU_HTML).toContain('href="/claim"');
+    expect(SITE_MOBILE_MENU_HTML).toMatch(/>Claim your listing — free</);
+  });
+
+  it('both footers link /claim beside the trial CTA, as its own destination', () => {
+    expect(PREMIUM_FOOTER).toContain('href="/claim"');
+    expect(DIRECTORY_PAGES_TS).toContain('<a href="/claim">Claim your listing — free</a>');
+    // /claim and /signup are different products — the claim is free forever.
+    expect(PREMIUM_FOOTER).toContain('href="/signup"');
+  });
+});
+
 describe('no menu entry is a dead end', () => {
   it('deep-links RFQ so it cannot bounce back to /directory', () => {
     // directory/entryPortFacets.ts: "/directory/rfq 302s straight back to
