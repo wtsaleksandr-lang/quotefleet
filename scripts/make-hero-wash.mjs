@@ -44,15 +44,32 @@ import url from 'node:url';
 const HERE = path.dirname(url.fileURLToPath(import.meta.url));
 const OUT = path.join(HERE, '..', 'src', 'server', 'public', 'brand');
 
-const W = 2560;
-const H = 1100; // ~2.33:1, close to the hero card's desktop aspect
 const QUALITY = 0.9;
 
 const VARIANTS = [
-  // near-white -> a touch richer than --surface-hero (#EFF6FF) -> +~26% --accent
-  { name: 'hero-wash-light', pale: [248, 251, 255], base: [233, 241, 254], deep: [190, 206, 250] },
+  /* HOMEPAGE — `field: 'wash'`. Bottom-anchored, near-white at the top-right.
+     near-white -> a touch richer than --surface-hero (#EFF6FF) -> +~26% --accent */
+  { name: 'hero-wash-light', field: 'wash', W: 2560, H: 1100,
+    pale: [248, 251, 255], base: [233, 241, 254], deep: [190, 206, 250] },
   // a shade under the dark --surface-hero (#131A28) -> #131A28 -> +~22% --accent
-  { name: 'hero-wash-dark', pale: [14, 19, 31], base: [19, 26, 40], deep: [26, 39, 84] },
+  { name: 'hero-wash-dark', field: 'wash', W: 2560, H: 1100,
+    pale: [14, 19, 31], base: [19, 26, 40], deep: [26, 39, 84] },
+
+  /* DIRECTORY — `field: 'facet'`. A top-left → bottom-right DIAGONAL with a
+     faint angular facet texture over it. One variant only, because the surface
+     it replaces is theme-invariant by design: `--accent-fill` is #3356EE and
+     `--accent-ink` is #FFFFFF in BOTH themes, so there is no dark twin to make.
+
+     THE STOPS ARE PICKED BY CONTRAST, NOT BY EYE. White text sits on all of
+     this, so every pixel has to clear AA (4.5:1), i.e. stay under luminance
+     0.1833. Deep navy #1B2E7D = 11.34:1 at the top-left, the token fill
+     #3356EE = 5.68:1 through the body, and #2E5BFF = 5.23:1 at the bottom-right
+     — brighter and more saturated than the fill (blue channel pinned at 255)
+     while being LOWER in luminance than a lighter-looking #4361F2 would be,
+     which is what buys the headroom. The facet and dither amplitudes are capped
+     so the brightest single pixel still clears AA. */
+  { name: 'dir-hero-wash', field: 'facet', W: 2560, H: 1000,
+    pale: [27, 46, 125], base: [51, 86, 238], deep: [46, 91, 255] },
 ];
 
 function resolveChromium() {
@@ -72,7 +89,7 @@ function resolveChromium() {
 
 /* Runs inside the page: everything below here is browser-side. */
 const draw = (cfg) => {
-  const { W, H, pale, base, deep, quality } = cfg;
+  const { W, H, pale, base, deep, quality, field } = cfg;
   const canvas = document.createElement('canvas');
   canvas.width = W;
   canvas.height = H;
@@ -103,26 +120,51 @@ const draw = (cfg) => {
     return (a * (1 - ux) + b * ux) * (1 - uy) + (c * (1 - ux) + e * ux) * uy;
   };
 
+  /* Flat-shaded triangular facets on a rotated, non-square lattice. Rotating
+     the frame is what stops the split diagonals reading as a checkerboard, and
+     flat shading (one value per triangle, hard edges) is what makes them read
+     as FACETS rather than as blur. Amplitude is tiny on purpose — you should
+     only find it if you go looking. */
+  const facet = (u, v) => {
+    const c = Math.cos(0.38), si = Math.sin(0.38);
+    const a = (u * c - v * si) * 7.5 + 11.3;
+    const b = (u * si + v * c) * 4.1 + 7.7;
+    const i = Math.floor(a), j = Math.floor(b);
+    const fa = a - i, fb = b - j;
+    const half = fa + fb > 1 ? 0.5 : 0;
+    return hash(i * 2.13 + half, j * 3.71 + half) - 0.5;
+  };
+
   let p = 0;
   for (let y = 0; y < H; y++) {
     const v = y / (H - 1);
     for (let x = 0; x < W; x++) {
       const u = x / (W - 1);
 
-      const bottom = smooth(0.34, 1.14, v) * 0.62;
+      let s, l;
+      if (field === 'facet') {
+        // The diagonal itself: top-left (0) -> bottom-right (1), eased so the
+        // token fill sits through the middle where most of the copy lands.
+        const diag = smooth(-0.05, 1.05, (u + v) * 0.5);
+        const tex = facet(u, v) * 0.06
+          + (vnoise(u * 3.1 + 5.5, v * 2.2 + 1.3) - 0.5) * 0.065;
+        s = Math.max(0, Math.min(1, (diag - 0.5) * 2 + tex));   // -> `deep` half
+        l = Math.max(0, Math.min(1, (0.5 - diag) * 2 - tex));   // -> `pale` half
+      } else {
+        const bottom = smooth(0.34, 1.14, v) * 0.62;
 
-      const dx = (u + 0.04) / 1.30;
-      const dy = (v - 1.06) / 1.04;
-      const corner = (1 - smooth(0, 1, Math.sqrt(dx * dx + dy * dy))) * 0.52;
+        const dx = (u + 0.04) / 1.30;
+        const dy = (v - 1.06) / 1.04;
+        const corner = (1 - smooth(0, 1, Math.sqrt(dx * dx + dy * dy))) * 0.52;
 
-      const lift = smooth(0.46, 1.05, u * 0.60 + (1 - v) * 0.78) * 0.72;
+        const lift = smooth(0.46, 1.05, u * 0.60 + (1 - v) * 0.78) * 0.72;
 
-      const mesh = (vnoise(u * 2.3 + 0.7, v * 1.7 + 0.4) - 0.5) * 0.13
-        + (vnoise(u * 4.6 + 3.1, v * 3.4 + 1.9) - 0.5) * 0.055;
+        const mesh = (vnoise(u * 2.3 + 0.7, v * 1.7 + 0.4) - 0.5) * 0.13
+          + (vnoise(u * 4.6 + 3.1, v * 3.4 + 1.9) - 0.5) * 0.055;
 
-      let s = bottom + corner + mesh;
-      s = s < 0 ? 0 : s > 1 ? 1 : s;
-      const l = lift < 0 ? 0 : lift > 1 ? 1 : lift;
+        s = Math.max(0, Math.min(1, bottom + corner + mesh));
+        l = Math.max(0, Math.min(1, lift));
+      }
 
       for (let ch = 0; ch < 3; ch++) {
         const mid = base[ch] + (deep[ch] - base[ch]) * s;
@@ -145,11 +187,11 @@ const page = await browser.newPage();
 await page.goto('about:blank');
 
 for (const variant of VARIANTS) {
-  const dataUrl = await page.evaluate(draw, { W, H, quality: QUALITY, ...variant });
+  const dataUrl = await page.evaluate(draw, { quality: QUALITY, ...variant });
   const buf = Buffer.from(dataUrl.split(',')[1], 'base64');
   const file = path.join(OUT, `${variant.name}.webp`);
   fs.writeFileSync(file, buf);
-  console.log(`${variant.name}.webp  ${W}x${H}  ${(buf.length / 1024).toFixed(1)} KB`);
+  console.log(`${variant.name}.webp  ${variant.W}x${variant.H}  ${(buf.length / 1024).toFixed(1)} KB`);
 }
 
 await browser.close();
