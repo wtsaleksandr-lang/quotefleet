@@ -236,7 +236,6 @@ body.qf-app-calculator .qf-cta:disabled::after {
   content: '';
   position: absolute;
   inset: 0;
-  background: rgba(255,255,255,.18);
   animation: qf-processing-sweep 1.1s linear infinite;
 }
 

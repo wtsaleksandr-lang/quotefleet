@@ -10,21 +10,6 @@
   padding: clamp(56px, 6vw, 88px) 0 clamp(40px, 5vw, 64px);
   border-top: 1px solid var(--border, rgba(133, 128, 123, 0.18));
 }
-
-/* Soft brand glow behind the globe */
-.qf-globe-section::before {
-  content: "";
-  position: absolute;
-  left: 50%;
-  top: 44%;
-  width: min(760px, 92vw);
-  height: min(760px, 92vw);
-  transform: translate(-50%, -50%);
-  background: rgba(110, 139, 255, 0.12);
-  pointer-events: none;
-  z-index: 0;
-}
-
 .qf-globe-head {
   position: relative;
   z-index: 3;
@@ -110,7 +95,15 @@
   left: 0;
   right: 0;
   height: 26%;
-  background: var(--bg, #161616);
+  /* Functional scrim, not decoration: fades the globe canvas into the
+     section background so the canvas does not end on a hard edge. Kept as a
+     gradient deliberately (design-refactor wave 1). */
+  background: linear-gradient(
+    to top,
+    var(--bg, #161616) 0%,
+    rgba(22, 22, 22, 0.8) 30%,
+    transparent 100%
+  );
   pointer-events: none;
   z-index: 6;
 }

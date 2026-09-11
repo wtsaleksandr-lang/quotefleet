@@ -25,17 +25,6 @@ body.qf-wft {
   color: var(--qf-wft-text);
   font-family: var(--qf-wft-sans);
 }
-
-body.qf-wft::before {
-  content: '';
-  position: fixed;
-  inset: 0;
-  pointer-events: none;
-  background: rgba(255,255,255,.018);
-  background-size: auto, auto, 28px 28px, 28px 28px;
-  opacity: .95;
-}
-
 .wft-nav {
   position: sticky;
   top: 0;

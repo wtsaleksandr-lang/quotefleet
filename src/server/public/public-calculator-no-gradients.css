@@ -1170,11 +1170,7 @@ body[data-qf-preset="citron"] {
    PLACEMENT 1 (PRIMARY — result RECEIPT panel = their chart-fill analogue):
    a BOLD grey diagonal hatch fills the line-item breakdown. Line-item text sits
    in a z-index:1 layer; ink #1A1714 over the hatched cream still clears >11:1. */
-body[data-qf-preset="vault"] .qf-result .lines { position: relative; overflow: hidden; }
-body[data-qf-preset="vault"] .qf-result .lines::before {
-  content: "" !important; position: absolute; inset: 0; z-index: 0; pointer-events: none;
-}
-/* Rows/cells are TRANSPARENT so the hatch runs CONTINUOUSLY behind every label +
+body[data-qf-preset="vault"] .qf-result .lines { position: relative; overflow: hidden; }/* Rows/cells are TRANSPARENT so the hatch runs CONTINUOUSLY behind every label +
    amount (no solid patch); text sits on top via z-index and stays legible. */
 body[data-qf-preset="vault"] .qf-result .lines .line,
 body[data-qf-preset="vault"] .qf-result .lines .line .name,
@@ -1186,19 +1182,10 @@ body[data-qf-preset="vault"] .qf-result .lines .line { position: relative; z-ind
    width band of the grey hatch across the top of the card. Decorative only, no
    text over it, so it reads as a bold brand texture. */
 body[data-qf-preset="vault"] .qf-widget { position: relative; }
-body[data-qf-preset="vault"] .qf-widget::before {
-  content: "" !important; position: absolute; top: 0; left: 0; right: 0; height: 16px;
-  border-radius: 18px 18px 0 0; z-index: 3; pointer-events: none;
-}
-
 /* PLACEMENT 3 (money moment — Estimated-total box): a LIGHTER hatch over the
    vermillion fill. Uses dark-ink lines (rgba 20,10,4) which DARKEN the local bg,
    so the white total's contrast only IMPROVES — never drops below AA. */
-body[data-qf-preset="vault"] .qf-total-box { position: relative !important; overflow: hidden; }
-body[data-qf-preset="vault"] .qf-total-box::before {
-  content: "" !important; position: absolute; inset: 0; z-index: 0; pointer-events: none;
-}
-/* Label + number are TRANSPARENT + on top, so the ink hatch runs CONTINUOUSLY
+body[data-qf-preset="vault"] .qf-total-box { position: relative !important; overflow: hidden; }/* Label + number are TRANSPARENT + on top, so the ink hatch runs CONTINUOUSLY
    behind "Estimated total" and "$1,840.00" — text overlaps the stripes. */
 body[data-qf-preset="vault"] .qf-total-box .qf-section-title,
 body[data-qf-preset="vault"] .qf-total-box .total,
@@ -1227,11 +1214,7 @@ body[data-qf-preset="vault"] .qf-tabs-ind {
 
 /* PLACEMENT 4 (extra presence — collapsed "Shipment options" bar): a subtler
    grey hatch so the texture recurs on the form. Trigger label sits above it. */
-body[data-qf-preset="vault"] .qf-options-summary { position: relative; overflow: hidden; }
-body[data-qf-preset="vault"] .qf-options-summary::before {
-  content: "" !important; position: absolute; inset: 0; z-index: 0; pointer-events: none;
-}
-body[data-qf-preset="vault"] .qf-options-summary > * { position: relative; z-index: 1; }
+body[data-qf-preset="vault"] .qf-options-summary { position: relative; overflow: hidden; }body[data-qf-preset="vault"] .qf-options-summary > * { position: relative; z-index: 1; }
 
 /* ── SECONDARY LIGHT-BLUE (#9DCAFF) — used PROMINENTLY, like the ref ──────────
    (a) the estimate / info panel is a SOLID light-blue surface (dark ink 9.29:1);

@@ -774,14 +774,7 @@ p { margin: 0; }
   padding: 96px 28px 80px;
   text-align: center;
   overflow: hidden;
-}
-.hero::before {
-  /* Soft cyan halo + dot pattern */
-  content: '';
-  position: absolute; inset: 0; pointer-events: none;
-  background: rgba(13, 60, 252, 0.07);
-}
-.hero > * { position: relative; }
+}.hero > * { position: relative; }
 .hero .tag { margin-bottom: var(--space-3); }
 .hero h1 {
   font-size: 64px; font-weight: 800; letter-spacing: -0.04em;
@@ -846,15 +839,7 @@ html[data-theme="light"] .hero h1 .accent {
   position: relative;
   transition: all .2s ease;
   overflow: hidden;
-}
-.feature-card::before {
-  /* Subtle dot grid in card background. */
-  content: ''; position: absolute; inset: 0; pointer-events: none;
-  background-image: rgba(255, 255, 255, 0.025);
-  background-size: 18px 18px;
-  opacity: 0.6;
-}
-.feature-card:hover {
+}.feature-card:hover {
   border-color: rgba(13, 60, 252, 0.35);
   box-shadow: var(--qf-shadow-lift);
 }

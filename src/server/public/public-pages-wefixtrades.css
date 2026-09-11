@@ -337,19 +337,6 @@ html[data-theme="light"] body.qf-public-wft .btn-secondary:hover {
   position: relative;
   z-index: 0;
 }
-.qf-public-wft .pricing.pricing-2up::before {
-  content: '';
-  position: absolute;
-  inset: -48px 0;
-  z-index: -1;
-  pointer-events: none;
-  background: rgba(88, 120, 255, 0.22);
-  filter: blur(8px);
-}
-html[data-theme="light"] body.qf-public-wft .pricing.pricing-2up::before {
-  background: rgba(88, 120, 255, 0.12);
-}
-
 /* DARK (default) — regularMaterial glass slab. */
 .qf-public-wft .price-card {
   background: rgb(34, 40, 42) !important;

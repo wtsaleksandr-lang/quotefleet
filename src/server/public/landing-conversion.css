@@ -64,15 +64,7 @@
 .hero {
   position: relative;
   padding: 72px 24px 50px;
-}
-.hero::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: rgba(94,117,255,.10);
-  pointer-events: none;
-}
-.hero-grid {
+}.hero-grid {
   max-width: 1360px;
   margin: 0 auto;
   display: grid;
