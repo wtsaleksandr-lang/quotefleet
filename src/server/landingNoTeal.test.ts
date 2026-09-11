@@ -20,8 +20,8 @@ describe('landing WeFixTrades cleanup skin', () => {
     const css = await file('landing-wefixtrades-cleanup.css');
 
     expect(css).toContain('Phase BV');
-    expect(css).toContain('--accent: #0d3cfc');
-    expect(css).toContain('--qf-wft-blue: #0d3cfc');
+    expect(css).toContain('--accent: #3356EE');
+    expect(css).toContain('--qf-wft-blue: #3356EE');
     expect(css).toContain('--qf-wft-bg: #1f2628');
     expect(css).toContain('--qf-wft-cream: #e7e2dc');
     expect(css).toContain('.hero-quick-points');

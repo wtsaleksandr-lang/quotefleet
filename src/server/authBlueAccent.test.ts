@@ -26,10 +26,10 @@ describe('public auth blue accent cleanup', () => {
     const publicCss = await file('public-pages-wefixtrades.css');
 
     expect(authCss).toContain('Phase BW');
-    // On-dark TEXT/glyph accent was moved off cobalt #0D3CFC (failed WCAG on the
-    // dark auth card) to accentOnDark #6E8BFF; cobalt is retained for solid button
-    // fills + --accent-soft. Still brand-blue, never teal.
-    expect(authCss).toContain('--accent: #6E8BFF');
+    // On-dark TEXT/glyph accent is the lightened step of the wave-2 accent:
+    // #3356EE measures 2.6:1 on the dark auth card, #8DA2F9 measures 7.2:1.
+    // The solid fills keep #3356EE. Still brand-blue, never teal.
+    expect(authCss).toContain('--accent: #8DA2F9');
     expect(authCss).toContain('/quotefleet-color-system.css');
     expect(authCss).toContain('.qf-mc-bubble');
     expect(authCss).not.toContain('#5EEAD4');
@@ -43,8 +43,8 @@ describe('public auth blue accent cleanup', () => {
 
     expect(landingMotion).toContain('/public-blue-fixes.css');
     expect(landingMotion).toContain('/quotefleet-color-system.css');
-    // Same WCAG-driven on-dark accent as auth; cobalt kept as --qf-wft-blue.
-    expect(publicCss).toContain('--accent: #6E8BFF');
-    expect(publicCss).toContain('--qf-wft-blue: #0D3CFC');
+    // Same WCAG-driven on-dark accent as auth; the fill stays --qf-wft-blue.
+    expect(publicCss).toContain('--accent: #8DA2F9');
+    expect(publicCss).toContain('--qf-wft-blue: #3356EE');
   });
 });

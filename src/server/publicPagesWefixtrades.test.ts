@@ -27,11 +27,12 @@ describe('WeFixTrades-style secondary public pages', () => {
 
     expect(css).toContain('Phase BQ');
     expect(css).toContain('/quotefleet-color-system.css');
-    expect(css).toContain('--qf-wft-blue: #0D3CFC');
+    expect(css).toContain('--qf-wft-blue: #3356EE');
+    // The dark band's own surfaces are still pinned here (this skin paints a
+    // dark section on otherwise-light pages); only the blue moved in wave 2.
     expect(css).toContain('#181D1F');
     expect(css).toContain('#22282A');
-    expect(css).toContain('#E4EDF1');
-    expect(css).toContain('#B1C5CE');
+    expect(css).toContain('--qf-wft-muted: #90A1B9');
     expect(css).toContain('.price-card.featured');
     expect(css).toContain('.support-card');
     expect(css).toContain('.sec-shell');

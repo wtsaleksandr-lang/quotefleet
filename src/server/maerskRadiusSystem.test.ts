@@ -13,9 +13,11 @@ describe('Maersk-style global radius system', () => {
     const css = await file('maersk-radius-system.css');
 
     expect(css).toContain('Phase BY');
-    expect(css).toContain('--qf-maersk-radius-card: 8px');
-    expect(css).toContain('--qf-maersk-radius-control: 6px');
-    expect(css).toContain('--qf-maersk-radius-button: 4px');
+    // Wave 2 retargets the shared ramp to 6 / 8 / 12 (plus the 9999 pill).
+    expect(css).toContain('--qf-maersk-radius-card: 12px');
+    expect(css).toContain('--qf-maersk-radius-control: 8px');
+    expect(css).toContain('--qf-maersk-radius-button: 8px');
+    expect(css).toContain('--radius-pill: 9999px');
     expect(css).toContain('body.qf-app-calculator .qf-widget');
     expect(css).toContain('body.qf-wft .visual-flow');
   });

@@ -241,8 +241,8 @@ body.qf-wft .mini-actions {
 }
 
 body.qf-wft .how-section .container {
-  width: min(1440px, calc(100vw - 56px)) !important;
-  max-width: 1440px !important;
+  width: min(1328px, calc(100vw - 48px)) !important;
+  max-width: 1328px !important;
 }
 
 /* Desktop/tablet: 2×2 grid so each how-it-works screenshot renders large and

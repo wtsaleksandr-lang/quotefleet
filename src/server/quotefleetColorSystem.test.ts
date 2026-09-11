@@ -13,17 +13,17 @@ describe('QuoteFleet global color system', () => {
     const css = await file('quotefleet-color-system.css');
 
     expect(css).toContain('Phase BZ');
-    expect(css).toContain('--qf-color-accent: #0D3CFC');
+    expect(css).toContain('--qf-color-accent: #3356EE');
     expect(css).toContain('--qf-color-white: #FFFFFF');
-    expect(css).toContain('--qf-color-bg: #181D1F');
-    expect(css).toContain('--qf-color-card-dark: #22282A');
-    expect(css).toContain('--qf-color-card-light: #E4EDF1');
-    expect(css).toContain('--qf-color-muted: #B1C5CE');
-    expect(css).toContain('--qf-color-warm-card: #F3EDDF');
-    expect(css).toContain('--qf-color-warm-muted: #EFE7D8');
-    expect(css).toContain('--qf-color-neutral-card: #E6E3E0');
-    expect(css).toContain('--qf-color-neutral-card-hover: #D4CFC9');
-    expect(css).toContain('--qf-color-light-text: #1E1E1E');
+    expect(css).toContain('--qf-color-bg: #0C111D');
+    expect(css).toContain('--qf-color-card-dark: #131A28');
+    expect(css).toContain('--qf-color-card-light: #F2F4F7');
+    expect(css).toContain('--qf-color-muted: #90A1B9');
+    expect(css).toContain('--qf-color-warm-card: #F2F4F7');
+    expect(css).toContain('--qf-color-warm-muted: #E2E8F0');
+    expect(css).toContain('--qf-color-neutral-card: #EAECF0');
+    expect(css).toContain('--qf-color-neutral-card-hover: #CAD5E2');
+    expect(css).toContain('--qf-color-light-text: #020618');
     expect(css).toContain('border-color: var(--qf-color-white) !important;');
     expect(css).toContain('border-color: var(--qf-color-accent) !important;');
   });
