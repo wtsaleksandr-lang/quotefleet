@@ -8,7 +8,7 @@ QuoteFleet is a branded hosted rate calculator page for trucking service provide
 
 Preferred framing:
 
-- `companyname.yourquote.net`
+- `companyname.yourquote.online` — an example hosted URL must use a domain we actually own (one of `HOST_DOMAINS`). `yourquote.net` is a parked for-sale domain belonging to someone else; never use it.
 - branded rate calculator page
 - no website changes needed
 - no contracts

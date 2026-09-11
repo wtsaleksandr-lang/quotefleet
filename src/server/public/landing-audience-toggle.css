@@ -330,3 +330,14 @@
   color: var(--muted);
   line-height: 1.5;
 }
+
+/* Each directory stat is one atomic fact — the row may wrap BETWEEN stats, but
+   a single stat must never break across lines ("18,000+" on one line, "Cities"
+   on the next). Appended at EOF rather than merged into the .qf-dir-stats block
+   above on purpose: the spacing/colour guards baseline by LINE NUMBER, so a
+   mid-file insertion renumbers every violation below it. See
+   docs/design-refactor/baseline-protocol.md.
+   Motivated by the FMCSA-freshness fix: that stat now renders the real data
+   vintage ("Aug 31, 2026 FMCSA data"), which is longer than the cadence word it
+   replaced and so is the item most likely to straddle a line break at 375px. */
+.qf-dir-stats li { white-space: nowrap; }

@@ -72,6 +72,7 @@ import { registerInboundReviewRoutes } from './routes/inboundReview.js';
 import { registerInboundWebhookRoutes } from './routes/inboundWebhook.js';
 import { hostInfoMiddleware } from './hostInfo.js';
 import { applyAuthChrome, applyFullSiteHeader, verifySiteChromeSlots } from './siteChrome.js';
+import { applyFmcsaFreshness } from './directory/fmcsaFreshness.js';
 import { registerPartnersRoutes } from './routes/partners.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -539,8 +540,16 @@ export function createApp(): express.Express {
     // THE HOMEPAGE GOES THROUGH THE SAME INJECTOR AS EVERY OTHER STATIC PAGE.
     // It used to be `res.sendFile`d, which is why it was the one page whose
     // chrome the shared constants did not actually govern.
+    //
+    // applyFmcsaFreshness replaces the page's FMCSA-freshness copy with the real
+    // data vintage (max(updated_at) across carrier_directory — the same number
+    // the carrier profiles publish as "FMCSA data as of …"). It is SYNCHRONOUS
+    // and reads a process-local cache, so the homepage acquires NO request-path
+    // DB dependency and no added latency; when the vintage is unknown the page's
+    // own fallback copy stands, and that fallback is itself truthful. This exists
+    // because the page used to hard-code "Synced daily" against a weekly cron.
     return void readFile(resolve(publicDir, 'landing.html'), 'utf8')
-      .then((html) => res.type('html').send(applyFullSiteHeader(html, 'landing.html')))
+      .then((html) => res.type('html').send(applyFmcsaFreshness(applyFullSiteHeader(html, 'landing.html'))))
       .catch(next);
   });
 

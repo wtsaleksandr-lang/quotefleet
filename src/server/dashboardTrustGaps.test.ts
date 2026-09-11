@@ -27,9 +27,12 @@ describe('dashboard trust gaps — canonical customer link', () => {
     ];
     for (const name of files) {
       const js = await pub(name);
-      // The old bug: appending `.yourquote.net` to a host-qualified slug.
-      expect(js, `${name} must not render a fake yourquote.net link`).not.toMatch(
-        /\$\{[^}]*\}\.yourquote\.net/
+      // The old bug: appending a hardcoded hosted-domain suffix to a slug.
+      // Widened beyond `.yourquote.net` when the marketing example moved to
+      // `yourquote.online` — the defect is fabricating the host at all, so the
+      // guard must not be pinned to whichever domain the copy happens to use.
+      expect(js, `${name} must not render a fabricated hosted link`).not.toMatch(
+        /\$\{[^}]*\}\.yourquote\.(?:net|online)/
       );
       expect(js, `${name} must read the shared canonical link`).toContain('__qfWidget');
     }

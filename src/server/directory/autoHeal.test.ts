@@ -19,6 +19,11 @@ import type { IngestSummary } from './carrierIngest.js';
 const emptySummary: IngestSummary = {
   carriersSeen: 0,
   ingested: 321000,
+  changed: 321000,
+  warnings: 0,
+  startedAt: new Date('2026-09-06T09:00:00.000Z'),
+  finishedAt: new Date('2026-09-06T09:20:00.000Z'),
+  durationMs: 1_200_000,
   intermodal: 0,
   stateCounts: [],
   portCounts: [],

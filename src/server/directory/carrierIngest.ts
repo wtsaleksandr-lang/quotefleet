@@ -589,9 +589,31 @@ export function filterAndNormalizeCarriers(
 }
 
 // ─── Store (the only writer of carrier_directory in this module) ──────────
+
+/**
+ * What one bulk upsert actually did.
+ *
+ * `written` and `changed` are DIFFERENT NUMBERS and conflating them is the
+ * defect this type exists to close. The upsert rewrites every mutable column on
+ * every row unconditionally, so `written` is always "the whole page" — it says
+ * nothing about whether FMCSA's answer differed from what we already stored.
+ * `changed` is the count of rows whose comparison tuple genuinely differed (see
+ * CARRIER_CHANGED_SQL), i.e. the only number that distinguishes a real refresh
+ * from a 330k-row no-op. See IngestSummary.changed.
+ */
+export interface CarrierUpsertResult {
+  /** Rows sent to the database (inserted or updated). */
+  written: number;
+  /** Of those, the rows whose stored data ACTUALLY differed. */
+  changed: number;
+}
+
 export interface CarrierStore {
-  /** Idempotent bulk upsert by USDOT: one multi-row statement per chunk. */
-  upsertMany(records: CarrierRecord[]): Promise<void>;
+  /** Idempotent bulk upsert by USDOT: one multi-row statement per chunk.
+   *  Returns what the write actually did; a store that cannot measure `changed`
+   *  (test fakes, dry-run doubles) may return `void` and the summary then
+   *  reports `changed: null` rather than a fabricated zero. */
+  upsertMany(records: CarrierRecord[]): Promise<CarrierUpsertResult | void>;
 }
 
 /** Rows per INSERT … ON CONFLICT statement. A whole L&I page (≤1000 filtered
@@ -856,8 +878,17 @@ export const CARRIER_UPSERT_SET = {
 
 export const dbCarrierStore: CarrierStore = {
   async upsertMany(records) {
-    if (records.length === 0) return;
+    if (records.length === 0) return { written: 0, changed: 0 };
+    let written = 0;
+    let changed = 0;
     for (let i = 0; i < records.length; i += UPSERT_BATCH) {
+      // ONE stamp per chunk. It is both the value written to `updated_at` and
+      // the sentinel that measures `changed`: CARRIER_UPDATED_AT_SQL writes
+      // `excluded.updated_at` ONLY when the comparison tuple differed and
+      // otherwise preserves the stored timestamp, so a returned `updated_at`
+      // equal to this stamp means "this row genuinely changed (or is new)".
+      // Free measurement — no second query, no extra scan.
+      const stampedAt = new Date();
       const chunk = records.slice(i, i + UPSERT_BATCH).map(({ safety, credentials, ...r }) => ({
         ...r,
         // Flatten the nested safety + credential blocks onto the row — the
@@ -865,18 +896,24 @@ export const dbCarrierStore: CarrierStore = {
         // dropped silently.
         ...safety,
         ...credentials,
-        updatedAt: new Date(),
+        updatedAt: stampedAt,
       }));
       // Multi-row INSERT with ON CONFLICT (usdot) DO UPDATE — idempotent re-run
       // refreshes every mutable column from the incoming (EXCLUDED) row. The
       // page is already de-duped by USDOT so no row is affected twice in one
       // statement. Ordered paging means a carrier straddling a page boundary
       // simply lands as an UPDATE in the next statement.
-      await db()
+      const rows = await db()
         .insert(carrierDirectory)
         .values(chunk)
-        .onConflictDoUpdate({ target: carrierDirectory.usdot, set: CARRIER_UPSERT_SET });
+        .onConflictDoUpdate({ target: carrierDirectory.usdot, set: CARRIER_UPSERT_SET })
+        .returning({ updatedAt: carrierDirectory.updatedAt });
+      written += chunk.length;
+      for (const row of rows) {
+        if (row.updatedAt && row.updatedAt.getTime() === stampedAt.getTime()) changed += 1;
+      }
     }
+    return { written, changed };
   },
 };
 
@@ -1236,9 +1273,52 @@ export interface IngestOptions {
   includeCanada?: boolean;
 }
 
+/**
+ * GREPPABLE MARKER for every non-fatal error the ingest deliberately swallows.
+ *
+ * The "NEVER fail the ingest" rule below is correct and stays — a flaky safety
+ * feed must not abort a 330k-row refresh. What was wrong is that a swallowed
+ * error was indistinguishable from a clean run: it went out as `…WARN: …` into
+ * a stdout nobody reads on Replit, was never counted, and never reached the
+ * `job_runs` ledger. Every swallow now (a) carries this marker so
+ * `grep '[ingest.swallowed]'` finds all of them, and (b) increments
+ * IngestSummary.warnings so the ledger row records how many there were.
+ * Visibility, not fragility: nothing here changes what the ingest SURVIVES.
+ */
+export const INGEST_SWALLOWED_MARKER = '[ingest.swallowed]';
+
+/** GREPPABLE MARKER for a completed run that changed ZERO rows — the silent
+ *  no-op this observability wave exists to surface. See IngestSummary.changed. */
+export const INGEST_NOOP_MARKER = '[ingest.noop]';
+
 export interface IngestSummary {
   carriersSeen: number;
   ingested: number;
+  /**
+   * Rows whose stored data ACTUALLY differed from FMCSA's answer.
+   *
+   * THE NUMBER THAT WAS MISSING. `ingested` counts rows WRITTEN, and the upsert
+   * writes every mutable column on every row unconditionally — so a run that
+   * rewrote all ~330k rows and changed literally nothing reported
+   * `ingested: 330218` and went green. That is exactly what happened on Sun
+   * 2026-09-06: 49,702 of the first 50,000 sitemap URLs still carried a
+   * `lastmod` of 2026-08-31 (the one-time backfill of the safety/credential
+   * columns added in #461/#462), meaning the next weekly run moved zero
+   * timestamps and nothing anywhere noticed. `changed` is the signal that tells
+   * a real refresh from a no-op.
+   *
+   * `null` (not 0) when the store could not measure it — see CarrierUpsertResult.
+   * A fabricated zero would be indistinguishable from a real zero.
+   */
+  changed: number | null;
+  /** Count of non-fatal errors caught and swallowed during the run. > 0 means
+   *  the run completed DEGRADED — see INGEST_SWALLOWED_MARKER. */
+  warnings: number;
+  /** Wall-clock start/end of the run, so the ledger records duration even when
+   *  the caller is a detached fire-and-forget promise. */
+  startedAt: Date;
+  finishedAt: Date;
+  durationMs: number;
   intermodal: number;
   stateCounts: Array<[string, number]>;
   portCounts: Array<[string, number]>;
@@ -1277,6 +1357,16 @@ export async function runIngest(
   let intermodal = 0;
   const stateCounts = new Map<string, number>();
   const portCounts = new Map<string, number>();
+  // Observability counters. `changed` stays null until a store reports a real
+  // measurement, so "we could not measure it" never masquerades as "zero".
+  let changed: number | null = null;
+  let warnings = 0;
+  /** Log + COUNT a deliberately-swallowed non-fatal error under one greppable
+   *  marker. Never rethrows — the swallow semantics are unchanged. */
+  const swallow = (scope: string, err: unknown): void => {
+    warnings += 1;
+    log(`  …${INGEST_SWALLOWED_MARKER} ${scope} (non-fatal, run continues): ${String(err)}`);
+  };
   let offset = opts.offset;
 
   for (;;) {
@@ -1321,7 +1411,7 @@ export async function runIngest(
       smsByDot = await fetchSafety(dots);
       smsOk = true;
     } catch (err) {
-      log(`  …WARN: safety (SMS) fetch failed at offset ${offset} (non-fatal): ${String(err)}`);
+      swallow(`safety (SMS) fetch failed at offset ${offset}`, err);
     }
     let crashByDot = new Map<string, CrashAggRow>();
     let crashOk = false;
@@ -1329,7 +1419,7 @@ export async function runIngest(
       crashByDot = await fetchCrashes(dots, windowStart);
       crashOk = true;
     } catch (err) {
-      log(`  …WARN: safety (crash) fetch failed at offset ${offset} (non-fatal): ${String(err)}`);
+      swallow(`safety (crash) fetch failed at offset ${offset}`, err);
     }
     const safetyLookup: SafetyLookup = {
       sms: smsByDot,
@@ -1353,10 +1443,15 @@ export async function runIngest(
       if (rec.state) stateCounts.set(rec.state, (stateCounts.get(rec.state) ?? 0) + 1);
       if (rec.nearestPortCode) portCounts.set(rec.nearestPortCode, (portCounts.get(rec.nearestPortCode) ?? 0) + 1);
     }
-    if (!opts.dryRun) await store.upsertMany(records);
+    if (!opts.dryRun) {
+      const wrote = await store.upsertMany(records);
+      if (wrote) changed = (changed ?? 0) + wrote.changed;
+    }
     ingested += records.length;
 
-    log(`  …offset ${offset}: +${records.length} carriers (running total ${ingested}, intermodal ${intermodal})`);
+    log(
+      `  …offset ${offset}: +${records.length} carriers (running total ${ingested}, changed ${changed ?? 'n/a'}, intermodal ${intermodal})`,
+    );
     offset += liRows.length;
     if (liRows.length < opts.pageSize) break; // last page
   }
@@ -1375,14 +1470,31 @@ export async function runIngest(
       await recomputeAndPersistDirectoryAggregates();
       log('  …precomputed + persisted global directory aggregates');
     } catch (err) {
-      log(`  …WARN: failed to persist directory aggregates (non-fatal): ${String(err)}`);
+      swallow('failed to persist directory aggregates', err);
     }
   }
 
+  // A completed run that moved ZERO rows is the failure mode with no exception
+  // and no missing signal — it looks identical to a healthy refresh unless
+  // something says so out loud. Say so, under a marker, before returning.
+  if (!opts.dryRun && changed === 0 && ingested > 0) {
+    log(
+      `  …${INGEST_NOOP_MARKER} run wrote ${ingested} rows but changed 0 — either the upstream FMCSA ` +
+        `snapshot is unchanged since the last run, or the fetch returned stale data. Not an error by ` +
+        `itself; it IS a no-op and is recorded as one in job_runs.`,
+    );
+  }
+
+  const finishedAt = now();
   const sortDesc = (m: Map<string, number>) => [...m.entries()].sort((a, b) => b[1] - a[1]);
   return {
     carriersSeen,
     ingested,
+    changed,
+    warnings,
+    startedAt: runAsOf,
+    finishedAt,
+    durationMs: Math.max(0, finishedAt.getTime() - runAsOf.getTime()),
     intermodal,
     stateCounts: sortDesc(stateCounts),
     portCounts: sortDesc(portCounts),
