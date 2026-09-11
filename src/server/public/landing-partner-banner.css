@@ -31,6 +31,26 @@ html body.qf-wft.landing-v2 .qf-partner-section {
   padding: 0 0 80px !important;
 }
 
+/* NO TOP DIVIDER ON EITHER OF THE TWO NEW SECTIONS.
+   landing-frame.css paints a 1px rgba-white rule at `top: 0` of every
+   `main > section` at z-index 4. That mechanism assumes the default
+   `.section { padding: 72px 0 }`, so the line lands in empty space above a
+   heading. These two sections deliberately have NO top padding — they are one
+   band under the bento grid, spaced by the previous section's bottom padding —
+   so the rule would paint ACROSS the partner card's own top edge and across
+   the marquee's heading. That is the same artifact #545 removed from the hero
+   (its exemption stopped matching when #535 renamed `.hero` to `.qf-hhero`),
+   and the same fix: suppress it, because the thing below already draws its own
+   edge — the card's 1px `--border-strong` rim, which is a stronger line than
+   the 7%-white rule and would have sat 0px away from it.
+   The marquee's sheet is loaded conditionally, so its selector lives here too;
+   otherwise an empty marquee would leave an unmatched rule and a populated one
+   would depend on load order for whether the seam appeared. */
+html body.landing-v2.qf-wft main > section.qf-partner-section::after,
+html body.landing-v2.qf-wft main > section.qf-marquee-section::after {
+  display: none;
+}
+
 /* The card.
 
    THE CROP IS NOT `cover`, AND THAT IS A CONTRAST DECISION, NOT A TASTE ONE.
@@ -44,10 +64,10 @@ html body.qf-wft.landing-v2 .qf-partner-section {
    the text. Measured off the rendered page, over exactly the box the headline
    and the CTA occupy, `--muted` against that ground came out:
 
-       light  3.68:1 @1440   3.19:1 @1024   3.94:1 @375
-       dark   4.41:1 @1440   4.22:1 @1024   4.62:1 @375
+       light  3.19:1 @1440   2.68:1 @1024   3.59:1 @375
+       dark   4.32:1 @1440   4.12:1 @1024   4.80:1 @375
 
-   — below AA in five of six, and the dark ground peaked at luminance 0.0446
+   — below AA in five of six, and the dark ground peaked at luminance 0.0468
    against the 0.0386 ceiling its own generator is capped to.
 
    So the field is painted at 300% of the card width instead: it spans three
@@ -55,8 +75,13 @@ html body.qf-wft.landing-v2 .qf-partner-section {
    slice that ever reaches this card is the light column the contrast floor was
    built for. Re-measured the same way:
 
-       light  5.65:1 @1440   5.64:1 @1024   5.18:1 @375
-       dark   5.39:1 @1440   5.28:1 @1024   5.12:1 @375
+       light  5.90:1 @1440   5.80:1 @1024   5.21:1 @375
+       dark   5.36:1 @1440   5.36:1 @1024   5.32:1 @375
+
+   BOTH SETS ARE AGAINST THE #545 WASH, re-measured after that PR darkened the
+   field and swapped the grain tile for white streaks — the `cover` crop got
+   WORSE under the new envelope (2.68:1 at 1024), and the light-column crop
+   held. Re-measure both if the generator is tuned again.
 
    Nothing is left uncovered: 300% of the width is ~129% of it in height
    (1100/2560 × 3), always taller than this card, and `--surface-hero` sits
@@ -84,23 +109,27 @@ html body.qf-wft.landing-v2 .qf-partner-section {
 }
 
 /* Icon tile — a rounded SQUARE, not a circle, so it echoes the card's own
-   corner. Sits on `--surface` rather than the wash so the glyph keeps its
-   contrast wherever the crop happens to land. */
+   corner. Same metric and the same two tokens as the icon tile #545 put on all
+   fifteen cards in the hero and bento grids (`.qf-toolcard__ico`): 48px, 12px
+   radius, `--icon-tile-bg` behind an `--accent-legible` glyph. Matching it
+   rather than inventing a third tile treatment is the point — this banner sits
+   directly under those cards. */
 .qf-partner-ico {
+  box-sizing: border-box;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   width: 48px;
   height: 48px;
-  background: var(--surface);
-  border: 1px solid var(--border);
+  padding: var(--space-1);
+  background: var(--icon-tile-bg);
   border-radius: var(--radius);
-  color: var(--ink);
+  color: var(--accent-legible);
 }
 .qf-partner-ico svg {
   display: block;
-  width: 24px;
-  height: 24px;
+  width: 100%;
+  height: 100%;
 }
 
 /* Two-tone headline. Same idiom as `.qf-toolgrid-head__soft` on the bento grid
@@ -142,15 +171,27 @@ html body.qf-wft .qf-partner-title .qf-partner-title__soft { color: var(--muted)
   text-decoration: none;
   transition: var(--motion);
 }
+/* The chevron slides on hover, `.2s`, exactly as the bento grid's buttons do —
+   the one bit of movement the button idiom on this page allows. */
 .qf-partner-cta__chev {
   flex: 0 0 auto;
   width: 16px;
   height: 16px;
+  transition: var(--motion-state);
 }
 html body.qf-wft .qf-partner-cta { color: var(--cta-text) !important; }
+/* HOVER — the same repaint #545 gave every primary button: `--cta-bg` to the
+   BRAND FILL family, not to `--cta-bg-hover` (a 0.0075 → 0.0045 luminance move
+   nobody can see). `--accent-fill` / `--accent-ink` are #3356EE / #FFFFFF in
+   both themes and measure 5.68:1 for this 16px/500 label. The card underneath
+   still does not move — the no-lift rule is about cards, not buttons. */
 html body.qf-wft .qf-partner-cta:hover {
-  background: var(--cta-bg-hover);
-  border-color: var(--cta-bg-hover);
+  background: var(--accent-fill);
+  border-color: var(--accent-fill);
+  color: var(--accent-ink) !important;
+}
+.qf-partner-cta:hover .qf-partner-cta__chev {
+  transform: translateX(4px);
 }
 .qf-partner-cta:focus-visible {
   outline: 2px solid var(--accent);

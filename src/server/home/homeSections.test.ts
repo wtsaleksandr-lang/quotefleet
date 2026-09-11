@@ -162,6 +162,39 @@ describe('homepage: the partner / embed banner', () => {
     // Cards never lift on hover; only the button reacts.
     expect(css).not.toMatch(/\.qf-partner-card:hover/);
   });
+
+  it('suppresses the frame divider on both new sections, which have no top padding', () => {
+    // landing-frame.css paints a 1px rule at `top: 0` of every `main > section`
+    // at z-index 4, on the assumption of `.section { padding: 72px 0 }` — i.e.
+    // that the line lands in empty space. These two sections deliberately have
+    // NO top padding, so it would paint across the partner card's own border
+    // and the marquee's heading: the exact artifact #545 removed from the hero
+    // when #535's `.hero` -> `.qf-hhero` rename orphaned its exemption.
+    const frame = strip(read('src/server/public/landing-frame.css'));
+    expect(frame).toContain('main > section::after');
+    expect(frame).toMatch(/main > section\.hero::after \{\s*display: none/);
+
+    const css = strip(read('src/server/public/landing-partner-banner.css'));
+    expect(css).toMatch(/main > section\.qf-partner-section::after/);
+    expect(css).toMatch(/main > section\.qf-marquee-section::after/);
+    // The premise: zero top padding is what makes the divider land on content.
+    expect(css).toMatch(/\.qf-partner-section \{\s*padding: 0 0 80px !important/);
+    const marquee = strip(read('src/server/public/landing-logo-marquee.css'));
+    expect(marquee).toMatch(/\.qf-marquee-section \{\s*padding: 0 0 80px !important/);
+  });
+
+  it('wears the icon tile and button hover the rest of the page wears', () => {
+    // #545 gave all fifteen cards a 48px tinted icon tile and moved every
+    // primary button's hover to the brand fill with a 4px chevron slide. A
+    // banner sitting directly under those cards must not invent a third look.
+    const css = strip(read('src/server/public/landing-partner-banner.css'));
+    expect(css).toContain('background: var(--icon-tile-bg)');
+    expect(css).toContain('color: var(--accent-legible)');
+    expect(css).toContain('background: var(--accent-fill)');
+    expect(css).toMatch(/\.qf-partner-cta:hover \.qf-partner-cta__chev \{\s*transform: translateX\(4px\)/);
+    // The dead `--cta-bg-hover` repaint #545 retired must not come back.
+    expect(css).not.toContain('--cta-bg-hover');
+  });
 });
 
 describe('homepage: the logo marquee', () => {
