@@ -1,12 +1,12 @@
 /* Phase AF: premium SaaS polish for dashboard feedback, loading, and modal groundwork. */
 #loading {
-  background: radial-gradient(circle at 20% 0%, rgba(13, 60, 252,.10), transparent 32rem), var(--bg) !important;
+  background: var(--bg) !important;
 }
 #loading > div {
   min-width: 260px;
   border: 1px solid var(--border);
   border-radius: 20px;
-  background: linear-gradient(180deg, rgba(255,255,255,.035), rgba(255,255,255,.012)), var(--surface);
+  background: var(--surface);
   color: var(--ink-soft);
   padding: 18px;
   box-shadow: var(--shadow-md);
@@ -19,7 +19,7 @@
   width: 100%;
   border-radius: 999px;
   margin-bottom: 14px;
-  background: linear-gradient(90deg, rgba(13, 60, 252,.16), rgba(13, 60, 252,.16), rgba(13, 60, 252,.16));
+  background: rgba(13, 60, 252,.16);
   background-size: 220% 100%;
   animation: qf-skeleton 1.3s ease-in-out infinite;
 }
@@ -36,7 +36,7 @@
   border: 1px solid var(--border-strong);
   border-left: 4px solid var(--accent);
   border-radius: 15px;
-  background: linear-gradient(180deg, rgba(255,255,255,.045), rgba(255,255,255,.018)), var(--surface);
+  background: var(--surface);
   color: var(--ink-soft);
   box-shadow: var(--shadow-lg);
   padding: 12px 13px;
@@ -70,7 +70,7 @@
   width: min(520px, 100%);
   border: 1px solid var(--border-strong);
   border-radius: 22px;
-  background: linear-gradient(180deg, rgba(255,255,255,.045), rgba(255,255,255,.018)), var(--surface);
+  background: var(--surface);
   color: var(--ink-soft);
   box-shadow: var(--shadow-lg);
   padding: 20px;
@@ -120,7 +120,7 @@
 .qf-page-skeleton span {
   height: 14px;
   border-radius: 999px;
-  background: linear-gradient(90deg, rgba(255,255,255,.05), rgba(255,255,255,.12), rgba(255,255,255,.05));
+  background: rgba(255,255,255,.05);
   background-size: 220% 100%;
   animation: qf-skeleton 1.3s ease-in-out infinite;
 }
@@ -154,7 +154,7 @@
   margin-top: 4px;
   border: 1px solid var(--border-strong);
   border-radius: 14px;
-  background: linear-gradient(180deg, rgba(255,255,255,.04), rgba(255,255,255,.015)), var(--surface);
+  background: var(--surface);
 }
 .qf-ingest-spinner {
   flex: none;
@@ -304,10 +304,7 @@
   display: block;
   height: 12px;
   border-radius: 999px;
-  background: linear-gradient(90deg,
-    color-mix(in srgb, var(--ink) 6%, transparent),
-    color-mix(in srgb, var(--ink) 16%, transparent),
-    color-mix(in srgb, var(--ink) 6%, transparent));
+  background: color-mix(in srgb, var(--ink);
   background-size: 220% 100%;
   animation: qf-skeleton 1.3s ease-in-out infinite;
 }
@@ -335,9 +332,7 @@
   width: 12%;
   height: 100%;
   border-radius: 999px;
-  background: linear-gradient(90deg,
-    color-mix(in srgb, var(--accent) 65%, transparent),
-    var(--accent));
+  background: color-mix(in srgb, var(--accent);
   transition: width .85s cubic-bezier(.22, .61, .36, 1);
 }
 .qf-ingest-progress-fill::after {
@@ -345,8 +340,7 @@
   position: absolute;
   inset: 0;
   border-radius: 999px;
-  background: linear-gradient(90deg, transparent,
-    color-mix(in srgb, var(--surface) 60%, transparent), transparent);
+  background: color-mix(in srgb, var(--surface);
   background-size: 45% 100%;
   background-repeat: no-repeat;
   animation: qf-ingest-sheen 1.4s ease-in-out infinite;

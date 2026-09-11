@@ -4,9 +4,7 @@
   padding: 18px;
   border: 1px solid rgba(184, 207, 245, 0.72);
   border-radius: 24px;
-  background:
-    radial-gradient(circle at 10% 0%, rgba(56, 189, 248, 0.18), transparent 34%),
-    linear-gradient(135deg, #ffffff 0%, #f4fbff 58%, #f5f2ff 100%);
+  background: #ffffff;
   box-shadow: 0 20px 54px rgba(37, 34, 99, 0.08);
 }
 
@@ -115,7 +113,7 @@
 
 html[data-theme="light"] .qf-lead-crm-bar {
   border-color: rgba(184, 207, 245, 0.72);
-  background: linear-gradient(135deg, #ffffff 0%, #f4fbff 62%, #f5f2ff 100%);
+  background: #ffffff;
   box-shadow: 0 16px 42px rgba(37, 34, 99, 0.06);
 }
 

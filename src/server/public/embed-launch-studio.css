@@ -2,7 +2,7 @@
 .qf-embed-launch-studio {
   border: 1px solid var(--border);
   border-radius: 20px;
-  background: linear-gradient(135deg, rgba(13, 60, 252, 0.08), rgba(93, 139, 255, 0.06)), var(--surface);
+  background: var(--surface);
   padding: 18px;
   margin: 0 0 16px;
   box-shadow: var(--shadow-md);

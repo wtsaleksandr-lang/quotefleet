@@ -8,7 +8,7 @@
   padding: 14px;
   border: 1px solid var(--border);
   border-radius: 20px;
-  background: linear-gradient(135deg, rgba(13, 60, 252, 0.08), rgba(93, 139, 255, 0.06)), var(--surface);
+  background: var(--surface);
   box-shadow: var(--shadow-md);
 }
 
@@ -73,7 +73,7 @@
 
 html[data-theme="light"] .qf-leads-focus {
   border-color: rgba(184, 207, 245, 0.72);
-  background: linear-gradient(135deg, #ffffff 0%, #f4fbff 62%, #f5f2ff 100%);
+  background: #ffffff;
   box-shadow: 0 16px 42px rgba(37, 34, 99, 0.06);
 }
 

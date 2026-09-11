@@ -18,10 +18,7 @@ body.qf-wft {
 }
 
 body.qf-wft::before {
-  background:
-    radial-gradient(circle at 20% -10%, rgba(13,60,252,.12), transparent 32%),
-    linear-gradient(rgba(255,255,255,.010) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255,255,255,.010) 1px, transparent 1px) !important;
+  background: rgba(255,255,255,.010) !important;
   background-size: auto, 34px 34px, 34px 34px !important;
   opacity: .42 !important;
 }

@@ -62,17 +62,11 @@ html[data-theme="light"] {
    made transparent so the field shows behind the sidebar + main. No image →
    CSP-safe. */
 body {
-  background:
-    radial-gradient(1200px 600px at 15% -10%, rgba(110, 139, 255, 0.16), transparent 60%),
-    radial-gradient(900px 500px at 100% 0%, rgba(13, 60, 252, 0.12), transparent 55%),
-    var(--bg);
+  background: var(--bg);
   background-attachment: fixed;
 }
 html[data-theme="light"] body {
-  background:
-    radial-gradient(1200px 600px at 15% -10%, rgba(110, 139, 255, 0.06), transparent 60%),
-    radial-gradient(900px 500px at 100% 0%, rgba(13, 60, 252, 0.06), transparent 55%),
-    var(--bg);
+  background: var(--bg);
   background-attachment: fixed;
 }
 .app-shell,
@@ -213,19 +207,17 @@ html[data-theme="light"] .app-main {
    Embedded WebViews / privacy modes that disable backdrop-filter get an OPAQUE
    surface (var(--surface) — theme-aware, the element's original tint) instead
    of a see-through wash over text. */
-@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
-  #qf-topbar,
-  #qf-account-menu,
-  #qf-sidebar,
-  html[data-theme="light"] #qf-sidebar,
-  .qf-kpi-tile,
-  .qf-kpi-card,
-  html[data-theme="light"] .qf-kpi-tile,
-  html[data-theme="light"] .qf-kpi-card,
-  .card.qf-glass,
-  html[data-theme="light"] .card.qf-glass,
-  .qf-glass,
-  .qf-glass-ultrathin {
-    background: var(--surface);
-  }
+#qf-topbar,
+#qf-account-menu,
+#qf-sidebar,
+html[data-theme="light"] #qf-sidebar,
+.qf-kpi-tile,
+.qf-kpi-card,
+html[data-theme="light"] .qf-kpi-tile,
+html[data-theme="light"] .qf-kpi-card,
+.card.qf-glass,
+html[data-theme="light"] .card.qf-glass,
+.qf-glass,
+.qf-glass-ultrathin {
+  background: var(--surface);
 }

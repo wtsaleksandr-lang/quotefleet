@@ -2,7 +2,7 @@
 .qf-account-readiness {
   border: 1px solid var(--border);
   border-radius: 18px;
-  background: linear-gradient(135deg, rgba(59, 130, 246, 0.10), rgba(16, 185, 129, 0.08));
+  background: rgba(59, 130, 246, 0.10);
   padding: 18px;
   margin: 0 0 18px;
   box-shadow: var(--shadow-soft, 0 12px 32px rgba(15, 23, 42, 0.08));

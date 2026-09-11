@@ -864,15 +864,15 @@ body[data-qf-preset="stripe"] .qf-widget { position: relative; }
 body[data-qf-preset="stripe"] .qf-widget::before {
   content: "" !important; position: absolute; top: 0; left: 0; right: 0; height: 4px;
   border-radius: 16px 16px 0 0;
-  background: linear-gradient(90deg, #635BFF 0%, #8A5CF6 22%, #C965D6 44%, #FF7AA2 64%, #FFB35C 82%, #4BC0E0 100%) !important;
-  background-image: linear-gradient(90deg, #635BFF 0%, #8A5CF6 22%, #C965D6 44%, #FF7AA2 64%, #FFB35C 82%, #4BC0E0 100%) !important;
+  background: #635BFF !important;
+  background-image: #635BFF !important;
   box-shadow: none !important;
   z-index: 3; pointer-events: none;
 }
 body[data-qf-preset="stripe"] #qf-calc-btn,
 body[data-qf-preset="stripe"] #qf-submit-btn,
 body[data-qf-preset="stripe"] #qf-continue-btn {
-  background-image: linear-gradient(135deg, #635BFF 0%, #5348E6 100%) !important;
+  background-image: #635BFF !important;
   border-color: transparent !important;
 }
 
@@ -1183,8 +1183,6 @@ body[data-qf-preset="citron"] {
 body[data-qf-preset="vault"] .qf-result .lines { position: relative; overflow: hidden; }
 body[data-qf-preset="vault"] .qf-result .lines::before {
   content: "" !important; position: absolute; inset: 0; z-index: 0; pointer-events: none;
-  background: repeating-linear-gradient(45deg, rgba(119,119,129,.20) 0 1.5px, transparent 1.5px 7px) !important;
-  background-image: repeating-linear-gradient(45deg, rgba(119,119,129,.20) 0 1.5px, transparent 1.5px 7px) !important;
 }
 /* Rows/cells are TRANSPARENT so the hatch runs CONTINUOUSLY behind every label +
    amount (no solid patch); text sits on top via z-index and stays legible. */
@@ -1201,8 +1199,6 @@ body[data-qf-preset="vault"] .qf-widget { position: relative; }
 body[data-qf-preset="vault"] .qf-widget::before {
   content: "" !important; position: absolute; top: 0; left: 0; right: 0; height: 16px;
   border-radius: 18px 18px 0 0; z-index: 3; pointer-events: none;
-  background: repeating-linear-gradient(45deg, rgba(119,119,129,.26) 0 1.6px, transparent 1.6px 7px) !important;
-  background-image: repeating-linear-gradient(45deg, rgba(119,119,129,.26) 0 1.6px, transparent 1.6px 7px) !important;
 }
 
 /* PLACEMENT 3 (money moment — Estimated-total box): a LIGHTER hatch over the
@@ -1211,8 +1207,6 @@ body[data-qf-preset="vault"] .qf-widget::before {
 body[data-qf-preset="vault"] .qf-total-box { position: relative !important; overflow: hidden; }
 body[data-qf-preset="vault"] .qf-total-box::before {
   content: "" !important; position: absolute; inset: 0; z-index: 0; pointer-events: none;
-  background: repeating-linear-gradient(45deg, rgba(20,10,4,.18) 0 1.5px, transparent 1.5px 7px) !important;
-  background-image: repeating-linear-gradient(45deg, rgba(20,10,4,.18) 0 1.5px, transparent 1.5px 7px) !important;
 }
 /* Label + number are TRANSPARENT + on top, so the ink hatch runs CONTINUOUSLY
    behind "Estimated total" and "$1,840.00" — text overlaps the stripes. */
@@ -1246,7 +1240,6 @@ body[data-qf-preset="vault"] .qf-tabs-ind {
 body[data-qf-preset="vault"] .qf-options-summary { position: relative; overflow: hidden; }
 body[data-qf-preset="vault"] .qf-options-summary::before {
   content: "" !important; position: absolute; inset: 0; z-index: 0; pointer-events: none;
-  background: repeating-linear-gradient(45deg, rgba(119,119,129,.14) 0 1.4px, transparent 1.4px 8px) !important;
 }
 body[data-qf-preset="vault"] .qf-options-summary > * { position: relative; z-index: 1; }
 

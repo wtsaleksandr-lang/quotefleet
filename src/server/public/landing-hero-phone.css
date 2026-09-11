@@ -23,7 +23,6 @@
   --pz-accent-edge: rgba(13, 60, 252, 0.22);
   --pz-card: #ffffff;
   --pz-card-edge: #edf1f7;
-
   display: none; /* desktop: hidden (composite shows). Mobile MQ turns it on. */
 }
 
@@ -245,7 +244,6 @@ html body.qf-wft .visual-flow.qf-hero-media > .qf-phone { display: none; }
 .qf-slide__route .qf-arrow {
   flex: 1 1 auto;
   height: 1px;
-  background: repeating-linear-gradient(90deg, var(--pz-chip-edge) 0 4px, transparent 4px 8px);
   position: relative;
 }
 .qf-slide__route .qf-arrow::after {
@@ -380,7 +378,7 @@ html body.qf-wft .visual-flow.qf-hero-media > .qf-phone { display: none; }
   flex: 1 1 auto;
   height: 8px;
   border-radius: 100px;
-  background: linear-gradient(90deg, var(--pz-chip) 0%, var(--pz-accent-soft) 50%, var(--pz-chip) 100%);
+  background: var(--pz-chip);
   background-size: 200% 100%;
 }
 

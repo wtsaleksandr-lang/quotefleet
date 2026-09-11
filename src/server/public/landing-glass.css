@@ -66,14 +66,10 @@ html:not([data-theme="light"]) {
    come from the base .hero::before rule.
    ═══════════════════════════════════════════════════════════════════════════ */
 html:not([data-theme="light"]) body.qf-wft .hero.visual-hero::before {
-  background:
-    radial-gradient(58% 48% at 16% 12%, rgba(13, 60, 252, 0.20), transparent 70%),
-    radial-gradient(52% 44% at 84% 20%, rgba(80, 120, 255, 0.14), transparent 72%) !important;
+  background: rgba(80, 120, 255, 0.14) !important;
 }
 html[data-theme="light"] body.qf-wft .hero.visual-hero::before {
-  background:
-    radial-gradient(58% 48% at 16% 12%, rgba(13, 60, 252, 0.14), transparent 70%),
-    radial-gradient(52% 44% at 84% 20%, rgba(80, 120, 255, 0.10), transparent 72%) !important;
+  background: rgba(80, 120, 255, 0.10) !important;
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -143,19 +139,17 @@ html:not([data-theme="light"]) body.qf-wft .nav-dd-panel {
 }
 
 /* Nav / dropdown solid fallback where backdrop-filter is unsupported. */
-@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
-  html[data-theme="light"] body.qf-wft.landing-v2 .site-header-inner,
-  html[data-theme="light"] body.qf-wft .nav-dd-panel {
+html[data-theme="light"] body.qf-wft.landing-v2 .site-header-inner,
+html[data-theme="light"] body.qf-wft .nav-dd-panel {
+  background: var(--glass-ultra-solid) !important;
+}
+html:not([data-theme="light"]) body.qf-wft.landing-v2 .site-header-inner,
+html:not([data-theme="light"]) body.qf-wft .nav-dd-panel {
+  background: var(--glass-ultra-solid) !important;
+}
+@media (max-width: 640px) {
+  html[data-theme="light"] body.qf-wft.landing-v2 .site-header {
     background: var(--glass-ultra-solid) !important;
-  }
-  html:not([data-theme="light"]) body.qf-wft.landing-v2 .site-header-inner,
-  html:not([data-theme="light"]) body.qf-wft .nav-dd-panel {
-    background: var(--glass-ultra-solid) !important;
-  }
-  @media (max-width: 640px) {
-    html[data-theme="light"] body.qf-wft.landing-v2 .site-header {
-      background: var(--glass-ultra-solid) !important;
-    }
   }
 }
 
@@ -181,11 +175,9 @@ html body.qf-wft .qf-dir-search {
   backdrop-filter: blur(16px) saturate(1.3) !important;
   box-shadow: var(--glass-shadow) !important;
 }
-@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
-  html body.qf-wft .qf-finder,
-  html body.qf-wft .qf-dir-search {
-    background: var(--glass-thin-solid) !important;
-  }
+html body.qf-wft .qf-finder,
+html body.qf-wft .qf-dir-search {
+  background: var(--glass-thin-solid) !important;
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -207,11 +199,9 @@ html body.qf-wft .qf-aud-seg.is-active {
   box-shadow: inset 0 0 0 1px var(--accent), 0 2px 8px rgba(10, 37, 64, 0.12) !important;
 }
 html body.qf-wft .qf-aud-seg.is-active:hover { color: var(--ink) !important; }
-@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
-  html body.qf-wft .qf-aud-toggle,
-  html body.qf-wft .qf-aud-seg.is-active {
-    background: var(--glass-thin-solid) !important;
-  }
+html body.qf-wft .qf-aud-toggle,
+html body.qf-wft .qf-aud-seg.is-active {
+  background: var(--glass-thin-solid) !important;
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -242,16 +232,14 @@ html[data-theme="light"] body.qf-wft .final-cta-card {
   box-shadow: var(--glass-shadow) !important;
   transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease !important;
 }
-@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
-  html body.qf-wft .qf-dir-card,
-  html body.qf-wft .qf-included-card,
-  html body.qf-wft .qf-trust-card,
-  html body.qf-wft .qf-wins-card,
-  html body.qf-wft .use-card,
-  html body.qf-wft .qf-ba-card,
-  html body.qf-wft .final-cta-card {
-    background: var(--glass-card-solid) !important;
-  }
+html body.qf-wft .qf-dir-card,
+html body.qf-wft .qf-included-card,
+html body.qf-wft .qf-trust-card,
+html body.qf-wft .qf-wins-card,
+html body.qf-wft .use-card,
+html body.qf-wft .qf-ba-card,
+html body.qf-wft .final-cta-card {
+  background: var(--glass-card-solid) !important;
 }
 
 /* Hover-lift (guarded for reduced-motion below). */

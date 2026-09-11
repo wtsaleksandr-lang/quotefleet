@@ -36,7 +36,7 @@
   display: inline-grid;
   place-items: center;
   border-radius: 10px;
-  background: linear-gradient(135deg, var(--accent), #6f8bff);
+  background: var(--accent);
   color: var(--accent-ink);
 }
 .site-logo svg { width: 18px; height: 18px; }
@@ -70,9 +70,7 @@
   content: '';
   position: absolute;
   inset: 0;
-  background:
-    radial-gradient(ellipse 56% 42% at 76% 18%, rgba(110,139,255,.12), transparent 68%),
-    radial-gradient(ellipse 40% 28% at 22% 18%, rgba(94,117,255,.10), transparent 70%);
+  background: rgba(94,117,255,.10);
   pointer-events: none;
 }
 .hero-grid {
@@ -153,7 +151,7 @@
   position: relative;
   border: 1px solid rgba(110,139,255,.2);
   border-radius: 22px;
-  background: linear-gradient(180deg, rgba(27,33,35,.96), rgba(18,21,26,.98));
+  background: rgba(27,33,35,.96);
   box-shadow: 0 20px 60px rgba(0,0,0,.24);
   padding: 18px;
   animation: softRise .7s ease both;
@@ -256,7 +254,7 @@
 .flow-arrow {
   position: relative;
   height: 2px;
-  background: linear-gradient(90deg, rgba(110,139,255,.2), var(--accent));
+  background: rgba(110,139,255,.2);
   animation: drawLine .9s ease both;
 }
 .flow-arrow::after {
@@ -353,7 +351,7 @@
 .sheet-art span {
   height: 9px;
   border-radius: 999px;
-  background: linear-gradient(90deg, var(--accent), rgba(110,139,255,.18));
+  background: var(--accent);
 }
 .sheet-art span:nth-child(2) { width: 74%; }
 .sheet-art span:nth-child(3) { width: 52%; }
@@ -421,7 +419,7 @@
 .pdf-card {
   border: 1px solid rgba(110,139,255,.18);
   border-radius: 24px;
-  background: linear-gradient(180deg, rgba(27,33,35,.96), rgba(18,21,26,.98));
+  background: rgba(27,33,35,.96);
   box-shadow: var(--shadow-md);
   padding: 18px;
 }
@@ -494,7 +492,7 @@
 .final-cta-card {
   border: 1px solid rgba(110,139,255,.2);
   border-radius: 26px;
-  background: linear-gradient(135deg, rgba(110,139,255,.06), rgba(62,95,255,.05));
+  background: rgba(110,139,255,.06);
   padding: 42px 28px;
   text-align: center;
   box-shadow: var(--shadow-md);
@@ -504,7 +502,7 @@
 
 .premium-footer {
   border-top: 1px solid var(--border);
-  background: linear-gradient(180deg, rgba(20,22,25,.98), rgba(12,14,16,1));
+  background: rgba(20,22,25,.98);
   padding: 54px 24px 34px;
 }
 .premium-footer-inner {

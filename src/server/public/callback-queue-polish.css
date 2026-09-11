@@ -4,7 +4,7 @@
   border: 1px solid var(--border);
   border-radius: 22px;
   overflow: hidden;
-  background: linear-gradient(135deg, rgba(13, 60, 252,.10), rgba(13, 60, 252,.055)), var(--surface);
+  background: var(--surface);
   box-shadow: var(--shadow-md);
 }
 .qf-callback-command__top {

@@ -21,9 +21,7 @@ html[data-theme="light"] {
 }
 
 html[data-theme="light"] body {
-  background:
-    radial-gradient(circle at 12% -10%, rgba(56, 189, 248, 0.18), transparent 34%),
-    linear-gradient(180deg, #ffffff 0%, #f6f9ff 100%);
+  background: #ffffff;
 }
 
 html[data-theme="light"] .app-shell {

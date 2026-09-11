@@ -615,12 +615,10 @@ html[data-theme="light"] body.qf-auth-wft .plan-opt:has(input:checked) {
 }
 
 /* SOLID fallback where backdrop-filter is unsupported. */
-@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
-  body.qf-auth-wft .card.elevated { background: rgba(34, 40, 42, 0.98) !important; }
-  body.qf-auth-wft .plan-opt { background: rgba(34, 40, 42, 0.96) !important; }
-  html[data-theme="light"] body.qf-auth-wft .card.elevated { background: rgba(255, 255, 255, 0.98) !important; }
-  html[data-theme="light"] body.qf-auth-wft .plan-opt { background: rgba(255, 255, 255, 0.96) !important; }
-}
+body.qf-auth-wft .card.elevated { background: rgba(34, 40, 42, 0.98) !important; }
+body.qf-auth-wft .plan-opt { background: rgba(34, 40, 42, 0.96) !important; }
+html[data-theme="light"] body.qf-auth-wft .card.elevated { background: rgba(255, 255, 255, 0.98) !important; }
+html[data-theme="light"] body.qf-auth-wft .plan-opt { background: rgba(255, 255, 255, 0.96) !important; }
 
 /* CTA micro-interaction: soft press on the submit button. (Hover glow/lift
    already defined above.) */

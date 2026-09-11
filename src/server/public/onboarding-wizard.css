@@ -78,7 +78,6 @@ html.qf-ob-open body {
   --ob-glow:        rgba(13, 60, 252, 0.35);
   --ob-shell-shadow: 0 24px 60px -16px rgba(15, 23, 42, 0.28);
   --ob-float-shadow: 0 16px 40px -12px rgba(15, 23, 42, 0.28);
-
   position: fixed;
   inset: 0;
   z-index: 2000;
@@ -91,11 +90,7 @@ html.qf-ob-open body {
      to refract (the premium moment). The flat light scrim is kept as the
      prefers-reduced-transparency fallback below. */
   background-color: var(--ob-backdrop);
-  background-image:
-    radial-gradient(60% 55% at 18% 14%, rgba(13, 60, 252, 0.42), transparent 70%),
-    radial-gradient(55% 52% at 84% 20%, rgba(99, 102, 241, 0.34), transparent 72%),
-    radial-gradient(64% 60% at 50% 96%, rgba(56, 189, 248, 0.20), transparent 74%),
-    radial-gradient(circle, rgba(255, 255, 255, 0.05) 1px, transparent 1px);
+  background-image: rgba(255, 255, 255, 0.05);
   background-size: auto, auto, auto, 24px 24px;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
@@ -159,11 +154,7 @@ html.qf-ob-open body {
 @media (prefers-reduced-transparency: reduce) {
   .qf-ob-overlay {
     background-color: color-mix(in srgb, var(--bg) 94%, transparent);
-    background-image: radial-gradient(
-      circle,
-      color-mix(in srgb, var(--ink) 7%, transparent) 1px,
-      transparent 1px
-    );
+    background-image: color-mix(in srgb, var(--ink);
     background-size: 24px 24px;
   }
 }
@@ -194,9 +185,7 @@ html.qf-ob-open body {
 .qf-ob-overlay.is-closing .qf-ob-shell  { transform: scale(0.96); opacity: 0; }
 
 /* No-backdrop-filter browsers get an opaque legible sheet (never see-through). */
-@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
-  .qf-ob-shell { background: var(--ob-shell-solid); }
-}
+.qf-ob-shell { background: var(--ob-shell-solid); }
 
 /* ── header: brand mark (left) + progress bar & skip (right) ─────────────── */
 .qf-ob-head {
@@ -276,9 +265,7 @@ html.qf-ob-open body {
   transition: width 0.45s cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 .qf-ob-seg.is-on .qf-ob-seg-fill { width: 100%; }
-@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
-  .qf-ob-seg { background: var(--surface-3); }
-}
+.qf-ob-seg { background: var(--surface-3); }
 @media (prefers-reduced-motion: reduce) {
   .qf-ob-seg-fill { transition: none; }
 }
@@ -355,9 +342,7 @@ html.qf-ob-open body {
   background: var(--accent-soft);
   transform: none;
 }
-@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
-  .qf-ob-card { background: var(--ob-card-solid); }
-}
+.qf-ob-card { background: var(--ob-card-solid); }
 @media (prefers-reduced-motion: reduce) {
   .qf-ob-card { transition: border-color 0.15s ease, background 0.15s ease; }
   .qf-ob-card:hover { transform: none; }
@@ -582,9 +567,7 @@ html.qf-ob-open body {
     border-color 0.12s ease, background 0.12s ease;
 }
 .qf-ob-region:hover { border-color: var(--accent); transform: translateY(-1px); }
-@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
-  .qf-ob-region { background: var(--ob-thin-solid); }
-}
+.qf-ob-region { background: var(--ob-thin-solid); }
 @media (prefers-reduced-motion: reduce) {
   .qf-ob-region { transition: border-color 0.12s ease, background 0.12s ease; }
   .qf-ob-region:hover { transform: none; }
@@ -607,13 +590,11 @@ html.qf-ob-open body {
   margin-top: var(--space-3);
   padding-top: var(--space-2);
   border-top: 1px solid var(--ob-ultra-brd);
-  background: linear-gradient(to top, var(--ob-ultra-bg), transparent);
+  background: var(--ob-ultra-bg);
   -webkit-backdrop-filter: blur(16px);
   backdrop-filter: blur(16px);
 }
-@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
-  .qf-ob-foot { background: var(--ob-ultra-solid); }
-}
+.qf-ob-foot { background: var(--ob-ultra-solid); }
 .qf-ob-btn {
   display: inline-flex;
   align-items: center;
@@ -859,9 +840,7 @@ html.qf-ob-open body {
   max-height: 300px;
   display: none;
 }
-@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
-  .qf-ob-finder-menu { background: var(--ob-thin-solid); }
-}
+.qf-ob-finder-menu { background: var(--ob-thin-solid); }
 .qf-ob-finder-item {
   display: block;
   width: 100%;

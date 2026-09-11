@@ -30,9 +30,7 @@
 }
 
 html[data-theme="light"] body, body:has(.qf-widget) { /* guarded: see EOF note — never the dark portal */
-  background:
-    radial-gradient(circle at 18% 0%, rgba(158, 232, 255, 0.32), transparent 30%),
-    linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
+  background: #ffffff;
 }
 
 .qf-widget {
@@ -53,7 +51,7 @@ html[data-theme="light"] body, body:has(.qf-widget) { /* guarded: see EOF note �
   align-items: center;
   justify-content: center;
   border-radius: 12px;
-  background: linear-gradient(135deg, var(--w-primary), #5b7cff);
+  background: var(--w-primary);
   color: #fff;
   font-size: 13px;
   font-weight: 950;
@@ -115,14 +113,14 @@ html[data-theme="light"] body, body:has(.qf-widget) { /* guarded: see EOF note �
 
 .qf-result {
   border-color: rgba(110, 139, 255, 0.55);
-  background: linear-gradient(135deg, #f7fdff 0%, #eefaff 45%, #f4f0ff 100%);
+  background: #f7fdff;
 }
 
 .qf-customer-note,
 .qf-result-guide,
 .qf-followup-choice-panel {
   border-color: rgba(110, 139, 255, 0.48);
-  background: linear-gradient(135deg, #ffffff, #f0fbff);
+  background: #ffffff;
 }
 
 .qf-trust-strip span,
@@ -149,7 +147,7 @@ html[data-theme="light"] body, body:has(.qf-widget) { /* guarded: see EOF note �
 .qf-launch-panel,
 .qf-share-readiness {
   border-color: var(--border);
-  background: linear-gradient(135deg, rgba(13, 60, 252, 0.08), rgba(93, 139, 255, 0.06)), var(--surface);
+  background: var(--surface);
 }
 
 .qf-brand-preview-card {
@@ -158,7 +156,7 @@ html[data-theme="light"] body, body:has(.qf-widget) { /* guarded: see EOF note �
 }
 
 .qf-brand-preview-logo {
-  background: linear-gradient(135deg, #3b22f4, #5b7cff);
+  background: #3b22f4;
   color: #fff;
   border-color: rgba(59, 34, 244, 0.22);
   box-shadow: 0 10px 22px rgba(59, 34, 244, 0.20);
@@ -177,13 +175,7 @@ html[data-theme="light"] body, body:has(.qf-widget) { /* guarded: see EOF note �
 }
 
 /* ── Page-wash scope note (rule near top of file) ──────────────────────────
-   The `body { background: <light gradient> }` rule up top is guarded as
-   `html[data-theme="light"] body, body:has(.qf-widget)` so the LIGHT page wash
-   applies to the public widget (widget.html — its static markup contains
-   .qf-widget, so :has() matches at first paint, no FOUC) and the LIGHT portal,
-   but NOT the dark-default portal. This sheet is runtime-injected into the
-   portal by premium-saas-polish.js AFTER portal-glass.css; a bare global body{}
-   here would out-cascade the portal's dark glass field and paint the dark
+   The `body { background: <light gradient> }   here would out-cascade the portal's dark glass field and paint the dark
    portal white (illegible H1s, muddy cards). The portal only ever renders
    .qf-widget inside a nested same-origin iframe, never in its own document, so
    :has(.qf-widget) is false on the portal doc. The dark portal matches neither

@@ -20,12 +20,7 @@
   width: min(760px, 92vw);
   height: min(760px, 92vw);
   transform: translate(-50%, -50%);
-  background: radial-gradient(
-    circle,
-    rgba(110, 139, 255, 0.12) 0%,
-    rgba(110, 139, 255, 0.04) 38%,
-    transparent 68%
-  );
+  background: rgba(110, 139, 255, 0.12);
   pointer-events: none;
   z-index: 0;
 }
@@ -115,12 +110,7 @@
   left: 0;
   right: 0;
   height: 26%;
-  background: linear-gradient(
-    to top,
-    var(--bg, #161616) 0%,
-    rgba(22, 22, 22, 0.8) 30%,
-    transparent 100%
-  );
+  background: var(--bg, #161616);
   pointer-events: none;
   z-index: 6;
 }
