@@ -41,7 +41,7 @@
     .benchmark { background: var(--accent-soft); border-radius: var(--radius); padding: 10px 12px; font-size: 13px; color: var(--accent); margin-top: 14px; }
     .disclaimer { font-size: 12px; color: var(--muted); margin-top: 16px; line-height: 1.55; }
     .typeahead-wrap { position: relative; }
-    .typeahead-list { position: absolute; top: 100%; left: 0; right: 0; z-index: 50; background: var(--surface); border: 1px solid var(--border-strong); border-radius: var(--radius); margin-top: 4px; max-height: 240px; overflow-y: auto; display: none; box-shadow: 0 8px 24px rgba(0,0,0,0.18); }
+    .typeahead-list { position: absolute; top: 100%; left: 0; right: 0; z-index: 50; background: var(--surface); border: 1px solid var(--border-strong); border-radius: var(--radius); margin-top: 4px; max-height: 240px; overflow-y: auto; display: none; box-shadow: var(--qf-shadow-md); }
     .typeahead-list.open { display: block; }
     .typeahead-list .item { padding: 9px 12px; font-size: 13px; cursor: pointer; border-bottom: 1px solid var(--border); }
     .typeahead-list .item:hover, .typeahead-list .item.active { background: var(--surface-2); color: var(--accent); }
@@ -54,7 +54,7 @@
       background: transparent; color: var(--muted);
       font-size: 11px; font-weight: 700; cursor: pointer;
       vertical-align: 1px; line-height: 1;
-      transition: background 0.15s, color 0.15s, border-color 0.15s;
+      transition: all .2s ease;
     }
     .tool-help:hover, .tool-help.open {
       background: var(--accent); color: var(--accent-ink); border-color: transparent;
@@ -65,10 +65,10 @@
       background: #0c1424; color: #fff;
       padding: 9px 12px; border-radius: 8px;
       font-size: 12.5px; line-height: 1.45;
-      box-shadow: 0 6px 24px rgba(0,0,0,0.4);
+      box-shadow: var(--qf-shadow-md);
       pointer-events: none;
       opacity: 0; transform: translateY(4px);
-      transition: opacity 0.12s ease, transform 0.12s ease;
+      transition: all .2s ease;
     }
     .tool-tip-bubble.show { opacity: 1; transform: translateY(0); }
     .tool-tip-bubble::before {
