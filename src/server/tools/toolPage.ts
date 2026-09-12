@@ -56,7 +56,6 @@
  * only at call sites · headings and eyebrows left-aligned, never centred.
  */
 import {
-  HUB_CSS,
   esc,
   fold,
   hubPage,
@@ -658,6 +657,3 @@ export function toolPage(opts: ToolPageOpts): string {
 
   return hubPage(shellOpts);
 }
-
-/** Re-exported so a tool page needs one import, not three. */
-export { HUB_CSS, esc };
