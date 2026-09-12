@@ -637,3 +637,74 @@ html body:has(#site-burger[aria-expanded="true"]) .qf-mc-fab { display: none !im
    the footer ground, exactly as the block above sets it.
    ═══════════════════════════════════════════════════════════════════════════ */
 .premium-footer .footer-col h4 { text-wrap: balance; }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   WAVE 5 — THE HOMEPAGE'S COPY OF THE LIGHTER FOOTER.
+
+   nav-unify.css carries this change for every other page. The homepage needs
+   it restated because FOUR sheets style this footer before nav-ia.css is
+   injected — landing-conversion.css (:491 padding, :507 heads, :593 logo),
+   landing-home-fixes.css (:517 the landing-v2 band), landing-footer-polish.css
+   (:14 the brand lockup, :26 a 60px logo) and nav-unify.css — and the ones
+   keyed at `body.qf-wft` outrank nav-unify's plain `.premium-footer`. Same
+   selectors the block at :198 already uses, declared later in the same sheet,
+   so they win on order rather than on a new !important.
+
+   NUMBERS ARE THE SHARED ONES, not homepage-specific taste: 32/24 padding,
+   24/16 grid gap, a 32px logo (28 on phones) and 12px/1.45 tagline. Measured
+   before: 810px at 1440, 1622px at 375, 1789px at 320.
+   ═══════════════════════════════════════════════════════════════════════════ */
+html body.qf-wft .premium-footer {
+  padding-top: var(--space-4);
+  padding-bottom: var(--space-3);
+}
+html body.qf-wft .premium-footer .premium-footer-inner {
+  column-gap: var(--space-2);
+  row-gap: var(--space-3);
+}
+html body.qf-wft .premium-footer .footer-brand { gap: var(--space-1-5); }
+html body.qf-wft .premium-footer .footer-brand .qf-footer-logo { height: 32px; }
+html body.qf-wft .premium-footer .qf-footer-brandtext { gap: 0; }
+html body.qf-wft .premium-footer .qf-footer-wordmark { font-size: 15px; }
+html body.qf-wft .premium-footer .footer-brand .qf-footer-tagline {
+  font-size: 12px;
+  line-height: 1.45;
+  max-width: 60ch;
+}
+html body.qf-wft .premium-footer .footer-col h4 { margin: 0; font-size: 11px; }
+html body.qf-wft .premium-footer .qf-fdisc-sum { padding: var(--space-0-5) 0; }
+html body.qf-wft .premium-footer .footer-col a { font-size: 13px; padding: var(--space-0-5) 0; }
+html body.qf-wft .premium-footer .footer-bottom {
+  margin-top: var(--space-3);
+  padding-top: var(--space-2);
+  display: block;
+  font-size: 11.5px;
+}
+
+@media (max-width: 640px) {
+  html body.qf-wft .premium-footer {
+    padding-top: var(--space-3);
+    padding-bottom: var(--space-3);
+  }
+  html body.qf-wft .premium-footer .premium-footer-inner { row-gap: var(--space-1-5); }
+  html body.qf-wft .premium-footer .footer-brand { gap: var(--space-1); }
+  html body.qf-wft .premium-footer .footer-brand .qf-footer-logo { height: 28px; }
+  html body.qf-wft .premium-footer .qf-fdisc-sum { min-height: 40px; padding: var(--space-1) 0; }
+  /* Same correction as nav-unify.css: the full-bleed last column must
+     paginate its LINKS, not the <details> that now wraps them.
+
+     KEYED ON [data-cols-odd] AND !important, because that is exactly what the
+     rule it has to beat carries (nav-ia.css:547 declares
+     `columns: 2 !important` at (0,6,2) — this sheet's whole homepage-override
+     layer is !important, since four earlier sheets style this footer).
+     Measured with the weaker forms: LEGAL kept `column-count: 2`, so its ONE
+     collapsed summary was balanced into the SECOND of two CSS columns and
+     rendered half-width in the right half of a full-bleed row — which reads
+     as exactly the orphaned column the ladder exists to prevent. */
+  html body.qf-wft .premium-footer .premium-footer-inner[data-cols-odd] > .footer-col:last-child { columns: auto !important; }
+  html body.qf-wft .premium-footer .premium-footer-inner[data-cols-odd] > .footer-col:last-child .qf-fdisc-body {
+    columns: 2;
+    column-gap: var(--space-2);
+  }
+  html body.qf-wft .premium-footer .premium-footer-inner[data-cols-odd] > .footer-col:last-child a { break-inside: avoid; }
+}

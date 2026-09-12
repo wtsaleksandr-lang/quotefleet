@@ -588,9 +588,17 @@ describe('the Free Tools group carries the new tool on every surface', () => {
     const freeMenu = SITE_NAV_HTML.match(/nav-free-menu[\s\S]*?<\/div><\/div>/)?.[0] ?? '';
     expect(freeMenu).toContain(HREF);
 
+    // Anchored on the HEADING, not on the element chain between it and the
+    // links. The 2026-09 "lighter footer" wave wrapped every column's links in
+    // a native <details>/<summary>, so the old
+    // `<div class="footer-col"><h4>Free Tools</h4>` prefix no longer describes
+    // the markup — but the filing decision these assertions exist to pin (this
+    // tool lives under Free Tools, beside /tools and /glossary) is unchanged,
+    // and matching from the heading to the end of the links wrapper still
+    // captures exactly the column's link set on both footers.
     for (const [name, markup, colRe] of [
-      ['PREMIUM_FOOTER', PREMIUM_FOOTER, /<div class="footer-col"><h4>Free Tools<\/h4>[\s\S]*?<\/div>/],
-      ['dirfoot', DIRECTORY_PAGES, /<div class="dirfoot-col"><h2 class="dirfoot-head">Free Tools<\/h2>[\s\S]*?<\/div>/],
+      ['PREMIUM_FOOTER', PREMIUM_FOOTER, /<h4>Free Tools<\/h4>[\s\S]*?<\/div>/],
+      ['dirfoot', DIRECTORY_PAGES, /<h2 class="dirfoot-head">Free Tools<\/h2>[\s\S]*?<\/div>/],
     ] as const) {
       const col = markup.match(colRe)?.[0] ?? '';
       expect(col, name).toContain(HREF);

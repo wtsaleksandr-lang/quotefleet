@@ -1143,3 +1143,112 @@ html[data-theme="light"] .site-mobile-menu:not([hidden]) {
    today's behaviour. marketing-chat.js's `.qf-mc-fab` is a single class, so
    this out-specifies it without !important however late its <style> lands. */
 body:has(#site-burger[aria-expanded="true"]) .qf-mc-fab { display: none; }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   WAVE 5 — PREMIUM FOOTER, LIGHTER AND SMALLER.
+
+   Alex, 2026-09: the footer "looks too heavy and big". Measured before this
+   block, on every server-rendered marketing page: 816px tall at 1440, 1686px
+   at 375 and 1854px at 320 — a footer taller than the phone viewport, under
+   every page on the site.
+
+   THREE THINGS MAKE THE HEIGHT, and this block takes all three:
+     1. PADDING AND GUTTERS. 60px top / 32px bottom with a 32px grid gap on a
+        block whose job is a site map. 32 / 24 / 24-16 reads identically and is
+        ~60px shorter before a single link moves.
+     2. THE BRAND BLOCK. A 60px-tall logo, a 19px wordmark and a full-sentence
+        tagline sat on their OWN full-bleed row (`.footer-brand` is pinned
+        `1 / -1`), so the footer opened with ~100px of masthead. The logo drops
+        to 32px — the height of the wordmark beside it — and the type steps
+        down with it. The tagline SENTENCE is unchanged: it is marketing copy,
+        not mine to rewrite.
+     3. THE LINK WALL, which is the phone story and is handled by the
+        disclosures in style.css rather than here.
+
+   PADDING-BOTTOM IS NOT ZERO, deliberately. The sub-bar sitting on the last
+   pixel of the document reads as a truncation bug rather than as a finished
+   page, so the footer keeps a real 24px floor under it.
+   ═══════════════════════════════════════════════════════════════════════════ */
+.premium-footer { padding: var(--space-4) var(--container-gutter) var(--space-3); }
+.premium-footer-inner { gap: var(--space-3) var(--space-2); }
+
+.premium-footer .footer-brand { gap: var(--space-1-5); align-items: center; }
+.premium-footer .footer-brand .qf-footer-logo { height: 32px; }
+.premium-footer .qf-footer-brandtext { gap: 0; }
+.premium-footer .qf-footer-wordmark { font-size: 15px; }
+.premium-footer .footer-brand .qf-footer-tagline {
+  font-size: 12px;
+  line-height: 1.45;
+  max-width: 60ch;
+}
+
+/* The heading is the <summary> now, so its old bottom margin became the
+   disclosure's padding — otherwise the gap doubled. */
+.premium-footer .footer-col h4 {
+  margin: 0;
+  font-size: 11px;
+  letter-spacing: .1em;
+  /* Kept from PR #560 and extended to this sheet: the homepage had the
+     balance fix, every OTHER marketing page did not, so "For Carriers &
+     Brokers" still stranded "Brokers" alone at 375 and 320 on /pricing,
+     /oversize and every tool page. Declared on the SELECTOR so a longer label
+     added to FOOTER_COLUMNS inherits it. */
+  text-wrap: balance;
+}
+.premium-footer .qf-fdisc-sum { padding: var(--space-0-5) 0; }
+.premium-footer .footer-col a { font-size: 13px; padding: var(--space-0-5) 0; }
+.premium-footer .qf-fdisc-sum:hover h4 { color: var(--footer-ink); }
+.premium-footer .qf-fdisc-chev { color: var(--footer-quiet); }
+
+.premium-footer .footer-bottom {
+  margin: var(--space-3) auto 0;
+  padding: var(--space-2) 0 0;
+  display: block;
+  border-top: 1px solid var(--footer-rule);
+}
+.premium-footer .footer-bottom .qf-foot-oog {
+  /* PLAIN BLOCK, shrink-wrapped — deliberately NOT inline-flex or flex.
+     • inline-flex picked up an 8px indent from the inline formatting context
+       after the legal <p> on the directory footer (measured left 168 against a
+       160 content edge) while sitting flush on the marketing one, AND dropped
+       the markup space before the trailing arrow <span> ("…quote→").
+     • flex fixed both but made the arrow its own flex item beside the text
+       box, so at 375px the text wrapped INSIDE that box and the arrow stayed
+       up on line one: "…OOG trucking →" / "quote".
+     A block keeps normal inline flow, so the arrow is just the last word of
+     the sentence and wraps with it; `fit-content` keeps the hover/focus target
+     on the text instead of the full footer width. */
+  display: block;
+  width: fit-content;
+  margin-top: var(--space-1);
+}
+/* THE SUB-BAR LINES UP WITH THE SITE MAP ABOVE IT. `.premium-footer-inner` and
+   `.footer-bottom` are both capped at --container-max (1328px); the pay row
+   kept the older hard-coded 1120px, so on a 1440 viewport it sat 104px inside
+   both of them — a strip that looked centred under left-aligned content. */
+.premium-footer .qf-footer-payrow { max-width: var(--container-max); }
+
+@media (max-width: 640px) {
+  .premium-footer { padding: var(--space-3) var(--container-gutter) var(--space-3); }
+  .premium-footer-inner { gap: var(--space-1-5) var(--space-2); }
+  .premium-footer .footer-brand { gap: var(--space-1); }
+  .premium-footer .footer-brand .qf-footer-logo { height: 28px; }
+  /* A collapsed column is a control, so give it a real target to tap. */
+  .premium-footer .qf-fdisc-sum { min-height: 40px; padding: var(--space-1) 0; }
+  /* THE SPANNED LAST COLUMN PAGINATES ITS LINKS, NOT ITS DISCLOSURE.
+     `.footer-col:last-child` is pinned `1 / -1` at this step and carried
+     `columns: 2` so its links filled the full-bleed row instead of running
+     down one side (nav-unify.css:792, and again at :1025 keyed on
+     `[data-cols-odd]`). With the links now inside a <details>, that rule would
+     paginate the DETAILS ELEMENT — summary and all — and a collapsed column
+     would try to flow one summary row across two tracks. So the multi-column
+     context moves down onto the links wrapper, where it always belonged.
+     Matched at the same (0,4,0) specificity as the `[data-cols-odd]` rule and
+     declared later, so it wins in both sheets. */
+  .premium-footer-inner[data-cols-odd] > .footer-col:last-child { columns: auto; }
+  .premium-footer-inner[data-cols-odd] > .footer-col:last-child .qf-fdisc-body {
+    columns: 2;
+    column-gap: var(--space-2);
+  }
+  .premium-footer-inner[data-cols-odd] > .footer-col:last-child a { break-inside: avoid; }
+}

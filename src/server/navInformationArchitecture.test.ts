@@ -912,49 +912,83 @@ describe('no nav control breaks its label across two lines', () => {
 });
 
 /* ═══════════════════════════════════════════════════════════════════════════
-   THE FOUR-ITEM TRUST BAR — 2×2, never 3+1.
+   ONE TRUST STRIP, NOT THREE STACKED BANDS.
+
+   REPLACES "the four-item trust bar goes 2×2, never 3+1" (2026-09). That rule
+   solved a real orphan, but it was solving it for a band that should not have
+   existed: `.qf-footer-trustbar` sat directly above FOOTER_PAY_ROW and its
+   first claim, "Payments secured by Stripe", was the SAME fact the pay row
+   already stated twice — "Powered by Stripe" and "Card details never touch our
+   servers". One fact, three sentences, two strips, and a footer measuring
+   1686px at 375px under every page on the site.
+
+   So the bar is gone: the duplicate was deleted outright and its three
+   non-overlapping claims moved into `.qf-payrow-trust`, which is now the ONE
+   place a trust claim may live. The claims are plain inline list items with a
+   CSS middot between them, which is also why this file no longer derives a
+   track ladder for them — text that reflows like a sentence cannot strand an
+   item on a line of its own, so there is no `N mod T` to protect.
    ═══════════════════════════════════════════════════════════════════════════ */
 
-describe('.qf-footer-trustbar never strands its fourth claim on a line alone', () => {
-  const TRUSTBAR_SURFACES: Array<[string, Array<[string, string]>]> = [
-    ['shared marketing chrome', PREMIUM_SHEETS_SHARED],
-    ['homepage', PREMIUM_SHEETS_HOMEPAGE],
+describe('the footer states a trust claim ONCE, in one strip', () => {
+  /** Claims the retired `.qf-footer-trustbar` used to carry. */
+  const RETIRED_BAR_CLAIMS = [
+    'SSL/TLS encrypted',
+    'GDPR &amp; CCPA-ready',
+    'Per-tenant data isolation',
   ];
 
-  it('has exactly four claims — the count the ladder is derived from', () => {
-    const bar = PREMIUM_FOOTER.match(/<ul class="qf-footer-trustbar"[\s\S]*?<\/ul>/)?.[0] ?? '';
-    expect((bar.match(/<li>/g) ?? []).length).toBe(4);
+  it('no longer renders a separate trust band', () => {
+    expect(PREMIUM_FOOTER).not.toContain('qf-footer-trustbar');
+    expect(DIRECTORY_PAGES_TS).not.toContain('qf-footer-trustbar');
+    expect(LANDING_HTML).not.toContain('qf-footer-trustbar');
   });
 
-  it.each(TRUSTBAR_SURFACES)('%s: two tracks below 720px, one row above', (_name, sheets) => {
-    // N=4 in T tracks strands `4 mod T` on the last row, so T=3 is the single
-    // forbidden count and the ladder is 4 → 2. Measured before the fix: the
-    // fourth claim sat alone from 459–673px on the homepage and 495–697px on
-    // every PREMIUM_FOOTER page.
-    const decls = collect(sheets, /qf-footer-trustbar/, 'grid-template-columns');
-    for (const w of [320, 375, 459, 500, 640, 673, 697, 720]) {
-      const win = winnerAt(decls, w);
-      expect(win, `no trust-bar rule applies at ${w}px`).toBeDefined();
-      expect(win.tracks, `${w}px`).toBe(2);
-    }
-    // Above 720px all four fit on one flex line on both surfaces (they need
-    // <=650px of the >=673px available), so there is deliberately no grid rule.
-    for (const w of [721, 900, 1120, 1600]) {
-      expect(winnerAt(decls, w), `${w}px should stay a plain flex row`).toBeUndefined();
+  it('dropped the duplicated Stripe claim and kept the one that says who processes', () => {
+    // THE DUPLICATE: "Payments secured by Stripe" is "Powered by Stripe" plus
+    // "Card details never touch our servers", which both still ship.
+    expect(PREMIUM_FOOTER).not.toContain('Payments secured by Stripe');
+    expect(PREMIUM_FOOTER).toContain('Powered by Stripe');
+    expect(PREMIUM_FOOTER).toContain('Card details never touch our servers');
+  });
+
+  it('carried every NON-duplicate claim across rather than deleting it', () => {
+    // Consolidation may remove a repetition. It may not quietly remove a claim.
+    for (const claim of RETIRED_BAR_CLAIMS) {
+      expect(PREMIUM_FOOTER, claim).toContain(claim);
     }
   });
 
-  it('leaves .qf-payrow-trust alone — its one-per-line stack is deliberate', () => {
-    // style.css: "One badge per line is a deliberate stack, not an orphaned
-    // wrap." Three items going fully vertical is a stack; it is not the 3+1
-    // remainder this rule is about, and it must not be "fixed".
-    expect(STYLE_CSS).toContain('One badge per line is a deliberate stack, not an orphaned wrap.');
-    expect(STYLE_CSS).toMatch(/\.qf-payrow-trust \{\s*flex-direction: column/);
-    // The nav sheets may NAME it in a comment (they explain why it is exempt);
-    // what they must not do is open a rule block for it.
+  it('states each claim exactly once per footer', () => {
+    // SCOPED TO THE FOOTER ELEMENT on the homepage, because the page BODY
+    // legitimately makes some of these claims too — "Per-tenant data
+    // isolation" is also a line in the homepage's own security copy. One
+    // mention in the footer and one in the page is not a duplicate; two in the
+    // footer is the stacked-bands defect this block exists to stop.
+    const landingFooter = LANDING_HTML.match(/<footer[\s\S]*?<\/footer>/)?.[0] ?? '';
+    expect(landingFooter, 'landing.html footer must be extractable').toContain('premium-footer');
+    for (const [name, html] of [
+      ['PREMIUM_FOOTER', PREMIUM_FOOTER],
+      ['landing.html footer', landingFooter],
+    ] as const) {
+      for (const claim of [...RETIRED_BAR_CLAIMS, 'Cancel anytime', 'No credit card to start']) {
+        expect((html.match(new RegExp(claim.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g')) ?? []).length,
+          `${name}: ${claim}`).toBe(1);
+      }
+    }
+  });
+
+  it('needs no track ladder, because the claims are text and not tiles', () => {
+    // The claims reflow inline with a `·` between them. An item that wraps is
+    // a word wrapping inside a sentence, not a tile stranded on a row — so no
+    // sheet should be opening a grid for them, and none should be re-deriving
+    // the retired 4 → 2 ladder either.
+    expect(STYLE_CSS).toMatch(/\.qf-payrow-trust \{\s*display: block/);
+    expect(STYLE_CSS).toMatch(/\.qf-payrow-trust li \{ display: inline; \}/);
+    expect(STYLE_CSS).toMatch(/\.qf-payrow-trust li \+ li::before \{\s*content: "·";/);
     for (const [name, css] of NAV_SHEETS) {
       const rules = css.replace(/\/\*[\s\S]*?\*\//g, '');
-      expect(rules, name).not.toContain('.qf-payrow-trust');
+      expect(rules, `${name} must not restyle the shared trust strip`).not.toContain('.qf-payrow-trust');
     }
   });
 });
