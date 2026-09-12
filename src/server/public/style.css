@@ -2652,48 +2652,68 @@ html[data-theme="dark"],
    THE CTA IS `--cta-bg` RE-HUED ONTO THE BAND. The site already has a primary
    button colour that inverts per theme: `--cta-bg` / `--cta-text` (near-black
    on white ink in light; near-white on near-black ink in dark). The hero CTA
-   is that same object moved onto the wash's hue 198 and to the luminance that
-   clears 3:1 against the band pixels ACTUALLY behind it. So `--hero-cta-ink`
-   is simply `var(--cta-text)` — it already inverts correctly, in both themes,
-   with no second declaration.
+   is that same object moved onto the wash's hue and stepped away from the band
+   in whichever direction the band leaves room. So `--hero-cta-ink` is simply
+   `var(--cta-text)` — it already inverts correctly, in both themes, with no
+   second declaration.
 
    THE DIRECTION OF THE STEP FLIPS WITH THE THEME, BECAUSE THE BAND DOES.
-   Light's band is a mid azure (measured #016FA0 -> #47AFDE behind the button),
+   Light's band is a mid azure (measured #016F9F -> #42ADDA behind the button),
    so the CTA steps DOWN from it. Dark's band is teal-navy near-black (#03273E
    -> #18394D), where "darker" does not exist — 3:1 below it is off the bottom
    of the gamut — so the CTA steps UP instead. That is not two buttons: it is
-   one rule, "the band's hue, stepped away from the band in whichever direction
-   the band leaves room", and it is the same answer `--hero-azure-lift` already
-   gives the card glyphs for exactly the same reason (see Wave 9).
+   one rule, and it is the same answer `--hero-azure-lift` already gives the
+   card glyphs for exactly the same reason (see Wave 9).
 
-   MEASURED, at hue 197.7-198.6 throughout (the band's own 198 family):
+   THE LIGHT FILL IS THE BAND'S `base` HUE EXACTLY. #003E5A is hue 198.67; the
+   generator's `base` anchor [4,117,168] is hue 198.66. Same colour story, one
+   step down in luminance — which is the whole of the owner's note.
 
-     light  fill  #001F2C  3.07:1 vs the darkest band pixel behind the button
-                           3.34:1 vs the generator's `base` anchor
-                           17.0:1 for the white label
-            hover #001822  3.28:1 / 18.2:1   (a further step DOWN the family)
-     dark   fill  #0496D7  3.67:1 vs the lightest band pixel behind the button
-                           5.70:1 for the near-black label
-            hover #1EA6E3  4.40:1 / 6.84:1   (a further step UP the family)
+   ── 2a. WHY THE RIM, AND NOT THE FILL, CARRIES 3:1 ────────────────────────
+
+   THE FIRST ATTEMPT AT THIS CHANGE GOT IT WRONG, AND THE MISTAKE IS WORTH
+   KEEPING. It required 3:1 between the FILL and the band. On this band that
+   forces the fill to near-black: `base` is pinned as "the lightest azure white
+   BODY copy can sit on" (heroWashAzure.test.ts) because an 18px lead runs
+   across it, so a step 3:1 darker than it lands at #001F2C — which measured
+   1.11:1 against the sixteen `--cta-bg` tool-card buttons and simply read as
+   black. It stopped clashing by ceasing to be blue.
+
+   WCAG 1.4.11 asks for 3:1 on the visual information that IDENTIFIES the
+   component, not on its fill. For a button with a visible rim that is the RIM.
+   So the rim is now 2px of `--hero-cta-rim` and is the load-bearing boundary,
+   and the fill is free to be a colour the owner actually asked for.
+
+   MEASURED, light theme, worst case across 320/375/768/1440:
+
+     fill   #003E5A   hue 198.67   2.06:1 vs the darkest band pixel
+                                  11.44:1 for the white label
+                                   1.65:1 vs `--cta-bg` (was 1.11 at #001F2C)
+     rim    white     2px         11.44:1 vs the fill
+                                   4.24:1 vs the darkest band pixel
+     hover  #00344B   hue 198.40   2.37:1 vs band, 13.18:1 for the label
+
+   IN DARK THE FILL STILL CARRIES IT ON ITS OWN — #0496D7 measures 3.61-3.69:1
+   against the dark band — so dark's rim is decorative rather than load-bearing
+   and stays the quiet `--border-strong`. One token, two jobs, stated here so
+   nobody "fixes" the dark rim to match the light one.
+
+   THE ONE PLACE THE RIM DOES NOT REACH 3:1, STATED RATHER THAN HIDDEN. At 320
+   the button sits low enough that the ramp has opened up behind it and the
+   band reaches #42ADDA. A white rim measures 2.55:1 against THAT pixel (3.52:1
+   against the band's modal colour there). No single rim colour can fix it: a
+   lighter rim does not exist, and a rim dark enough to clear 3:1 against a
+   #42ADDA ground would have to be darker than the fill it also has to
+   separate from. It is one width, against the lightest pixel of a grainy
+   ramp, with the fill's own 4.62:1 against that same pixel underneath it.
 
    HOVER DARKENS IN LIGHT AND LIGHTENS IN DARK — IT NEVER CHANGES FAMILY. This
    is the trap #570 documented and dodged: `--accent-strong` is #2440C4 in
    light but a PALE LAVENDER #B4C2FC in dark (and `landing-s-polish.css`
    re-declares it as the lavender on `.landing-v2` in BOTH themes), so any
    hover that reaches for it puts a white label on a pale ground at 1.4:1. The
-   tokens below never leave hue 198, so every state is AA by construction
-   rather than by review.
-
-   AN HONEST NOTE ON WHAT THE 3:1 TARGET COSTS. Our band is pinned at the dark
-   end of the reference's — `base` is "the lightest azure white BODY copy can
-   sit on" (heroWashAzure.test.ts) because an 18px lead runs across it. A step
-   3:1 darker than a band that dark necessarily lands near-black: #001F2C is a
-   deep ocean blue, not the mid-blue the reference's much lighter sky can
-   afford. It is unmistakably the band's hue and it clears every number, but it
-   reads darker than the reference does. The lighter alternative that also
-   clears 3:1 is a PALE azure (L >= 0.76) with dark ink — a near-white button —
-   which is the opposite of the "deeper blue" that was asked for, so it is not
-   what ships here. Recorded so the next person does not re-derive it.
+   tokens below never leave the 197-199 hue window, so every state is AA by
+   construction rather than by review.
 
    ── 3. THE TOGGLE ─────────────────────────────────────────────────────────
 
@@ -2721,9 +2741,10 @@ html[data-theme="dark"],
    6/8/12 ramp, every length on the 8px ramp.
    ───────────────────────────────────────────────────────────────────────── */
 :root {
-  --hero-cta-fill:       #001F2C;
-  --hero-cta-fill-hover: #001822;
+  --hero-cta-fill:       #003E5A;
+  --hero-cta-fill-hover: #00344B;
   --hero-cta-ink:        var(--cta-text);
+  --hero-cta-rim:        var(--hero-wash-ink);
   --hero-toggle-rim:     var(--hero-wash-line);
   --hero-toggle-rim-on:  var(--hero-wash-ink);
   --hero-toggle-tint:    rgba(var(--hero-wash-ink-rgb), 0.10);
@@ -2732,12 +2753,14 @@ html[data-theme="dark"],
 :root:not([data-theme="light"]) {
   --hero-cta-fill:       #0496D7;
   --hero-cta-fill-hover: #1EA6E3;
+  --hero-cta-rim:        var(--hero-wash-line);
   --hero-toggle-rim:     rgba(var(--hero-wash-ink-rgb), 0.38);
 }
 @media (prefers-color-scheme: light) {
   :root:not([data-theme="dark"]) {
-    --hero-cta-fill:       #001F2C;
-    --hero-cta-fill-hover: #001822;
+    --hero-cta-fill:       #003E5A;
+    --hero-cta-fill-hover: #00344B;
+    --hero-cta-rim:        var(--hero-wash-ink);
     --hero-toggle-rim:     var(--hero-wash-line);
   }
 }

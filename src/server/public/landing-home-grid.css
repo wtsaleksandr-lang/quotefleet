@@ -960,12 +960,26 @@ html body.qf-wft .qf-hhero .qf-shipper-preview__label {
  * **1.02:1** against it at 1440/768/375. The rim was not reinforcing a weak
  * boundary; it was the ONLY boundary.
  *
- * SO THE FILL NOW CARRIES ITS OWN BOUNDARY. `--hero-cta-fill` is the band's
- * hue at the luminance that clears 3:1 against the pixels actually behind the
- * button — 3.07:1 in light (#001F2C), 3.67:1 in dark (#0496D7) — and the rim
- * is now a detail rather than the load-bearing element. Derivation, the
- * theme-flip, and the honest cost of the 3:1 target are written up in full at
- * the foot of style.css (Wave 10); they are not restated here.
+ * SO THE 2px RIM IS THE BOUNDARY, AND THE FILL IS FREE TO BE BLUE.
+ * `--hero-cta-fill` is the band's own `base` hue (198.67, to a hundredth of a
+ * degree) stepped down in luminance: #003E5A in light, #0496D7 in dark.
+ *
+ * The first pass at this required 3:1 between the FILL and the band, which on
+ * a band pinned this dark forces the fill to #001F2C — near-black, 1.11:1
+ * against the sixteen `--cta-bg` tool buttons right below it. It stopped
+ * clashing by ceasing to be blue. WCAG 1.4.11 wants 3:1 on whatever
+ * IDENTIFIES the component, and for a button with a visible rim that is the
+ * rim: 2px of `--hero-cta-rim`, measured at 11.44:1 against the fill and
+ * 4.24:1 against the darkest band pixel behind the button.
+ *
+ * `--hero-cta-rim` IS THEME-SPLIT ON PURPOSE. Light's rim is load-bearing so
+ * it is the full `--hero-wash-ink`. Dark's fill already clears 3:1 against its
+ * own band on its own (3.61-3.69:1), so its rim is decorative and stays the
+ * quiet `--border-strong` — a white ring there would be a halo for nothing.
+ *
+ * Derivation, the theme-flip, and the one width where the rim does not reach
+ * 3:1 (320, against the lightest pixel of the opened ramp) are written up in
+ * full at the foot of style.css (Wave 10); they are not restated here.
  *
  * THE SIXTEEN TOOL-CARD BUTTONS STAY NEUTRAL, and that is still the actual
  * decision rather than an omission. Sixteen filled primaries on one page means
@@ -982,7 +996,7 @@ html body.qf-wft .qf-hhero .qf-shipper-preview__label {
  * i.e. white on a bright azure at 3.3:1 in dark. */
 html body.qf-wft .qf-hhero .qf-aud-panel .qf-hhero__action .hero-cta .btn {
   background: var(--hero-cta-fill) !important;
-  border: 1px solid var(--hero-wash-line) !important;
+  border: 2px solid var(--hero-cta-rim) !important;
   color: var(--hero-cta-ink) !important;
   box-shadow: none !important;
 }

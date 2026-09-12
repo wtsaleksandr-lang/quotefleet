@@ -294,14 +294,40 @@ describe('the hero CTA is the band, stepped away from itself', () => {
     expect(luminance(DARK_FILL)).toBeGreaterThan(luminance(DARK_BAND.base));
   });
 
-  it('clears 3:1 against its own band — the boundary is the FILL now, not the rim', () => {
-    // Light: `base` is the band's body, the ground under the button.
-    expect(contrast(LIGHT_FILL, LIGHT_BAND.base)).toBeGreaterThanOrEqual(3);
-    // Dark: check the LIGHTEST of the dark anchors too. `sky` sits bluer than
-    // the straight line from `base` to `pale`, so it — not `base` — is the
-    // worst case for a fill that has stepped UP.
+  /**
+   * WCAG 1.4.11 asks for 3:1 on whatever VISUALLY IDENTIFIES the component,
+   * not on its fill. Which part of this button that is differs by theme, and
+   * getting it backwards is how the first pass at this shipped a near-black
+   * button: requiring 3:1 of the FILL against a band pinned as "the lightest
+   * azure white body copy can sit on" forces the fill to #001F2C, which
+   * measured 1.11:1 against the sixteen `--cta-bg` tool buttons under it.
+   */
+  it('puts 3:1 on whatever identifies the control — the rim in light, the fill in dark', () => {
+    // DARK: the fill does it unaided. `sky` sits bluer than the straight line
+    // from `base` to `pale`, so it — not `base` — is the worst case for a fill
+    // that has stepped UP.
     expect(contrast(DARK_FILL, DARK_BAND.base)).toBeGreaterThanOrEqual(3);
     expect(contrast(DARK_FILL, DARK_BAND.sky)).toBeGreaterThanOrEqual(3);
+
+    // LIGHT: the fill deliberately does NOT, and that is the point — this
+    // assertion is what stops someone "fixing" it back to near-black.
+    expect(contrast(LIGHT_FILL, LIGHT_BAND.base)).toBeLessThan(3);
+    // ...so the 2px rim carries it, on BOTH sides.
+    const RIM_LIGHT = hexToRgb('#FFFFFF'); // --hero-cta-rim -> --hero-wash-ink -> --accent-ink
+    expect(contrast(RIM_LIGHT, LIGHT_FILL)).toBeGreaterThanOrEqual(3);
+    expect(contrast(RIM_LIGHT, LIGHT_BAND.base)).toBeGreaterThanOrEqual(3);
+    expect(GRID).toContain('border: 2px solid var(--hero-cta-rim) !important;');
+    expect(STYLE).toContain('--hero-cta-rim:        var(--hero-wash-ink);');
+    // Dark's rim is decorative BECAUSE its fill is not — keep them from being
+    // "unified" by a later cleanup that does not know why they differ.
+    expect(STYLE).toContain('--hero-cta-rim:        var(--hero-wash-line);');
+  });
+
+  it('stays distinguishable from the sixteen neutral tool-card buttons', () => {
+    // The whole point of one primary among sixteen neutrals. #001F2C — the
+    // fill a 3:1-on-the-fill rule produces — measured 1.11:1 here and read as
+    // just another dark button.
+    expect(contrast(LIGHT_FILL, hexToRgb('#0C111D'))).toBeGreaterThan(1.5);
   });
 
   it('is AA for its label, which is the site’s own theme-inverting CTA ink', () => {
@@ -321,8 +347,11 @@ describe('the hero CTA is the band, stepped away from itself', () => {
       .toBeGreaterThan(contrast(hexToRgb('#FFFFFF'), LIGHT_FILL));
     expect(contrast(hexToRgb('#0C111D'), DARK_HOVER))
       .toBeGreaterThan(contrast(hexToRgb('#0C111D'), DARK_FILL));
-    // ...and both hover states still clear 3:1 on their own band.
-    expect(contrast(LIGHT_HOVER, LIGHT_BAND.base)).toBeGreaterThanOrEqual(3);
+    // ...and each hover moves FURTHER from its own band than the resting fill
+    // is. (Light's fill is not required to clear 3:1 — see the rim test above;
+    // dark's is, and still does on hover.)
+    expect(contrast(LIGHT_HOVER, LIGHT_BAND.base))
+      .toBeGreaterThan(contrast(LIGHT_FILL, LIGHT_BAND.base));
     expect(contrast(DARK_HOVER, DARK_BAND.sky)).toBeGreaterThanOrEqual(3);
   });
 
