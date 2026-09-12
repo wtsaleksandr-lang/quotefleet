@@ -16,6 +16,7 @@
  * A free tenant is never 500'd — it just gets the badged version.
  */
 import PDFDocument from 'pdfkit';
+import { formatDocketNumber } from './directory/docketNumber.js';
 
 /** A single customer-facing pricing line (already margin-folded upstream via
  *  customerFacingLines — this module never sees a raw margin row). */
@@ -183,7 +184,7 @@ export function buildQuotePdf(input: QuotePdfInput): Promise<QuotePdfResult> {
     leftY = doc.y;
   }
   const regLine = [
-    input.carrier.mcNumber ? `MC ${input.carrier.mcNumber}` : '',
+    formatDocketNumber(input.carrier.mcNumber) ?? '',
     input.carrier.dotNumber ? `US DOT ${input.carrier.dotNumber}` : '',
   ].filter(Boolean).join('  ·  ');
   if (regLine) {

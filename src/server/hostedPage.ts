@@ -28,6 +28,7 @@ import type {
   HostedBackground,
 } from '../db/schema.js';
 import { resolveWidgetTheme } from './widgetThemes.js';
+import { formatDocketNumber } from './directory/docketNumber.js';
 
 type HostedTenant = Pick<Tenant, 'name' | 'slug' | 'dotNumber' | 'mcNumber'>;
 type HostedBrand = Pick<
@@ -287,7 +288,11 @@ export function computeTrustBadges(
   if (!enabled) return [];
   const badges: string[] = [];
   if (tenant.dotNumber && tenant.dotNumber.trim()) badges.push(`USDOT ${tenant.dotNumber.trim()}`);
-  if (tenant.mcNumber && tenant.mcNumber.trim()) badges.push(`MC ${tenant.mcNumber.trim()}`);
+  // Claiming a directory profile copies carrier_directory.mc_number into
+  // tenants.mc_number, prefix and all ("MC012892"), so this badge must format
+  // rather than prepend — see docketNumber.ts.
+  const mc = formatDocketNumber(tenant.mcNumber);
+  if (mc) badges.push(mc);
   if (badges.length) badges.push('Insured');
   return badges;
 }

@@ -20,6 +20,7 @@ import {
   type CarrierOverrideRow,
 } from '../../db/schema.js';
 import { CONTAINER_PORTS, PORT_GROUPS, portFilterCodes, portGroupForMemberCode, isKnownPortCode } from './containerPorts.js';
+import { formatDocketNumber } from './docketNumber.js';
 import type { CarrierSafety } from './safetyData.js';
 import type { CarrierCredentials } from './carrierCredentials.js';
 
@@ -2677,10 +2678,13 @@ function heroLocation(r: typeof carrierDirectory.$inferSelect): { locLabel: stri
  * directory, so they are safe to surface here.
  */
 export function heroCarrierCard(r: typeof carrierDirectory.$inferSelect): HeroCarrierCard {
-  // Mirror the directory's own id rendering (`MC ${mcNumber}`) — mcNumber is
-  // stored as the bare docket number, prefixed with "MC " for display.
-  const mc = String(r.mcNumber ?? '').trim();
-  const ids = mc ? `USDOT ${r.usdot} · MC ${mc}` : `USDOT ${r.usdot}`;
+  // Mirror the directory's own id rendering via the shared formatter. mcNumber
+  // is stored VERBATIM as the L&I feed supplies it — already prefixed
+  // ("MC012892", and "FF…" for the freight forwarders in the table) — so the
+  // prefix must never be prepended here a second time. formatDocketNumber owns
+  // that rule for every render site; see docketNumber.ts.
+  const mc = formatDocketNumber(r.mcNumber);
+  const ids = mc ? `USDOT ${r.usdot} · ${mc}` : `USDOT ${r.usdot}`;
   const { locLabel, locValue } = heroLocation(r);
   return {
     slug: r.publicSlug,

@@ -46,6 +46,7 @@ import { sql } from 'drizzle-orm';
 import { db } from '../../db/client.js';
 import { carrierDirectory, type CarrierDirectoryRow } from '../../db/schema.js';
 import { nearestPortForZip, nearestCaPortForProvince } from './containerPorts.js';
+import { canonicalDocketNumber } from './docketNumber.js';
 import { US_STATE_CODES } from './usStates.js';
 import { CA_PROVINCE_CODES } from './caProvinces.js';
 import { MX_STATE_CODES } from './mxStates.js';
@@ -304,9 +305,22 @@ export function normalizeDot(v: unknown): string | null {
   return digits.length ? digits : null;
 }
 
-/** MC/docket number verbatim (e.g. "MC012892"), trimmed. */
+/**
+ * MC/docket number in its canonical STORED form (e.g. "MC012892") — the feed's
+ * own registry prefix preserved and upper-cased, separators and surrounding
+ * whitespace removed. The L&I feed already supplies the prefix, so this is a
+ * no-op for the rows currently in the table; it exists so a future feed-format
+ * drift ("mc-12892", " MC 12892 ") cannot introduce a second storage shape.
+ *
+ * The prefix is deliberately KEPT, not stripped to bare digits: FMCSA issues
+ * several docket registries (MC motor carrier, FF freight forwarder, MX
+ * Mexican carrier) and the directory holds FF rows, so dropping it would
+ * silently relabel a freight forwarder as a motor carrier. Display prefixing
+ * is `formatDocketNumber` (docketNumber.ts); search normalization to bare
+ * digits is `normalizeMcQuery` (queries.ts).
+ */
 export function normalizeMc(v: unknown): string | null {
-  return cleanStr(v);
+  return canonicalDocketNumber(v);
 }
 
 /** Keep a phone only if it has ≥10 digits; store the digit string. */

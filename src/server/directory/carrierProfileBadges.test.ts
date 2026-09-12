@@ -248,7 +248,9 @@ describe('renderCarrierProfile — DrayLocator-structured header', () => {
     expect(sub).toContain('<svg class="dir-ico"'); // the pin
     const badges = html.slice(html.indexOf('class="cp-hbadges"'));
     const dot = badges.indexOf('USDOT 107080');
-    const mc = badges.indexOf('MC MC012892');
+    // "MC 012892", never "MC MC012892" — the stored value already carries the
+    // prefix, so the badge adds none. See docketNumber.ts.
+    const mc = badges.indexOf('MC 012892');
     expect(dot).toBeGreaterThan(-1);
     expect(mc).toBeGreaterThan(dot);
     // Fleet figures are badges too, and they are the stored FMCSA values.
