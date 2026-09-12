@@ -1871,6 +1871,14 @@ export const DIRECTORY_CSS = `
   .site-footer .dirfoot-head {
     margin: 0 0 8px;
     text-align: left;
+    /* NO ORPHANED WORD — the same no-orphan rule the legal line below and the
+       .cp-crosslinks grid above already obey. At 320px "For Carriers &
+       Brokers" broke ["For Carriers &" 103.2px | "Brokers" 51.6px], stranding
+       one word on its own line; both halves fit the 136px track, so balance
+       simply redistributes them. Declared on the SELECTOR, not on the one
+       heading that wraps today, so a longer column label added to
+       FOOTER_COLUMNS inherits the fix instead of re-reporting the bug. */
+    text-wrap: balance;
     font-family: var(--font-mono);
     font-size: 11px;
     letter-spacing: 0.12em;
@@ -2377,6 +2385,34 @@ export const DIRECTORY_CSS = `
     /* The tile takes its own line: beside the body it left ~250px for a CTA
        whose label does not break, which pushed the page 10px wider than 375. */
     .cp-claimcard { flex-direction: column; gap: 12px; }
+    /* ...AND THE BODY HAS TO STRETCH TO THAT LINE, NOT SHRINK-TO-FIT IT.
+       Turning the card into a COLUMN makes the cross axis HORIZONTAL, so the
+       "align-items: flex-start" declared on .cp-claimcard for the desktop ROW
+       now sizes each item to fit-content in WIDTH — and fit-content is floored
+       by min-content. The body's min-content is the CTA's: .btn is
+       "white-space: nowrap", so at 320px that floor measured 289.547px inside
+       a 282px content box. The column hung 4.5px past the viewport, clipping
+       every line of copy at the screen edge, putting the CTA out of reach and
+       taking the page to 325px of scroll.
+       "min-width: 0" on the body (set above) CANNOT fix this and never could:
+       used width is clamp(fit-content, min-width, max-width) and 289.547 > 0,
+       so a floor of 0 never binds. min-width: 0 only frees an item being
+       SHRUNK along the MAIN axis — which is the desktop row, where it is still
+       doing real work and stays.
+       Two declarations close it. Stretch the body to the card's content box,
+       and let the CTA's label wrap so its own min-content stops being the
+       whole unbroken string — the identical treatment .cp-gated .btn above
+       already gets, for the identical reason. */
+    .cp-claimcard-body { align-self: stretch; }
+    /* display: block, not the inherited inline-flex, is what keeps the trailing
+       arrow ATTACHED to the label once the label wraps. Under flex the arrow is
+       its own flex item, so a two-line label leaves it stranded at the button's
+       right edge on neither line — visible at 320px, where "…free, forever"
+       breaks. As one inline flow the arrow simply follows the last word and
+       text-align centres both. The 4px margin replaces the flex gap the block
+       context drops: markup word-space (~4px) + 4px = the 8px .btn had. */
+    .cp-claimcard .btn { display: block; width: 100%; white-space: normal; text-align: center; line-height: 1.3; }
+    .cp-claimcard .btn .arr { margin-left: 4px; }
     /* NO ORPHANED PILL. Seven header badges flow-wrapped to 3 + 3 + 1 at 375px,
        stranding "MC ..." alone on the last line. A 2-track grid cannot strand
        one: when the COUNT is odd the first pill spans both tracks, so every
