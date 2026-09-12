@@ -996,7 +996,7 @@ html[data-theme="light"] .nav-dd-panel { box-shadow: var(--qf-shadow-md); }
 .premium-footer .qf-pm { color: var(--footer-ink); fill: currentColor; }
 
 /* ── The footer track ladder, keyed on the count the markup declares ─────
-   qf-footer-ladder: columns=5 wide=5 mid=3 phone=2 span-last=yes
+   qf-footer-ladder: columns=5 wide=5 mid=3 phone=1 span-last=no
 
    siteChrome.ts builds the columns from FOOTER_COLUMNS and writes their COUNT
    into `data-cols` (plus `data-cols-odd` when the count is odd), and
@@ -1229,7 +1229,12 @@ body:has(#site-burger[aria-expanded="true"]) .qf-mc-fab { display: none; }
 .premium-footer .qf-footer-payrow { max-width: var(--container-max); }
 
 @media (max-width: 640px) {
-  .premium-footer { padding: var(--space-3) var(--container-gutter) var(--space-3); }
+  /* 16px side gutters on phones, not the 24px container gutter — which is what
+     the homepage and the directory footer already use at this width. Beyond
+     consistency it buys 16px of measure back: at 375px the carrier-marks note
+     was wrapping to one line more here than on the homepage purely because the
+     content box was 327px instead of 343px. */
+  .premium-footer { padding: var(--space-3) var(--space-2) var(--space-3); }
   .premium-footer-inner { gap: var(--space-1-5) var(--space-2); }
   .premium-footer .footer-brand { gap: var(--space-1); }
   .premium-footer .footer-brand .qf-footer-logo { height: 28px; }
@@ -1251,4 +1256,62 @@ body:has(#site-burger[aria-expanded="true"]) .qf-mc-fab { display: none; }
     column-gap: var(--space-2);
   }
   .premium-footer-inner[data-cols-odd] > .footer-col:last-child a { break-inside: avoid; }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   WAVE 5b — THE PHONE FOOTER STACKS, AND CLEARS THE CHAT LAUNCHER.
+
+   1. ONE COLUMN AT <=640px, not two. The ladder's phone step is now
+      `columns % 2 === 0 ? 2 : 1` (footerTrackLadder), so N=5 stacks. The
+      two-track step needed the FIFTH column pinned `grid-column: 1 / -1`, and
+      once the columns became collapsed disclosures that read as one lone
+      summary bar sitting under two tidy rows of two — the orphan shape the
+      no-orphan rule exists to prevent, even though the arithmetic was legal.
+      Stacking also makes every <summary> a full-width tap target instead of a
+      half-width one, which is the better phone control.
+
+      The older `[data-cols-odd]` span/pagination rules above are now INERT
+      rather than overridden: `phoneSpansLast` is false, so siteChrome.ts stops
+      emitting the attribute and nothing matches them. Left in place because
+      deleting mid-file renumbers the line-keyed guard baselines; they go with
+      the trust-bar rules in the next wave that regenerates them.
+
+   2. THE FOOTER CLEARS THE CHAT LAUNCHER. `.qf-mc-fab` is
+      `position: fixed; right: 12px; bottom: 12px; 56x56` at z-index 2147483000
+      in the page's ROOT stacking context, so at 375px — where the sub-bar's
+      claims run the full width — the last line rendered UNDER the button:
+      "Per-tenant dat[a isolation]" with the rest covered, on every page.
+
+      THE FOOTER MOVES, NOT THE BUTTON. The launcher's geometry is settled: a
+      bottom lift was removed from it after four separate content collisions,
+      and PR #555 measured this exact report on the directory listing and
+      proved the launcher was NOT the cause there. So the fix is clearance the
+      footer owns — 12 + 56 + 12 = 80px, the button's own footprint plus the
+      gap it already keeps, on the 8px ramp — plus the iOS home-indicator
+      inset, which is 0 on every other platform.
+   ═══════════════════════════════════════════════════════════════════════════ */
+@media (max-width: 640px) {
+  /* row-gap rides the SAME [data-cols="5"] selector, not a bare
+     `.premium-footer-inner`: the two-track rule it replaces (nav-unify.css:1020)
+     also sets `row-gap: 24px` at (0,2,0), so a (0,1,0) override lost and the
+     stack shipped with the two-track gutter — measured 24px between five
+     stacked summary bars, 80px of pure air. A stack's rows are adjacent
+     controls, not grid cells that need a gutter to read apart. */
+  .premium-footer-inner[data-cols="5"] {
+    grid-template-columns: repeat(1, minmax(0, 1fr));
+    row-gap: var(--space-0-5);
+  }
+  /* THE LAST COLUMN STOPS PAGINATING. Two rules gave it `columns: 2` so its
+     links filled the old full-bleed row: the [data-cols-odd] one (now inert —
+     the attribute is no longer emitted) AND this older attribute-free form at
+     nav-unify.css:792, which still matches. Measured with only the first
+     neutralised: LEGAL's single collapsed summary was balanced into the SECOND
+     of two CSS columns and rendered indented halfway across its row, reading
+     as a centred heading among four left-aligned ones. Matched at the same
+     (0,3,1) and declared later. */
+  .premium-footer-inner > .footer-col:last-child { columns: auto; }
+  .premium-footer .footer-brand { margin-bottom: var(--space-1); }
+}
+@media (max-width: 900px) {
+  .premium-footer { padding-bottom: calc(80px + env(safe-area-inset-bottom, 0px)); }
 }

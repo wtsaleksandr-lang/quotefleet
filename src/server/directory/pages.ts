@@ -2479,8 +2479,26 @@ export const DIRECTORY_CSS = `
      right edge. Stretch it back to the track. */
   .site-footer .dirfoot-col > .qf-fdisc { align-self: stretch; width: 100%; }
   .site-footer .footer-bottom .qf-foot-links a { margin-left: 8px; }
+  /* THE FOOTER CLEARS THE CHAT LAUNCHER. .qf-mc-fab (marketing-chat.js) is
+     position:fixed, 56x56 at right/bottom 12px, z-index 2147483000 in the
+     ROOT stacking context — so where the sub-bar's claims run the full width
+     the last line rendered UNDERNEATH it. 12 + 56 + 12 = 80px is the button's
+     own footprint plus the gap it already keeps, and the safe-area inset adds
+     the iOS home indicator (0 everywhere else).
+
+     THE FOOTER MOVES, NOT THE BUTTON: a bottom lift was removed from the
+     launcher after four content collisions, and PR #555 proved it was not the
+     cause of the directory-listing overlap. Declared HERE rather than in
+     style.css because this sheet loads last and the <=900px block above sets
+     padding-bottom: 32px, which would otherwise win. */
+  @media (max-width: 900px) {
+    .site-footer { padding-bottom: calc(80px + env(safe-area-inset-bottom, 0px)); }
+  }
   @media (max-width: 640px) {
-    .site-footer { margin-top: 16px; padding: 24px 16px 24px; }
+    .site-footer {
+      margin-top: 16px;
+      padding: 24px 16px calc(80px + env(safe-area-inset-bottom, 0px));
+    }
     .site-footer .dirfoot { gap: 12px 16px; }
     /* A collapsed column is a control — give it a real target to tap. */
     .site-footer .qf-fdisc-sum { min-height: 40px; padding: 8px 0; }

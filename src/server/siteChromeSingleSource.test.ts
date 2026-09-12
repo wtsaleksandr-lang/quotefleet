@@ -230,10 +230,17 @@ describe('the footer column count is derived, not written down twice', () => {
         expect(t, `N=${n} T=${t}`).toBeGreaterThanOrEqual(1);
         if (t > 1) expect(n % t, `N=${n} in ${t} tracks strands one`).not.toBe(1);
       }
-      // The phone step is always two tracks; an odd count pays for it by
-      // spanning the last column, which leaves an even number to wrap.
-      expect(l.phone).toBe(2);
-      expect((n - (l.phoneSpansLast ? 1 : 0)) % 2, `N=${n} phone remainder`).toBe(0);
+      // THE PHONE STEP TAKES TWO TRACKS ONLY WHEN TWO DIVIDE THE COUNT.
+      // It used to be two unconditionally, with an odd count paying for it by
+      // pinning its last column `1 / -1`. The arithmetic was legal, but once
+      // the columns became collapsed disclosures the spanned column read as
+      // one lone summary bar under two rows of two — the orphan SHAPE the rule
+      // exists to prevent. An odd count now stacks, which the law blesses
+      // without qualification (T=1 is a deliberate stack, never a remainder).
+      expect(l.phone).toBe(n % 2 === 0 ? 2 : 1);
+      expect(l.phone === 1 || n % l.phone === 0, `N=${n} phone remainder`).toBe(true);
+      // Nothing spans any more: two tracks are only used when they divide.
+      expect(l.phoneSpansLast, `N=${n} must not need a spanned column`).toBe(false);
     }
     // Worked examples: 4 cannot use three tracks (4 mod 3 === 1), 5 can.
     expect(footerTrackLadder(4).mid).toBe(2);

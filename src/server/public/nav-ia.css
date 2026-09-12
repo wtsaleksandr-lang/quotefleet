@@ -524,7 +524,7 @@ html body.qf-wft .premium-footer .qf-paymark,
 html body.qf-wft .premium-footer .qf-pm { color: var(--footer-ink) !important; fill: currentColor !important; }
 
 /* ── The footer track ladder, keyed on the count the markup declares ─────
-   qf-footer-ladder: columns=5 wide=5 mid=3 phone=2 span-last=yes
+   qf-footer-ladder: columns=5 wide=5 mid=3 phone=1 span-last=no
    Derived by footerTrackLadder(FOOTER_COLUMNS.length) in siteChrome.ts and
    re-checked against this sentinel by siteChromeSingleSource.test.ts. Same
    arithmetic, same numbers, same `data-cols` key as nav-unify.css — stated
@@ -707,4 +707,34 @@ html body.qf-wft .premium-footer .footer-bottom {
     column-gap: var(--space-2);
   }
   html body.qf-wft .premium-footer .premium-footer-inner[data-cols-odd] > .footer-col:last-child a { break-inside: avoid; }
+}
+
+/* ═══ WAVE 5b — the homepage's copy of the stacked, launcher-clearing footer.
+   Same two changes as the block at the foot of nav-unify.css, restated at
+   `html body.qf-wft` + !important because that is what the rules they replace
+   carry (nav-ia.css:541 declares the two-track phone grid !important, since
+   landing-conversion.css and landing-home-fixes.css each ship a phone footer
+   of their own). Numbers are the shared ones, not homepage taste. ═══ */
+@media (max-width: 640px) {
+  html body.qf-wft .premium-footer .premium-footer-inner[data-cols="5"] {
+    grid-template-columns: repeat(1, minmax(0, 1fr)) !important;
+    row-gap: var(--space-0-5) !important;
+  }
+  /* Same correction as nav-unify.css: the attribute-free `columns: 2` rule at
+     nav-ia.css:306 still matches now that [data-cols-odd] is gone, and it
+     pushed LEGAL's collapsed summary into a second CSS column. */
+  html body.qf-wft .premium-footer .premium-footer-inner > .footer-col:last-child {
+    columns: auto !important;
+  }
+  html body.qf-wft .premium-footer .footer-brand { margin-bottom: var(--space-1); }
+}
+@media (max-width: 900px) {
+  /* !important because landing-home-fixes.css:517 reaches this element as
+     `body.qf-wft.landing-v2 .premium-footer` — (0,3,1), which outranks this
+     sheet's `html body.qf-wft .premium-footer` at (0,2,2). Measured without
+     it: 54px of top padding on the homepage footer where 24 was declared. */
+  html body.qf-wft .premium-footer {
+    padding-top: var(--space-3) !important;
+    padding-bottom: calc(80px + env(safe-area-inset-bottom, 0px)) !important;
+  }
 }

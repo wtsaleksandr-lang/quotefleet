@@ -536,12 +536,20 @@ describe('NO FOOTER ROW EVER HOLDS ONE COLUMN — every variant, 320→1600px', 
   /* THE OWNER'S ASK, PINNED. "I don't like that footer it is 1 long stacked
      column in a mobile view. optimize it. make 2 columns." Every variant, at
      the reference phone width, with the remainder still zero. */
-  it('is TWO columns at 375px — the reference phone width — with no orphaned row', () => {
+  it('divides evenly at 375px — the reference phone width — with no orphaned row', () => {
+    // NOT "is two columns" any more. The phone step is
+    // `columns % 2 === 0 ? 2 : 1` (footerTrackLadder), so the track count is a
+    // function of the surface's own column count rather than one number for
+    // all of them: the five-column marketing footer stacks and the
+    // four-column directory footer goes 2×2. What every surface still owes is
+    // this — whatever T it takes, the columns must divide into it with nothing
+    // left over, which is the property the whole file is about.
     for (const surface of FOOTER_SURFACES) {
       const sheets = surface.sheets as unknown as Array<[string, string]>;
       const t = winnerAt(collect(sheets, surface.sel), 375).tracks;
-      expect(t, `${surface.name} at 375px`).toBe(2);
-      const wrapping = surface.cols() - spannedAt(sheets, 375);
+      const n = surface.cols();
+      expect(t, `${surface.name} at 375px`).toBe(n % 2 === 0 ? 2 : 1);
+      const wrapping = n - spannedAt(sheets, 375);
       expect(wrapping % t, `${surface.name}: ${wrapping} wrapping columns in ${t} tracks`).toBe(0);
     }
   });
@@ -567,18 +575,31 @@ describe('NO FOOTER ROW EVER HOLDS ONE COLUMN — every variant, 320→1600px', 
     expect(bad).toEqual([]);
   });
 
-  it('steps the ladder 5 → 3 → 2 for the five-column footer, on BOTH surfaces', () => {
+  it('steps the ladder 5 → 3 → 1 for the five-column footer, on BOTH surfaces', () => {
     for (const surface of FOOTER_SURFACES.filter((s) => s.cols() === 5)) {
       const sheets = surface.sheets as unknown as Array<[string, string]>;
       const decls = collect(sheets, surface.sel);
       const at = (w: number) => winnerAt(decls, w).tracks;
       expect([at(1600), at(1101)], `${surface.name} wide`).toEqual([5, 5]);
       expect([at(1100), at(641)], `${surface.name} mid`).toEqual([3, 3]);
-      // The phone step is TWO, not the old full-bleed stack. It is only legal
-      // because the last link column is pinned `1 / -1` there, leaving four
-      // columns to wrap into two tracks with nothing left over.
-      expect([at(640), at(320)], `${surface.name} phone`).toEqual([2, 2]);
-      expect([spannedAt(sheets, 640), spannedAt(sheets, 320)], `${surface.name} spanned`).toEqual([1, 1]);
+      // THE PHONE STEP IS A STACK AGAIN (2026-09), and this time on purpose
+      // rather than by default. It was two tracks with the fifth column pinned
+      // `1 / -1` — arithmetically orphan-free, because four columns wrap into
+      // two with no remainder. But once every column became a collapsed
+      // <details>, that full-bleed row stopped being "a two-up block of links
+      // that owns its row" and became one lone summary bar sitting under two
+      // tidy rows of two: the orphan SHAPE, reached by a legal route.
+      //
+      // T=1 is blessed unconditionally by the same rule ("a deliberate full
+      // stack rather than a wrap remainder"), it needs no spanned column to be
+      // legal, and it gives every <summary> a full-width tap target. So the
+      // ladder's phone step is now `columns % 2 === 0 ? 2 : 1` — arithmetic,
+      // not an exception: N=5 stacks here and the directory's N=4 still gets a
+      // true 2×2 below.
+      expect([at(640), at(320)], `${surface.name} phone`).toEqual([1, 1]);
+      // NOTHING SPANS, at any width. `phoneSpansLast` is false, so siteChrome
+      // stops emitting `data-cols-odd` and the old span rules match nothing.
+      expect(PREMIUM_FOOTER, 'the span hook must be gone from the markup').not.toContain('data-cols-odd');
       expect(spannedAt(sheets, 641), `${surface.name} does NOT span above the phone step`).toBe(0);
     }
   });
@@ -931,9 +952,13 @@ describe('no nav control breaks its label across two lines', () => {
    ═══════════════════════════════════════════════════════════════════════════ */
 
 describe('the footer states a trust claim ONCE, in one strip', () => {
-  /** Claims the retired `.qf-footer-trustbar` used to carry. */
+  /**
+   * Claims the retired `.qf-footer-trustbar` carried that had to SURVIVE the
+   * merge. "SSL/TLS encrypted" is deliberately NOT here: Alex dropped it
+   * (2026-09) as table stakes in 2026 — the only claim removed for weakness
+   * rather than duplication, and asserted absent below so it cannot drift back.
+   */
   const RETIRED_BAR_CLAIMS = [
-    'SSL/TLS encrypted',
     'GDPR &amp; CCPA-ready',
     'Per-tenant data isolation',
   ];
@@ -978,17 +1003,77 @@ describe('the footer states a trust claim ONCE, in one strip', () => {
     }
   });
 
+  it('dropped SSL/TLS encrypted, and it must not drift back', () => {
+    // Table stakes in 2026 — every site the reader has opened has it — so it
+    // spent a line of the strip saying nothing that distinguishes us.
+    for (const [name, html] of [
+      ['PREMIUM_FOOTER', PREMIUM_FOOTER],
+      ['landing.html', LANDING_HTML],
+      ['.dirfoot', DIRECTORY_PAGES_TS],
+    ] as const) {
+      expect(html, name).not.toContain('SSL/TLS');
+    }
+  });
+
+  it('splits the claims into two grouped runs, not one crawl', () => {
+    // Five claims end to end read as one undifferentiated line. They are two
+    // kinds of promise: what happens when you PAY (beside the marks and the
+    // processor line, same subject) and what the product does with your DATA.
+    const pay = PREMIUM_FOOTER.match(/<ul class="qf-payrow-trust"[\s\S]*?<\/ul>/)?.[0] ?? '';
+    const platform = PREMIUM_FOOTER.match(/<ul class="qf-payrow-platform"[\s\S]*?<\/ul>/)?.[0] ?? '';
+    expect((pay.match(/<li>/g) ?? []).length, 'payment claims').toBe(3);
+    expect((platform.match(/<li>/g) ?? []).length, 'platform claims').toBe(2);
+    for (const c of ['Card details never touch our servers', 'No credit card to start', 'Cancel anytime']) {
+      expect(pay, c).toContain(c);
+    }
+    for (const c of RETIRED_BAR_CLAIMS) expect(platform, c).toContain(c);
+    // The runs are PEERS: same treatment, separated by a gap rather than by a
+    // rule, a bullet or a weight change.
+    expect(PREMIUM_FOOTER.indexOf('qf-payrow-trust')).toBeLessThan(
+      PREMIUM_FOOTER.indexOf('qf-payrow-platform'),
+    );
+  });
+
   it('needs no track ladder, because the claims are text and not tiles', () => {
     // The claims reflow inline with a `·` between them. An item that wraps is
     // a word wrapping inside a sentence, not a tile stranded on a row — so no
     // sheet should be opening a grid for them, and none should be re-deriving
     // the retired 4 → 2 ladder either.
-    expect(STYLE_CSS).toMatch(/\.qf-payrow-trust \{\s*display: block/);
-    expect(STYLE_CSS).toMatch(/\.qf-payrow-trust li \{ display: inline; \}/);
-    expect(STYLE_CSS).toMatch(/\.qf-payrow-trust li \+ li::before \{\s*content: "·";/);
+    for (const cls of ['.qf-payrow-trust', '.qf-payrow-platform']) {
+      const esc = cls.replace('.', '\\.');
+      expect(STYLE_CSS, cls).toMatch(new RegExp(`${esc} \\{[\\s\\S]{0,200}?display: block`));
+      expect(STYLE_CSS, cls).toMatch(new RegExp(`${esc} li \\{ display: inline; \\}`));
+      expect(STYLE_CSS, cls).toMatch(new RegExp(`${esc} li \\+ li::before \\{\\s*content: "·";`));
+      for (const [name, css] of NAV_SHEETS) {
+        const rules = css.replace(/\/\*[\s\S]*?\*\//g, '');
+        expect(rules, `${name} must not restyle ${cls}`).not.toContain(cls);
+      }
+    }
+  });
+
+  it('keeps the footer clear of the fixed chat launcher', () => {
+    // `.qf-mc-fab` is position:fixed, 56x56 at right/bottom 12px, z-index
+    // 2147483000 in the ROOT stacking context — so at 375px, where the
+    // sub-bar's claims run the full width, the last line rendered UNDER it.
+    // The footer owns the clearance; the launcher does not move (a bottom lift
+    // was removed from it after four content collisions, and PR #555 proved it
+    // was not the cause of the directory-listing overlap).
+    const CLEAR = /padding-bottom: calc\(80px \+ env\(safe-area-inset-bottom, 0px\)\)/;
+    expect(NAV_UNIFY_CSS, 'marketing footer clearance').toMatch(CLEAR);
+    expect(NAV_IA_CSS, 'homepage footer clearance').toMatch(CLEAR);
+    // The directory declares it in DIRECTORY_CSS, which loads last and would
+    // otherwise re-win with its own padding shorthand.
+    expect(DIRECTORY_CSS, 'directory footer clearance')
+      .toMatch(/calc\(80px \+ env\(safe-area-inset-bottom, 0px\)\)/);
+    // And nobody "fixed" it by MOVING the launcher. Scoped to geometry: the
+    // sheets legitimately stand the launcher down while the mobile drawer is
+    // open (`body:has(#site-burger[aria-expanded="true"]) .qf-mc-fab`), which
+    // is a visibility rule for a different collision, not a reposition.
     for (const [name, css] of NAV_SHEETS) {
-      const rules = css.replace(/\/\*[\s\S]*?\*\//g, '');
-      expect(rules, `${name} must not restyle the shared trust strip`).not.toContain('.qf-payrow-trust');
+      for (const block of css.matchAll(/\.qf-mc-fab[^{]*\{([^}]*)\}/g)) {
+        expect(block[1], `${name} must not move or resize the launcher`)
+          .not.toMatch(/\b(bottom|right|top|left|position|transform|width|height|margin)\s*:/);
+      }
     }
   });
 });

@@ -336,18 +336,34 @@ export function authSiteHeader(link: AuthChromeLink): string {
  * two of the trust bar's claims were already being made right here. "Payments
  * secured by Stripe" sat directly above "Powered by Stripe" AND "Card details
  * never touch our servers": one fact, three sentences, two strips. So the
- * duplicate was DELETED (not restyled) and the trust bar's three remaining,
- * non-overlapping claims — SSL/TLS, GDPR & CCPA, per-tenant isolation — moved
- * into this list, which is now the single place a trust claim may live.
+ * duplicate was DELETED (not restyled) and the trust bar's remaining
+ * non-overlapping claims moved into this strip, which is now the single place
+ * a trust claim may live.
  *
  * THE PER-CLAIM ICONS WENT WITH IT. Six 15px glyphs bought nothing a reader
  * could not get from the words, and each one forced its claim to be an
  * inline-flex BLOCK that wrapped as a unit — which is what made three claims
  * need their own stacked line on phones. As plain list items with a CSS `·`
- * separator the claims reflow as ordinary text, so six of them occupy the
- * space the old three did and no claim can be orphaned onto a line alone.
- * NOTHING WAS ADDED: every claim below was already rendered somewhere in the
- * old footer, and each remains backed by the repo evidence catalogued above.
+ * separator the claims reflow as ordinary text, so no claim can be orphaned
+ * onto a line alone. NOTHING WAS ADDED: every claim below was already rendered
+ * somewhere in the old footer, and each remains backed by the repo evidence
+ * catalogued above.
+ *
+ * "SSL/TLS ENCRYPTED" WAS DROPPED (Alex, 2026-09). It was true, but transport
+ * encryption is table stakes in 2026 — every site the reader has ever opened
+ * has it — so it spent a line of the strip saying nothing that distinguishes
+ * us. It is the only claim removed for weakness rather than duplication.
+ *
+ * TWO SHORT RUNS, NOT ONE LONG ONE. Five claims joined by middots read as an
+ * undifferentiated crawl: the reader has to parse the whole line to find the
+ * one fact they wanted. They are two DIFFERENT KINDS of promise, so they are
+ * two lists:
+ *   • `.qf-payrow-trust` — what happens when you pay. It belongs beside the
+ *     marks and "Powered by Stripe" because it is the same subject.
+ *   • `.qf-payrow-platform` — what the product does with your data once you
+ *     are in. Nothing to do with checkout, so it sits apart.
+ * Two runs of three and two scan in one glance at 375px; one run of five did
+ * not. No claim was reworded to fit the grouping.
  *
  * STYLING — monochrome by design: the marks inherit `currentColor` from
  * `--ink`, which is near-white on the dark theme and deep navy on light, so
@@ -388,7 +404,8 @@ export const FOOTER_PAY_ROW = `<div class="qf-footer-payrow">`
   + `<li>Card details never touch our servers</li>`
   + `<li>No credit card to start</li>`
   + `<li>Cancel anytime — no contracts</li>`
-  + `<li>SSL/TLS encrypted</li>`
+  + `</ul>`
+  + `<ul class="qf-payrow-platform" role="list">`
   + `<li>GDPR &amp; CCPA-ready</li>`
   + `<li>Per-tenant data isolation</li>`
   + `</ul></div>`;
@@ -621,14 +638,33 @@ export interface FooterTrackLadder {
  * Each band therefore takes the WIDEST legal track count it can afford:
  *   • wide  — one row, so T = N (N mod N is 0 for every N ≥ 1).
  *   • mid   — at most three tracks, stepping down until `N mod T !== 1`.
- *   • phone — two tracks (Alex, 2026-09: "make 2 columns"), which for an ODD N
- *             is only legal with the last column spanning both, leaving an even
- *             number to wrap.
+ *   • phone — two tracks ONLY IF TWO DIVIDE THE COLUMNS EVENLY; an odd count
+ *             stacks instead.
  *
- * For today's N = 5 that yields 5 → 3 → 2-with-span, which is exactly what the
- * stylesheets declare. Change `FOOTER_COLUMNS` and this function immediately
- * reports different numbers; siteChromeSingleSource.test.ts then fails naming
- * the sheets that still declare the old ones.
+ * THE PHONE STEP CHANGED IN 2026-09, AND THE OLD ONE IS WHY. It used to be two
+ * tracks unconditionally, and an odd N paid for that by pinning its LAST column
+ * `grid-column: 1 / -1`. The arithmetic was sound — four columns wrapping into
+ * two tracks leaves no remainder — but the RESULT was a footer that read 2 / 2
+ * / 1, with the fifth heading sitting alone on a full-width final row. The rule
+ * blesses a full-bleed row as "a row that holds one column because it was told
+ * to", and against five open link LISTS that was fair: the spanned column was
+ * visibly a two-up block of links, not a stranded item. Against five COLLAPSED
+ * disclosures it is one lone summary bar under two tidy rows of two, which is
+ * exactly the shape the no-orphan rule exists to prevent.
+ *
+ * So an odd count now takes T = 1, which the law above already blesses without
+ * qualification — a deliberate full stack, never a wrap remainder. On a phone
+ * that is also the better control: every <summary> becomes a full-width tap
+ * target instead of a half-width one.
+ *
+ * ONE RULE, BOTH FOOTERS. This is arithmetic, not a special case for the
+ * marketing footer: N=5 yields 5 → 3 → 1 (stack) and the directory's N=4 yields
+ * 4 → 2 → 2, because four genuinely does divide into two tracks with nothing
+ * left over. Neither footer needs a hand-written exception.
+ *
+ * Change `FOOTER_COLUMNS` and this function immediately reports different
+ * numbers; siteChromeSingleSource.test.ts then fails naming the sheets that
+ * still declare the old ones.
  */
 export function footerTrackLadder(columns: number): FooterTrackLadder {
   const widest = (max: number): number => {
@@ -639,8 +675,10 @@ export function footerTrackLadder(columns: number): FooterTrackLadder {
     columns,
     wide: widest(columns),
     mid: widest(3),
-    phone: 2,
-    phoneSpansLast: columns % 2 === 1,
+    phone: columns % 2 === 0 ? 2 : 1,
+    // Nothing spans any more: two tracks are used only when they divide the
+    // count evenly, so there is never a leftover column to pin full-bleed.
+    phoneSpansLast: false,
   };
 }
 
