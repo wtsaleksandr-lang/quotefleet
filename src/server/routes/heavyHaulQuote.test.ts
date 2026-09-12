@@ -31,6 +31,7 @@ import {
   type HeavyHaulApiRequest,
 } from './heavyHaulQuote.js';
 import { clearGeocodeCache } from '../../calc/heavyHaul/geocode.js';
+import { MILEAGE_TIERS } from '../../calc/heavyHaul/corridor.js';
 import type { DieselReading, LaneEndpoint } from '../../calc/heavyHaul/quote.js';
 import {
   SITE_NAV_HTML,
@@ -434,6 +435,18 @@ describe('the coverage endpoint', () => {
 
 describe('the page', () => {
   const html = renderHeavyHaulToolPage();
+  /**
+   * The page now ships the shared tool-page template's stylesheet, which
+   * DOCUMENTS in prose the two hex values the header band must not borrow and
+   * the `overflow: hidden` that kills a sticky descendant. Both are comments,
+   * not declarations, so the "must not appear" assertions below read the CSS
+   * with comments stripped — the discipline `toolPage.test.ts` states for the
+   * template itself. Two of these assertions also used to anchor their slice on
+   * `.hh-shell`, which the template owns now: with the anchor gone `indexOf`
+   * returned -1 and the slice was one character, so they passed on nothing.
+   */
+  const styleBlock = /<style>([\s\S]*?)<\/style>/.exec(html)?.[1] ?? '';
+  const cssDecls = styleBlock.replace(/\/\*[\s\S]*?\*\//g, '');
 
   it('serves with the database down and carries the shared chrome', async () => {
     clearGeocodeCache();
@@ -457,10 +470,14 @@ describe('the page', () => {
     expect(html).toMatch(/No margin is added, ever/);
   });
 
-  it('LEFT-ALIGNS the hero and puts the eyebrow top-left', () => {
-    expect(html).toMatch(/\.hh-hero \{[^}]*text-align: left/);
-    expect(html).toMatch(/\.hh-hero h1 \{[^}]*text-align: left/);
-    expect(html).toMatch(/\.hh-eyebrow \{[^}]*text-align: left/);
+  it('LEFT-ALIGNS the header band and puts the eyebrow top-left', () => {
+    // The hero is the template's header band now; the properties are asserted
+    // on the stylesheet the page actually ships.
+    expect(cssDecls).toMatch(/\.qtt-band h1 \{[^}]*text-align: left/);
+    expect(cssDecls).toMatch(/\.qtt-band p\.qtt-lead \{[^}]*text-align: left/);
+    expect(cssDecls).toMatch(/\.qtt-eyebrow \{[^}]*text-align: left/);
+    expect(html.indexOf('qtt-eyebrow')).toBeLessThan(html.indexOf('<h1>'));
+    expect(html.indexOf('qtt-crumbs')).toBeLessThan(html.indexOf('class="qtt-band"'));
   });
 
   it('puts input titles IN the field and stacks components at 2px', () => {
@@ -469,9 +486,18 @@ describe('the page', () => {
     expect(html).toMatch(/\.hh-row2 \{[^}]*gap: 2px/);
   });
 
-  it('draws a selected pill as an OUTLINE, never a bright fill', () => {
-    expect(html).toMatch(/\.hh-pill\[aria-pressed="true"\] \{[^}]*border-width: 2px/);
-    expect(html).toMatch(/\.hh-pill\[aria-pressed="true"\] \{[^}]*background: var\(--accent-soft\)/);
+  it('draws a selected pill as a COLOUR SWAP on a 2px border, so nothing reflows', () => {
+    // The border is 2px in EVERY state. It used to be 1px unselected and 2px
+    // selected, so picking a unit or a route class moved the pill's own label
+    // one pixel and nudged the rows under it. Selection now changes colour only.
+    expect(cssDecls).toMatch(/\.hh-pill \{[^}]*border: 2px solid var\(--border\)/);
+    const selected = /\.hh-pill\[aria-pressed="true"\] \{([^}]*)\}/.exec(cssDecls)?.[1] ?? '';
+    expect(selected).toMatch(/border-color: var\(--accent\)/);
+    expect(selected).toMatch(/background: var\(--accent-soft\)/);
+    // No geometry in the selected rule at all — no width, no padding, no margin.
+    expect(selected).not.toMatch(/border-width|padding|margin/);
+    // ...and an outline, never a bright fill.
+    expect(selected).not.toMatch(/background: var\(--accent-fill\)/);
   });
 
   // ── THE SHIPPER FORM ─────────────────────────────────────────────────
@@ -587,14 +613,71 @@ describe('the page', () => {
   });
 
   it('uses overflow: clip near the sticky column, never overflow: hidden', () => {
-    const css = html.slice(html.indexOf('.hh-shell'), html.indexOf('</style>'));
-    expect(css).not.toMatch(/overflow:\s*hidden/);
-    expect(css).toMatch(/overflow: clip/);
+    expect(cssDecls).not.toMatch(/overflow:\s*hidden/);
+    expect(cssDecls).toMatch(/overflow: clip/);
   });
 
   it('uses only design tokens — no raw hex anywhere in the page CSS', () => {
-    const css = html.slice(html.indexOf('.hh-shell'), html.indexOf('</style>'));
-    expect(css).not.toMatch(/#[0-9a-fA-F]{3,8}\b/);
+    expect(cssDecls.length).toBeGreaterThan(1000);
+    expect(cssDecls).not.toMatch(/#[0-9a-fA-F]{3,8}\b/);
+  });
+
+  it('renders the delivered figure with tabular figures and flat ink', () => {
+    for (const rule of [
+      /\.hh-tv \{[^}]*font-variant-numeric: tabular-nums/,
+      /\.hh-trange \{[^}]*font-variant-numeric: tabular-nums/,
+      /\.hh-kpiscore \{[^}]*font-variant-numeric: tabular-nums/,
+      /\.hh-tile \.v \{[^}]*font-variant-numeric: tabular-nums/,
+      /\.hh-lamt \{[^}]*font-variant-numeric: tabular-nums/,
+    ]) {
+      expect(cssDecls, String(rule)).toMatch(rule);
+    }
+    const tv = /\.hh-tv \{([^}]*)\}/.exec(cssDecls)?.[1] ?? '';
+    expect(tv).toContain('color: var(--ink)');
+    expect(tv).not.toContain('var(--accent)');
+  });
+
+  it('guards every animation behind prefers-reduced-motion', () => {
+    const withoutMotionQueries = cssDecls
+      .replace(/@media \(prefers-reduced-motion: no-preference\) \{[\s\S]*?\n  \}/g, '')
+      .replace(/@media \(prefers-reduced-motion: reduce\) \{[\s\S]*?\n  \}/g, '');
+    expect(withoutMotionQueries).not.toMatch(/^\s*transition:/m);
+    expect(cssDecls).toContain('@media (prefers-reduced-motion: reduce)');
+  });
+
+  it('answers a FAQ, emits FAQPage schema for exactly it, and asserts no state rule', () => {
+    const ld = [...html.matchAll(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/g)]
+      .map((m) => JSON.parse(m[1] as string) as Record<string, unknown>);
+    const faq = ld.find((o) => o['@type'] === 'FAQPage') as
+      | { mainEntity: Array<{ name: string; acceptedAnswer: { text: string } }> }
+      | undefined;
+    expect(faq, 'the page must emit FAQPage schema').toBeDefined();
+    const entities = faq!.mainEntity;
+    expect(entities.length).toBeGreaterThanOrEqual(4);
+    for (const q of entities) {
+      expect(q.acceptedAnswer.text.length).toBeGreaterThan(40);
+      const rendered = q.name
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+      expect(html, `FAQ question not rendered: ${q.name}`).toContain(rendered);
+    }
+    const folds = html.slice(html.indexOf('id="faq"')).match(/<details class="qh-fold"/g) ?? [];
+    expect(folds).toHaveLength(entities.length);
+
+    // THE HONESTY GUARD. Every answer is grounded in a constant or a measured
+    // figure in this repo. None of them may assert a jurisdiction's law, and
+    // Canada is a known corpus gap that must not be mentioned at all.
+    const text = entities.map((q) => `${q.name} ${q.acceptedAnswer.text}`).join(' ');
+    for (const banned of [/\bCanad(a|ian)\b/i, /\bprovinc/i, /\byou (?:will |must )?need a permit\b/i]) {
+      expect(text, `FAQ asserts an unsourced rule: ${String(banned)}`).not.toMatch(banned);
+    }
+    // ...and the mileage answer quotes the bands the corridor module records,
+    // rather than a number somebody liked the sound of.
+    expect(text).toContain(`±${MILEAGE_TIERS.routedPrimaryNetwork.totalBandPct}%`);
+    expect(text).toContain(`±${MILEAGE_TIERS.routedPrimaryNetwork.stateBandPct}%`);
   });
 
   it('scrolls a wide table inside its own box, never the document', () => {

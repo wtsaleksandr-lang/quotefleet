@@ -96,11 +96,16 @@ import { setPublicDirectoryCache } from '../directory/httpCache.js';
 import { stateByCode } from '../directory/usStates.js';
 import { FULL_SITE_HEADER, PREMIUM_FOOTER, HEADER_SCRIPTS, TOOL_PROMO_CTA } from '../siteChrome.js';
 import { requireAuth, requireSuperAdmin } from '../middleware.js';
+import { jsonLdBreadcrumb, jsonLdFaq } from '../osow/hubShell.js';
+import { factList, sectionHeader, toolPage } from '../tools/toolPage.js';
 import { OSOW_TOOL_PATH } from './osowPermits.js';
 
 const SITE = 'https://quotefleet.net';
 export const PILOT_CAR_PATH = '/pilot-cars';
 export const PILOT_CAR_JOIN_PATH = '/pilot-cars/join';
+
+/** Where the band's "embed this directory" affordance points today. */
+const EMBED_SURFACE = '/pricing';
 
 function esc(s: unknown): string {
   return String(s == null ? '' : s).replace(/[&<>"']/g, (m) =>
@@ -205,14 +210,17 @@ const PC_CSS = `
 
   /* ── Results. ─────────────────────────────────────────────────────────── */
   .pc-results { display: grid; gap: 16px; }
-  .pc-count { margin: 0; font-size: 13px; color: var(--muted); font-family: var(--font-mono); }
+  /* Tabular figures on everything that is a COUNT the filter recomputes — the
+     result count changes on every filter change, and proportional digits move
+     the words beside them as it does. */
+  .pc-count { margin: 0; font-size: 13px; color: var(--muted); font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
   .pc-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 16px; }
   .pc-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 16px; display: flex; flex-direction: column; gap: 8px; }
   .pc-card h3 { font-size: 16px; margin: 0; color: var(--ink); text-align: left; }
   .pc-card h3 a { color: inherit; text-decoration: none; }
   .pc-card h3 a:hover, .pc-card h3 a:focus-visible { text-decoration: underline; }
   .pc-card p { margin: 0; font-size: 13px; line-height: 1.55; color: var(--ink-soft); }
-  .pc-meta { color: var(--muted); font-size: 12px; font-family: var(--font-mono); }
+  .pc-meta { color: var(--muted); font-size: 12px; font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
 
   /* PILLS ARE OUTLINE, NEVER A BRIGHT FILL, and a pill never wraps in half. The
      groups below are laid out so a run never strands one pill alone on a line —
@@ -241,6 +249,10 @@ const PC_CSS = `
   .pc-sec { margin: 28px 0 0; }
   .pc-sec h2 { font-size: 20px; margin: 0 0 4px; color: var(--ink); text-align: left; }
   .pc-sec p.pc-sub { margin: 0 0 12px; color: var(--muted); font-size: 14px; line-height: 1.55; max-width: 780px; }
+  /* The caveat under the certification table. On the 8px ramp, and a class
+     rather than a style attribute so it is a token-only declaration. */
+  p.pc-sub--after { margin: 12px 0 0; color: var(--muted); font-size: 14px; line-height: 1.55; max-width: 780px; }
+  p.pc-sub--after strong { color: var(--ink); }
 
   /* The state certification reference table. Scrolls INSIDE its own box at
      narrow widths — the wrapper is what scrolls, so document.scrollWidth never
@@ -261,11 +273,19 @@ const PC_CSS = `
 
   .pc-link { color: var(--accent); font-size: 13px; overflow-wrap: anywhere; }
 
-  /* Foldable prose — keeps the page concise without losing content. */
+  /* Foldable prose — keeps the page concise without losing content. Still used
+     by the profile, join and manage pages, which keep this file's own shell;
+     the INDEX has moved to the tool-page template and states both halves of the
+     honesty rule uncollapsed instead. */
   details.qt-fold { margin: 8px 0 16px; }
   details.qt-fold > summary { cursor: pointer; color: var(--accent); font-size: 13px; list-style: none; display: inline-flex; align-items: center; gap: 4px; }
   details.qt-fold > summary::-webkit-details-marker { display: none; }
-  details.qt-fold > summary::before { content: '▸'; transition: transform .2s; }
+  details.qt-fold > summary::before { content: '▸'; }
+  /* Declared inside the no-preference query rather than outside one, so a
+     reader who has asked for less motion never has it applied at all. */
+  @media (prefers-reduced-motion: no-preference) {
+    details.qt-fold > summary::before { transition: transform .2s; }
+  }
   details.qt-fold[open] > summary::before { transform: rotate(90deg); }
   details.qt-fold > .qt-fold-body { padding: 8px 0 0; color: var(--muted); font-size: 14px; line-height: 1.5; }
 
@@ -538,6 +558,32 @@ function emptyState(f: OperatorFilters): string {
   </div>`;
 }
 
+/**
+ * THE CERTIFICATION CORPUS, COUNTED — every figure the index quotes about
+ * reciprocity comes from here rather than from a sentence someone typed.
+ *
+ * Recomputed at render time from `PILOT_CAR_CERTIFICATION`, so the numbers in
+ * the FAQ and the alternating rows cannot go stale the day a state is added.
+ */
+function certificationCounts() {
+  const has = (c: string) => PILOT_CAR_CERTIFICATION[c];
+  const known = PILOT_CAR_STATE_CODES.filter((c) => has(c)?.requirement !== 'unknown');
+  const inbound = PILOT_CAR_STATE_CODES.filter((c) => has(c)?.inboundPublished);
+  return {
+    tracked: PILOT_CAR_STATE_CODES.length,
+    known: known.length,
+    unknown: PILOT_CAR_STATE_CODES.length - known.length,
+    /** States that publish WHOSE certificates they accept. */
+    inboundPublished: inbound.length,
+    /** Of those, the ones whose published list is EMPTY — New York accepts nobody. */
+    inboundEmpty: inbound.filter((c) => (has(c)?.acceptsCertificationFrom ?? []).length === 0).length,
+    /** States that publish who accepts THEIRS. Almost none do. */
+    outboundPublished: PILOT_CAR_STATE_CODES.filter((c) => has(c)?.outboundPublished).length,
+    certifies: statesRequiringCertification().length,
+    disputed: PILOT_CAR_STATE_CODES.filter((c) => has(c)?.requirement === 'disputed').length,
+  };
+}
+
 /** The certification reference table — compiled data, so it renders DB or no DB. */
 function certificationReference(): string {
   const rows = PILOT_CAR_STATE_CODES.filter((c) => PILOT_CAR_CERTIFICATION[c]?.requirement !== 'unknown')
@@ -564,16 +610,24 @@ function certificationReference(): string {
   const unknowns = PILOT_CAR_STATE_CODES.filter(
     (c) => PILOT_CAR_CERTIFICATION[c]?.requirement === 'unknown',
   );
-  return `<section class="pc-sec">
-    <h2>Which states certify pilot-car operators</h2>
-    <p class="pc-sub">Compiled from the same cited state sources the permit calculator reads, and shown here because it is the fact that decides whether the operator you are about to call can legally take the job. Where a state's own pages contradict each other, this says so rather than picking one.</p>
+  /* A `.qtt-sec` with the template's own section header, so this table sits in
+     the same rhythm as the eight blocks around it rather than reintroducing a
+     second section pattern. It is the one thing on this page that must render
+     with the database unreachable AND above the fold-out blocks, which is why
+     it goes in `afterToolHtml` rather than inside a row figure: five columns
+     and 19 rows do not fit a half-width illustration. */
+  return `<section class="qtt-sec" id="certification">${sectionHeader({
+    eyebrow: 'Reference',
+    heading: 'Which states certify pilot-car operators',
+    sub: "Compiled from the same cited state sources the permit calculator reads, because it is the fact that decides whether the operator you are about to call can legally take the job. Where a state's own pages contradict each other, this says so rather than picking one.",
+  })}
     <div class="pc-tablewrap">
       <table class="pc-table">
         <thead><tr><th>State</th><th>Certification</th><th>Accepts cards from</th><th>Term</th><th>Source</th></tr></thead>
         <tbody>${rows}</tbody>
       </table>
     </div>
-    <p class="pc-sub" style="margin-top:12px;">We hold no certification source for ${unknowns.length} states — ${esc(unknowns.join(', '))}. <strong>That is not "no certification required."</strong> Several of them are named by other states as issuers whose cards they accept, which strongly implies a programme we simply have not sourced. Check with the state before you dispatch.</p>
+    <p class="pc-sub pc-sub--after">We hold no certification source for ${unknowns.length} states — ${esc(unknowns.join(', '))}. <strong>That is not "no certification required."</strong> Several of them are named by other states as issuers whose cards they accept, which strongly implies a programme we simply have not sourced. Check with the state before you dispatch.</p>
   </section>`;
 }
 
@@ -598,58 +652,228 @@ export function renderIndexPage(
         </div>`
       : '';
 
-  const body = `
-  <section class="hero pc-hero">
-    <div class="container-narrow">
-      <p class="pc-eyebrow">Free directory &middot; no account needed</p>
-      <h1>Pilot Car &amp; Escort Operator Directory</h1>
-      <p class="lead">Filter escort operators by the things that decide whether they can legally take your load: the states they run, the certificate they hold in each one and when it expires, the equipment on the truck, the escort vehicle's own weight rating, and their insurance.</p>
-      <p style="margin:12px 0 0;font-size:14px;color:var(--ink-soft);">Listings are self-reported and unverified unless the card says otherwise.</p>
-      <details class="qt-fold">
-        <summary>About this directory's data</summary>
-        <div class="qt-fold-body">
-          <p><strong>Operators list themselves; we do not import anyone.</strong> A record marked <em>Self-reported</em> is the operator's own statement and nobody here has checked it — ask for the certificate and the insurance certificate before you dispatch. Where we have checked something, the card says what we checked, when, and links the register we checked it against.</p>
-          <p style="margin-top:8px;"><strong>Whether a state requires certification is genuinely disputed, and we publish the disagreement.</strong> Two pages of the same Virginia DMV give different reciprocity answers and neither carries a date. Colorado, Oklahoma and Washington publish who they ACCEPT and no list of who accepts them. New York accepts nobody. The table below records each state's published position and links the document — it does not average them into a single confident answer.</p>
-        </div>
-      </details>
-    </div>
-  </section>
-
-  <main class="pc-shell">
-    <div class="pc-grid">
+  const toolHtml = `<div class="pc-grid">
       ${filterForm(f)}
       <section class="pc-results" aria-live="polite">
         ${showing}
         ${pager}
       </section>
-    </div>
-
-    ${certificationReference()}
-
-    <section class="pc-sec">
-      <h2>How many escorts does the load actually need?</h2>
-      <p class="pc-sub">The <a class="pc-link" href="${esc(OSOW_TOOL_PATH)}">oversize &amp; overweight permit calculator</a> answers that per state from each state's own escort rules, with the statute behind every line, and links straight back here pre-filtered to the states and certificates that lane needs. The <a class="pc-link" href="/tools/heavy-haul-quote">heavy-haul quote tool</a> does the same inside a delivered-cost estimate.</p>
-    </section>
-
-    <section class="pc-sec">
-      <h2>Run pilot cars?</h2>
-      <p class="pc-sub">Listing is free and takes a few minutes. You get a private link that edits or deletes your record — including deleting it outright, which removes the row rather than hiding it. You choose per field whether your phone number and email are public.</p>
-      <p><a class="btn btn-primary" href="${esc(PILOT_CAR_JOIN_PATH)}">List your escort service</a></p>
-    </section>
-  </main>`;
+    </div>`;
 
   const title = 'Pilot Car & Escort Operator Directory — Filter by State & Certification | QuoteFleet';
   const description =
     'Free, opt-in directory of pilot car and escort vehicle operators, filterable by states covered, per-state certification and expiry, equipment, escort-vehicle GVWR and insurance. Self-reported records are labelled as such.';
-  const jsonLd = `<script type="application/ld+json">${JSON.stringify({
-    '@context': 'https://schema.org',
-    '@type': 'CollectionPage',
-    name: 'Pilot Car & Escort Operator Directory',
-    url: `${SITE}${PILOT_CAR_PATH}`,
+
+  const counts = certificationCounts();
+  /**
+   * Tennessee's escort-VEHICLE rule is the one this codebase holds a citation
+   * for (Tenn. Comp. R. & Regs. 1680-07-01-.21, recorded in
+   * `src/calc/osow/pilotCar/certification.ts`), and it is the only per-state
+   * vehicle figure quoted anywhere on this page. Read from the corpus rather
+   * than typed, so it cannot drift from the table below it.
+   */
+  const tn = PILOT_CAR_CERTIFICATION.TN;
+
+  /**
+   * THE FAQ, AND THE RULE IT IS WRITTEN UNDER.
+   *
+   * This directory is compliance-adjacent: booking the wrong escort is a truck
+   * running illegally. So every answer below is grounded in either the compiled
+   * certification corpus (counted at render time, never typed) or in how this
+   * page itself behaves — and where the honest answer is "the state decides",
+   * that is what it says, with a pointer to the state, rather than a rule of
+   * our own invention.
+   *
+   * DELIBERATELY NOT ANSWERED HERE: whether a given operator may lawfully
+   * escort a given load; what a state's escort thresholds are; anything about
+   * Canadian provinces. The metric GVWR bands in the filter exist because
+   * several provinces cap the escort vehicle by mass, and the page says in
+   * terms that those provincial figures are NOT in our cited corpus — so no
+   * question here asserts one.
+   */
+  const faqs = [
+    // model.ts VERIFICATION_TIERS / VERIFICATION_LABEL, rendered by tierBlock().
+    {
+      q: 'Are these operators checked by you?',
+      a: 'Most are not, and every card says which. Each listing carries a verification tier, and the default — Self-reported — states in words that the operator entered it and nobody here has checked it against any state record. Where we did check something, the card says what we checked, when, and links the register we checked it against. A tier word never appears without that sentence under it: there is no code path that renders the pill alone.',
+    },
+    // The module contract at the top of this file: opt-in only, no ingest job.
+    {
+      q: 'Where do the listings come from?',
+      a: 'Operators list themselves. Nothing here was scraped, imported or seeded from another directory — a record exists because that operator submitted it and ticked a consent box the schema will not accept as false. There is no ingest job in this feature and nowhere for one to write. That also means the directory is smaller than the incumbents, and new: an empty result is often a gap in the directory rather than a gap in the trade.',
+    },
+    // certification.ts — counted by certificationCounts(), not typed.
+    {
+      q: 'Does a certificate from one state work in another?',
+      a: `Only where the state you are working in says so, and the published positions do not line up. Of the ${counts.tracked} jurisdictions tracked here, ${counts.inboundPublished} publish a list of whose certificates they accept — and ${counts.inboundEmpty} of those lists is empty, meaning that state accepts nobody. Only ${counts.outboundPublished} publish who accepts THEIRS, so "where is my card good" is usually not a published fact at all. ${counts.disputed} states' own documents contradict each other, and we record both readings rather than averaging them. The filter therefore counts only a current, unexpired certificate issued by the state you picked; a card from a state that reciprocates is shown on the profile and never satisfies the filter, because whether it is accepted is the working state's call.`,
+    },
+    // certification.ts TN entry: vehicleWeightMinLbs / vehicleGvwrMaxLbs, cited.
+    {
+      q: 'Can an operator be certified and still be wrong for my load?',
+      a: `Yes, and it is the trap the free-text directories cannot show you: some states regulate the escort VEHICLE as well as the driver. Tennessee is the one we hold a citation for — its rule requires an escort vehicle weighing more than ${(tn?.vehicleWeightMinLbs ?? 0).toLocaleString('en-US')} lb with a manufacturer's GVWR under ${(tn?.vehicleGvwrMaxLbs ?? 0).toLocaleString('en-US')} lb — and a certificate earned elsewhere does not change it. That is why escort-vehicle GVWR and vehicle type are filterable columns here rather than prose, and why operators who have not stated a GVWR are excluded from that filter rather than assumed to fit.`,
+    },
+    // emptyState() and the AND semantics in store.ts / model.ts.
+    {
+      q: 'Why does the list empty out when I pick several states?',
+      a: 'Because the state filter is an AND, not a shortlist: an operator has to cover every state you picked. Most pilot-car outfits work a region, so a long lane is usually two or three operators handing off rather than one who runs the whole thing. When nothing matches, the page offers each state on its own as a separate link rather than leaving you to conclude the trade has nobody in it.',
+    },
+    // A statement of what this page does NOT answer, with the pointer.
+    {
+      q: 'How many escorts does my load actually need?',
+      a: 'Not a question this directory answers — it is a per-state rule that depends on your dimensions and the road class. The oversize permit calculator answers it from each state\'s own escort rules with the statute behind every line, and links back here pre-filtered to the states and certificates that lane needs. The permitting office for each state on your route is the final word, and it also keeps its own list of certified operators.',
+    },
+  ];
+
+  return toolPage({
+    title,
     description,
-    isAccessibleForFree: true,
-  })}</script>`;
-  return page(title, description, PILOT_CAR_PATH, body, jsonLd);
+    path: PILOT_CAR_PATH,
+
+    // ── 1 ── THE ONE-LINE HONESTY CLAIM STAYS UNCOLLAPSED AND STAYS FIRST.
+    // #518 split it in two: the short form leads, the long form explains. The
+    // long form used to sit behind a `details` in the hero; it is now the
+    // answer/limits strip, which is open by default — so both halves are
+    // visible without a click, which is strictly more than before.
+    crumbs: [{ name: 'Free tools', path: '/tools' }, { name: 'Pilot car directory' }],
+    eyebrow: 'Free directory · no account needed',
+    h1: 'Pilot Car & Escort Operator Directory',
+    lead: "Filter escort operators by the things that decide whether they can legally take your load: the states they run, the certificate they hold in each one and when it expires, the equipment on the truck, the escort vehicle's own weight rating, and their insurance. <strong>Listings are self-reported and unverified unless the card says otherwise.</strong>",
+    embed: { href: EMBED_SURFACE, label: 'Embed this directory' },
+
+    // ── 2 ──
+    toolHtml,
+
+    // The compiled certification table, which needs no database and must render
+    // above the explanatory blocks.
+    afterToolHtml: certificationReference(),
+
+    // ── 3 ──
+    limits: {
+      head: {
+        eyebrow: 'Scope',
+        heading: "What a listing is, and what it is not",
+        sub: 'A directory that lets a self-asserted claim wear a verified badge is worse than no directory. These three facts are the whole boundary.',
+      },
+      facts: [
+        {
+          label: 'Where the records come from',
+          bodyHtml:
+            '<strong>Operators list themselves; we do not import anyone.</strong> A record marked <em>Self-reported</em> is the operator\'s own statement and nobody here has checked it — ask for the certificate and the insurance certificate before you dispatch. Where we have checked something, the card says what we checked, when, and links the register we checked it against.',
+        },
+        {
+          label: 'Where the states disagree',
+          bodyHtml: `<strong>Whether a state requires certification is genuinely disputed, and we publish the disagreement.</strong> Two pages of the same Virginia DMV give different reciprocity answers and neither carries a date. Colorado, Oklahoma and Washington publish who they ACCEPT and no list of who accepts them. New York accepts nobody. The table above records each state's published position and links the document — it does not average them into a single confident answer.`,
+        },
+        {
+          label: 'What it costs',
+          bodyHtml: `Nothing, either side. Searching needs no account, and <a href="${esc(PILOT_CAR_JOIN_PATH)}">listing is free</a> — you get a private link that edits or deletes your record outright, and you choose per field whether your phone number and email are public.`,
+        },
+      ],
+    },
+
+    // ── 4 ──
+    steps: {
+      head: { eyebrow: 'How it works', heading: 'Three filters that decide a booking' },
+      items: [
+        {
+          title: 'The states on your route',
+          bodyHtml:
+            'An AND, not a shortlist — an operator must cover every state you pick. A long lane is usually two or three operators handing off, and the page says so instead of returning nothing.',
+        },
+        {
+          title: 'The certificate, and its expiry',
+          bodyHtml:
+            'Only a current, unexpired certificate issued by that state satisfies the filter. A lapsed card is shown as lapsed rather than hidden, and a card held under reciprocity is shown but never counted.',
+        },
+        {
+          title: 'The vehicle and the cover',
+          bodyHtml: `Escort-vehicle GVWR, vehicle type, equipment carried and liability limits are columns, not prose. An operator who has not stated a GVWR is excluded from that filter rather than assumed to fit.`,
+        },
+      ],
+    },
+
+    // ── 5 ── Two rows, both figures counted from the compiled corpus.
+    rows: {
+      head: { eyebrow: 'Why this one', heading: 'Two things a free-text directory cannot tell you' },
+      items: [
+        {
+          heading: 'Reciprocity is two lists, and they do not match',
+          bodyHtml: `<p>Which cards a state ACCEPTS and who accepts that state's OWN card are published separately, and they disagree. Georgia accepts five states' cards; only one of those five publishes that it accepts Georgia's. Folding the two into one symmetric "reciprocal states" field — what a naive schema does — manufactures a permission no state granted.</p>
+            <p>So they are two fields here, an empty published list is recorded as "accepts nobody" rather than as missing data, and a state we hold no source for is never rendered as "no certification required".</p>`,
+          figureHtml: factList([
+            { label: 'Jurisdictions tracked', value: String(counts.tracked) },
+            { label: 'Publish whose cards they accept', value: String(counts.inboundPublished) },
+            { label: 'Publish who accepts theirs', value: String(counts.outboundPublished) },
+          ]),
+        },
+        {
+          heading: 'Certified is not the same as legal',
+          bodyHtml: `<p>Some states regulate the escort VEHICLE as well as the driver, so an operator can hold every certificate the lane asks for and still be refused on the weight of their truck. Tennessee's cap is the one we hold a citation for, and it is in the filter as a band rather than as a sentence.</p>
+            <p>Every figure on this page traces to a document with a publisher and a retrieval date. <a href="#certification">The full per-state table is above</a>, with the source on every row.</p>`,
+          figureHtml: factList([
+            { label: 'Tennessee escort vehicle, maximum GVWR', value: (tn?.vehicleGvwrMaxLbs ?? 0).toLocaleString('en-US'), unit: 'lb' },
+            { label: 'Tennessee escort vehicle, minimum weight', value: (tn?.vehicleWeightMinLbs ?? 0).toLocaleString('en-US'), unit: 'lb' },
+            { label: 'States we hold no certification source for', value: String(counts.unknown) },
+          ]),
+        },
+      ],
+    },
+
+    // ── 6 ── Four cards: 4 / 2x2 / 4x1, never 3+1.
+    related: {
+      head: {
+        eyebrow: 'Next',
+        heading: 'Before you book the escort',
+        sub: 'The escort requirement comes out of the permit, and these three answer it with the statute attached.',
+      },
+      items: [
+        {
+          href: OSOW_TOOL_PATH,
+          title: 'Oversize permit calculator',
+          blurb: "How many escorts each state requires for your load, from that state's own rules.",
+        },
+        {
+          href: '/oversize/escort-requirements',
+          title: 'Escort requirements by state',
+          blurb: 'The published rule behind the count, state by state, with its revision date.',
+        },
+        {
+          href: '/tools/heavy-haul-quote',
+          title: 'Heavy-haul quote tool',
+          blurb: 'The same escort counts inside a delivered-cost estimate, with your own pilot-car rate.',
+        },
+        {
+          href: PILOT_CAR_JOIN_PATH,
+          title: 'List your escort service',
+          blurb: 'Free, opt-in, and you keep a private link that edits or deletes the record outright.',
+        },
+      ],
+    },
+
+    // ── 7 ──
+    faq: { head: { eyebrow: 'FAQ', heading: 'Questions' }, items: faqs },
+
+    extraCss: PC_CSS,
+    // NO SCRIPTS. The index is a plain GET form the server renders, so it needs
+    // neither `/pilot-cars.js` (submit and delete, which only the join and
+    // manage pages do) nor `/suggest-field.js` (the join form's name field).
+    // The shell already carries marketing-chat and the theme toggle.
+    jsonLd: [
+      jsonLdBreadcrumb([
+        { name: 'Free tools', path: '/tools' },
+        { name: 'Pilot car directory', path: PILOT_CAR_PATH },
+      ]),
+      {
+        '@context': 'https://schema.org',
+        '@type': 'CollectionPage',
+        name: 'Pilot Car & Escort Operator Directory',
+        url: `${SITE}${PILOT_CAR_PATH}`,
+        description,
+        isAccessibleForFree: true,
+      },
+      jsonLdFaq(faqs),
+    ],
+  });
 }
 
 // ── The profile ────────────────────────────────────────────────────────────

@@ -85,10 +85,17 @@ import { US_STATE_CODES, stateByCode, US_STATES } from '../directory/usStates.js
 import { publicCalcLimiter } from '../rateLimits.js';
 import { setPublicDirectoryCache } from '../directory/httpCache.js';
 import { escortDirectoryHref } from '../pilotCars/model.js';
-import { FULL_SITE_HEADER, PREMIUM_FOOTER, HEADER_SCRIPTS, TOOL_PROMO_CTA } from '../siteChrome.js';
+import {
+  jsonLdBreadcrumb,
+  jsonLdFaq,
+  jsonLdWebApplication,
+} from '../osow/hubShell.js';
+import { factList, toolPage } from '../tools/toolPage.js';
 
-const SITE = 'https://quotefleet.net';
 export const HEAVY_HAUL_TOOL_PATH = '/tools/heavy-haul-quote';
+
+/** Where the band's "embed this tool" affordance points today. See osowPermits. */
+const EMBED_SURFACE = '/pricing';
 
 function esc(s: unknown): string {
   return String(s == null ? '' : s).replace(/[&<>"']/g, (m) =>
@@ -487,22 +494,14 @@ function toEndpoint(address: string, result: GeocodeResult): LaneEndpoint | null
 // both work with no `data-theme` block of our own and no raw hex anywhere.
 
 const HH_CSS = `
-  .hh-shell { max-width: 1080px; margin: 0 auto; padding: 24px; }
-  /* Shared .hero centres its text. Left-align it and centre the same 1032px
-     column the body uses, so the H1 starts on the body's left edge. */
-  .hh-hero { padding: 48px 24px 16px; text-align: left; }
-  .hh-hero .container-narrow { max-width: 1032px; margin: 0 auto; padding: 0; }
-  .hh-eyebrow { color: var(--accent); font-family: var(--font-mono); font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; margin: 0 0 8px; text-align: left; }
-  .hh-hero h1 { font-size: 40px; line-height: 1.1; margin: 0 0 8px; text-align: left; text-wrap: balance; }
-  .hh-hero p.lead { max-width: 800px; margin: 0; text-align: left; text-wrap: pretty; }
-
-  /* The honesty banner. Solid, never glass: it sits behind body text. */
-  .hh-truth { background: var(--warn-bg); border: 1px solid var(--warn); border-radius: var(--radius-lg); padding: 16px; margin: 16px 0 0; }
-  .hh-truth h2 { font-size: 16px; margin: 0 0 4px; color: var(--ink); }
-  .hh-truth p { margin: 0; color: var(--ink-soft); font-size: 14px; line-height: 1.55; }
-  .hh-truth strong { color: var(--ink); }
-
-  .hh-grid { display: grid; grid-template-columns: minmax(0, 420px) minmax(0, 1fr); gap: 24px; align-items: start; margin-top: 24px; }
+  /* ── WHAT THE TOOL-PAGE TEMPLATE NOW OWNS ────────────────────────────────
+     Document, header band (which replaced this page's '.hh-hero'), breadcrumb,
+     section-header stack, focus ring, reduced-motion guard, shell width and
+     padding — all in '../tools/toolPage.ts'. What is left here is THE TOOL.
+     Every '.hh-*' class name is unchanged on purpose: '/heavy-haul-quote.js'
+     and the e2e suite drive them by name, and this migration must not move a
+     figure in the quote. */
+  .hh-grid { display: grid; grid-template-columns: minmax(0, 420px) minmax(0, 1fr); gap: 24px; align-items: start; }
   .hh-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 16px; }
   .hh-card + .hh-card { margin-top: 16px; }
 
@@ -525,11 +524,17 @@ const HH_CSS = `
   .hh-field input:focus + .hh-lab, .hh-field select:focus + .hh-lab { color: var(--accent); }
 
   /* Route-class pills: 4 options in a 2-column grid, so they wrap 2x2 and a
-     single pill can never sit alone on a line. Selected = outline + tint. */
+     single pill can never sit alone on a line. Selected = outline + tint.
+
+     THE BORDER IS 2px IN EVERY STATE. It was 1px unselected and 2px selected,
+     so every units switch and every route-class pick moved the pill's own label
+     a pixel — and the units switch is two pills that sit directly above the
+     cargo fields, so the whole form nudged. Selection is now a COLOUR swap
+     only; the geometry never changes and nothing reflows. */
   .hh-pills { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 2px; }
-  .hh-pill { min-height: 44px; padding: 8px 12px; font: inherit; font-size: 13px; text-align: left; color: var(--ink-soft); background: transparent; border: 1px solid var(--border); border-radius: var(--radius); cursor: pointer; }
+  .hh-pill { min-height: 44px; padding: 8px 12px; font: inherit; font-size: 13px; text-align: left; color: var(--ink-soft); background: transparent; border: 2px solid var(--border); border-radius: var(--radius); cursor: pointer; }
   .hh-pill:hover { border-color: var(--border-strong); }
-  .hh-pill[aria-pressed="true"] { border-color: var(--accent); border-width: 2px; padding: 8px 12px; background: var(--accent-soft); color: var(--ink); }
+  .hh-pill[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-soft); color: var(--ink); }
 
   .hh-legs { display: grid; gap: 2px; }
   .hh-leg { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 116px) 44px; gap: 2px; }
@@ -551,9 +556,13 @@ const HH_CSS = `
   .hh-total { scroll-margin-top: 96px; background: var(--surface); border: 1px solid var(--border-strong); border-radius: var(--radius-lg); padding: 16px; }
   .hh-total--partial { border-color: var(--warn); }
   .hh-tl { font-size: 12px; font-family: var(--font-mono); letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); margin: 0 0 4px; }
-  /* Flat ink, never the accent: the total must not collide with its surface. */
-  .hh-tv { font-size: 40px; font-weight: 700; line-height: 1.1; color: var(--ink); margin: 0; }
-  .hh-trange { font-size: 13px; color: var(--ink-soft); margin: 4px 0 0; font-family: var(--font-mono); }
+  /* Flat ink, never the accent: the total must not collide with its surface.
+     TABULAR FIGURES. The delivered figure is recalculated on every submit and
+     every units switch; with proportional digits $21,568.03 and $9,420.00 put
+     the dollar sign at two different x positions, which reads as the number
+     twitching. tabular-nums pins every digit to one advance width. */
+  .hh-tv { font-size: 40px; font-weight: 700; font-variant-numeric: tabular-nums; line-height: 1.1; color: var(--ink); margin: 0; }
+  .hh-trange { font-size: 13px; color: var(--ink-soft); margin: 4px 0 0; font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
   .hh-tpart { font-size: 12px; font-family: var(--font-mono); letter-spacing: 0.04em; text-transform: uppercase; color: var(--warn); margin: 4px 0 0; }
   .hh-tsub { font-size: 13px; color: var(--ink-soft); margin: 4px 0 0; line-height: 1.55; }
 
@@ -561,7 +570,7 @@ const HH_CSS = `
      reasons are what make the number worth reading. */
   .hh-kpi { margin-top: 12px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--bg); padding: 12px; }
   .hh-kpihead { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
-  .hh-kpiscore { font-size: 28px; font-weight: 700; line-height: 1.1; color: var(--ink); font-family: var(--font-mono); }
+  .hh-kpiscore { font-size: 28px; font-weight: 700; font-variant-numeric: tabular-nums; line-height: 1.1; color: var(--ink); font-family: var(--font-mono); }
   .hh-kpilabel { font-size: 11px; font-family: var(--font-mono); letter-spacing: 0.06em; text-transform: uppercase; padding: 4px 8px; border-radius: var(--radius-pill); border: 1px solid var(--border-strong); color: var(--muted); white-space: nowrap; }
   /* The BORDER may be the raw success token; the 11px TEXT may not. Bare
      var(--success) renders 3.54:1 on this page's light surface — under WCAG
@@ -599,7 +608,7 @@ const HH_CSS = `
   .hh-tile { border: 1px solid var(--border); border-radius: var(--radius); padding: 12px; background: var(--bg); }
   .hh-tile.is-yours { border-style: dashed; border-color: var(--accent); }
   .hh-tile .k { font-size: 11px; font-family: var(--font-mono); letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); display: block; margin-bottom: 4px; }
-  .hh-tile .v { font-size: 18px; font-weight: 600; color: var(--ink); font-family: var(--font-mono); }
+  .hh-tile .v { font-size: 18px; font-weight: 600; font-variant-numeric: tabular-nums; color: var(--ink); font-family: var(--font-mono); }
   /* CLAMPED TO TWO LINES. Four captions at four lines each is 200px of prose
      above the breakdown, and every one of these claims is repeated on the
      rows beneath with its own rating and its own hover card. */
@@ -669,13 +678,12 @@ const HH_CSS = `
 
   .hh-empty { color: var(--muted); font-size: 14px; line-height: 1.6; margin: 0; }
 
-  /* Foldable prose — keeps the page concise without losing content. */
-  details.qt-fold { margin: 8px 0 16px; }
-  details.qt-fold > summary { cursor: pointer; color: var(--accent); font-size: 13px; list-style: none; display: inline-flex; align-items: center; gap: 4px; }
-  details.qt-fold > summary::-webkit-details-marker { display: none; }
-  details.qt-fold > summary::before { content: '▸'; transition: transform .2s; }
-  details.qt-fold[open] > summary::before { transform: rotate(90deg); }
-  details.qt-fold > .qt-fold-body { padding: 8px 0 0; color: var(--muted); font-size: 14px; line-height: 1.5; }
+  /* The hero's '.qt-fold' prose disclosure — "how this estimate works" — is
+     gone with the hero. Its content is now the answer/limits strip, block 3 of
+     the template, which is open by default rather than behind a summary. It
+     took the page's only unguarded transition with it: nothing in this
+     stylesheet animates now, and the template's reduced-motion block covers
+     anything the shell brings. */
   .hh-busy { color: var(--muted); font-size: 14px; margin: 0; }
   .hh-eglist { margin: 8px 0 0; padding-left: 20px; display: grid; gap: 4px; }
   .hh-eglist li { font-size: 13px; line-height: 1.55; color: var(--ink-soft); }
@@ -728,7 +736,7 @@ const HH_CSS = `
   .hh-line { display: grid; grid-template-columns: minmax(0, 1fr) max-content; column-gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--border); position: relative; }
   .hh-lines > .hh-line:last-child { border-bottom: none; }
   .hh-lname { grid-column: 1; font-size: 13px; color: var(--ink); line-height: 1.5; overflow-wrap: anywhere; }
-  .hh-lamt { grid-column: 2; grid-row: 1; text-align: right; font-family: var(--font-mono); font-size: 13px; color: var(--ink); white-space: nowrap; }
+  .hh-lamt { grid-column: 2; grid-row: 1; text-align: right; font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-size: 13px; color: var(--ink); white-space: nowrap; }
   .hh-lamt.is-mine { font-style: italic; }
   .hh-lamt.is-nil { color: var(--warn); }
   /* A BENCHMARK NEVER RENDERS AS A POINT. The range is the figure; the single
@@ -760,7 +768,15 @@ const HH_CSS = `
      way. Anchored to the pill and constrained to the row, so it can never push
      the document sideways. Opens on hover where there IS a hover, and on click
      everywhere, because a tooltip a phone cannot open is not a tooltip. */
-  .hh-hover { display: none; position: absolute; z-index: 6; top: calc(100% + 4px); left: 0; width: 320px; max-width: 100%; box-sizing: border-box; padding: 12px; border: 1px solid var(--border-strong); border-radius: var(--radius); background: var(--surface-2); box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18); }
+  /* THE POPOVER'S SHADOW IS A TOKEN, NOT A FOURTH HAND-ROLLED ONE. It shipped
+     as a literal 0 8px 24px of black at 18%, which is off the three-shadow ramp
+     AND theme-blind: pure black at 18% over a dark surface is very nearly
+     invisible, which is exactly why --shadow-lg is remapped under the dark
+     theme. It survived this long because scripts/check-hardcoded-colors.mjs
+     walks only .css and .html, so CSS authored inside a .ts template literal is
+     never scanned — a clean guard run is not evidence that a call site is
+     tokenised, and this one was not. */
+  .hh-hover { display: none; position: absolute; z-index: 6; top: calc(100% + 4px); left: 0; width: 320px; max-width: 100%; box-sizing: border-box; padding: 12px; border: 1px solid var(--border-strong); border-radius: var(--radius); background: var(--surface-2); box-shadow: var(--shadow-lg); }
   .hh-hover.is-open { display: block; }
   @media (hover: hover) { .hh-tierwrap:hover > .hh-hover, .hh-tierwrap:focus-within > .hh-hover { display: block; } }
   .hh-hbrief { margin: 0; font-size: 12px; line-height: 1.5; color: var(--ink-soft); }
@@ -810,11 +826,6 @@ const HH_CSS = `
     .hh-split { grid-template-columns: minmax(0, 1fr); }
   }
   @media (max-width: 640px) {
-    .hh-hero h1 { font-size: 28px; }
-    .hh-hero { padding: 32px 16px 12px; }
-    /* 80px of bottom clearance so the last line never sits under the fixed
-       chat launcher, which is bottom-right at phone widths. */
-    .hh-shell { padding: 16px 16px 80px; }
     .hh-tv { font-size: 32px; }
     .hh-leg { grid-template-columns: minmax(0, 1fr) minmax(0, 92px) 44px; }
     .hh-field input, .hh-field select { font-size: 16px; }
@@ -891,23 +902,7 @@ export function renderHeavyHaulToolPage(): string {
     )
     .join('');
 
-  const body = `
-  <section class="hero hh-hero">
-    <div class="container-narrow">
-      <p class="hh-eyebrow">Free tool &middot; no account needed</p>
-      <h1>Heavy-Haul &amp; OOG Delivered-Cost Estimator</h1>
-      <p class="lead">Two addresses and your cargo. That is the whole form. Axle count, trailer class and route class are worked out from the load rather than asked for, and every charge that comes back says what kind of evidence stands behind it.</p>
-      <details class="qt-fold">
-        <summary>How this estimate works</summary>
-        <div class="qt-fold-body">
-          <p><strong>State permit fees are cited to the statute or fee schedule they came from, and carry no range. Fuel is indexed to the EIA weekly diesel price. Line haul, pilot cars and accessorials are a benchmark band from published market data, always shown as a range, and replaced outright by any rates YOU enter.</strong> No margin is added, ever. A component we cannot price is named and left out, never counted as $0.</p>
-        </div>
-      </details>
-    </div>
-  </section>
-
-  <main class="hh-shell">
-    <div class="hh-grid">
+  const toolHtml = `<div class="hh-grid">
       <form class="hh-form" id="hh-form" novalidate>
         <div class="hh-card">
           <div class="hh-sec">${cue('cue-lane')}<h2>Pickup and delivery</h2></div>
@@ -1028,81 +1023,207 @@ export function renderHeavyHaulToolPage(): string {
           <ul>${notIncludedHtml}</ul>
         </details>
       </section>
-    </div>
-  </main>`;
-
-  const jsonLd = [
-    {
-      '@context': 'https://schema.org',
-      '@type': 'WebApplication',
-      name: 'Heavy-Haul Delivered-Cost Estimator',
-      applicationCategory: 'BusinessApplication',
-      operatingSystem: 'Any',
-      url: `${SITE}${HEAVY_HAUL_TOOL_PATH}`,
-      offers: { '@type': 'Offer', price: '0', priceCurrency: 'USD' },
-      description: `Free heavy-haul delivered-cost estimator: cargo dimensions and weight, pickup and delivery addresses, and a line-by-line cost breakdown with a decomposable confidence score. State permit fees cited across ${covered.length} states.`,
-    },
-    {
-      '@context': 'https://schema.org',
-      '@type': 'BreadcrumbList',
-      itemListElement: [
-        { '@type': 'ListItem', position: 1, name: 'Home', item: `${SITE}/` },
-        { '@type': 'ListItem', position: 2, name: 'Free Tools', item: `${SITE}/tools` },
-        {
-          '@type': 'ListItem',
-          position: 3,
-          name: 'Heavy-Haul Quote Tool',
-          item: `${SITE}${HEAVY_HAUL_TOOL_PATH}`,
-        },
-      ],
-    },
-  ];
+    </div>`;
 
   const title = 'Heavy-Haul Quote Calculator — Delivered Cost + Confidence | QuoteFleet';
   const description = `Free heavy-haul quote tool. Enter cargo dimensions, weight and two addresses for a delivered-cost estimate with a line-by-line breakdown and a confidence score. State permit fees cited across ${covered.length} states; line haul and pilot cars priced from your own rates.`;
 
-  return `<!doctype html>
-<html lang="en">
-<head>
-  <meta charset="utf-8">
-  <script>(function(){try{var t=localStorage.getItem('qf-theme');if(t==='dark'||(!t&&window.matchMedia&&matchMedia('(prefers-color-scheme:dark)').matches))document.documentElement.setAttribute('data-theme','dark');else document.documentElement.setAttribute('data-theme','light');}catch(e){document.documentElement.setAttribute('data-theme','light');}})();</script>
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>${esc(title)}</title>
-  <meta name="description" content="${esc(description)}">
-  <link rel="canonical" href="${SITE}${HEAVY_HAUL_TOOL_PATH}">
-  <link rel="stylesheet" href="/style.css">
-  <link rel="stylesheet" href="/nav-unify.css">
-  <style>${HH_CSS}</style>
-  <link rel="icon" href="/favicon.ico" sizes="any">
-  <link rel="icon" type="image/png" sizes="32x32" href="/brand/favicon-32.png">
-  <link rel="icon" type="image/png" sizes="16x16" href="/brand/favicon-16.png">
-  <link rel="apple-touch-icon" sizes="180x180" href="/brand/apple-touch-icon-180.png">
-  <link rel="manifest" href="/site.webmanifest">
-  <meta name="theme-color" content="#F6F8FA">
-  <meta property="og:title" content="${esc(title)}">
-  <meta property="og:description" content="${esc(description)}">
-  <meta property="og:image" content="${SITE}/brand/og-image-1200x630.png">
-  <meta name="twitter:card" content="summary_large_image">
-  <meta name="twitter:image" content="${SITE}/brand/og-image-1200x630.png">
-  ${jsonLd.map((o) => `<script type="application/ld+json">${JSON.stringify(o)}</script>`).join('\n  ')}
-</head>
-<body class="qf-mc-hide-sm">
-  ${FULL_SITE_HEADER}
-  ${body}
-  ${TOOL_PROMO_CTA}
-  ${PREMIUM_FOOTER}
-  ${HEADER_SCRIPTS}
-  <template id="hh-tier-legend"><details class="hh-legend"><summary>What the four ratings mean</summary><dl>${tierLegend}</dl></details></template>
+  const routed = MILEAGE_TIERS.routedPrimaryNetwork;
+
+  /**
+   * THE FAQ, AND THE RULE IT IS WRITTEN UNDER.
+   *
+   * Every answer is grounded in a constant or a measurement recorded in this
+   * repository, and each question names the file its answer comes from. Where a
+   * truthful answer would need a jurisdiction-specific legal claim — when a
+   * given state requires an escort, what triggers a route survey — the question
+   * is not asked here, because our corpus prices permits and does not opine on
+   * permitting decisions. The estimator is US-only and there are no Canadian
+   * questions for that reason.
+   */
+  const faqs = [
+    // TIER_LABELS / TIER_MEANINGS, src/calc/heavyHaul/market/index.ts.
+    {
+      q: 'What does the rating on each charge mean?',
+      a: `Four ratings, and every line carries one. ${TIER_LABELS.cited} — ${TIER_MEANINGS.cited} ${TIER_LABELS.indexed} — ${TIER_MEANINGS.indexed} ${TIER_LABELS.benchmark} — ${TIER_MEANINGS.benchmark} ${TIER_LABELS.refused} — ${TIER_MEANINGS.refused}`,
+    },
+    // MILEAGE_TIERS.routedPrimaryNetwork / .filed, src/calc/heavyHaul/corridor.ts.
+    {
+      q: 'How accurate is the mileage from just two addresses?',
+      a: `Two addresses are routed in-process over the US Census TIGER/Line federal primary-road network and intersected with full-resolution state polygons. Measured against a reference router over 80 real lanes, on the 66 that pass the guards: lane totals came out at a mean 2.1%, p95 8.9%; per-state legs of 25 miles or more at a p95 of 14.4%. The bands the quote shows — ±${routed.totalBandPct}% on the lane and ±${routed.stateBandPct}% on a state — are those p95 figures rounded up, not a hoped-for number. Legs under 25 miles are much worse and are named in the quote rather than hidden inside the band. Enter your filed per-state miles instead and the band goes to ${MILEAGE_TIERS.filed.totalBandPct}%, because those are the miles the state bills.`,
+    },
+    // CONFIDENCE_HIGH_MIN / CONFIDENCE_MEDIUM_MIN / CONFIDENCE_BANDS,
+    // src/calc/heavyHaul/confidence.ts.
+    {
+      q: 'What is the confidence score, and why is mine not 100?',
+      a: `It starts at 100 and is docked for each specific fact that weakens the estimate — mileage that was routed rather than filed, a line that is a market band rather than a cited fee, a mileage row that could not be used — and every deduction is itemised with the points it cost. ${CONFIDENCE_HIGH_MIN} and above is high, ${CONFIDENCE_MEDIUM_MIN} and above is medium. The band drawn around the figure follows from it: ±${Math.round(CONFIDENCE_BANDS.high * 100)}% at high, ±${Math.round(CONFIDENCE_BANDS.medium * 100)}% at medium and ±${Math.round(CONFIDENCE_BANDS.low * 100)}% below that.`,
+    },
+    // HEAVY_HAUL_NOT_INCLUDED[0] and the `subtotalYourRatesUsd` split in
+    // src/calc/heavyHaul/quote.ts.
+    {
+      q: 'Is any margin added, and what happens if I enter my own rates?',
+      a: 'No margin is added, ever — there is no code path in this tool that adds one, and every number here is a cost. Anything you enter in the rates panel REPLACES our band outright for that line, and the line then says the basis is yours rather than ours. Nothing you enter can move a cited permit fee: those come from a statute or a published fee schedule and are subtotalled separately from money derived from your rates.',
+    },
+    // HEAVY_HAUL_NOT_INCLUDED — the detention/layover entry and the refusals.
+    {
+      q: 'Why is there a charge with no number on it?',
+      a: `Because we will not guess it. Detention, layover, escort wait time and cancellation are real and published, but the HOURS are set by whoever keeps the truck waiting, so they are disclosed as risk lines with their published rate and left out of the total rather than estimated into it. A superload line haul, utility line lifts and a few other components are refused outright because the published evidence stops there — each refusal says what would produce a real number. ${HEAVY_HAUL_NOT_INCLUDED.length} things are excluded in all, each with its reason, listed beside the estimate.`,
+    },
+    // A statement about the tool's scope, not about any state's rules.
+    {
+      q: 'Is this a quote I can hold someone to?',
+      a: 'No. It is a delivered-cost estimate with a stated basis on every line — a defensible starting number, not a price anybody has offered you. The permit fees inside it are cited and do bind whoever hauls the load, but the move itself is priced by a carrier, and the route, the escorts and the timing are decided by each state\'s own permitting office on the day.',
+    },
+  ];
+
+  return toolPage({
+    title,
+    description,
+    path: HEAVY_HAUL_TOOL_PATH,
+
+    // ── 1 ──
+    crumbs: [{ name: 'Free tools', path: '/tools' }, { name: 'Heavy-haul quote' }],
+    eyebrow: 'Free tool · no account needed',
+    h1: 'Heavy-Haul & OOG Delivered-Cost Estimator',
+    lead: 'Two addresses and your cargo. That is the whole form. Axle count, trailer class and route class are worked out from the load rather than asked for, and every charge that comes back says what kind of evidence stands behind it.',
+    embed: { href: EMBED_SURFACE, label: 'Embed this tool' },
+
+    // ── 2 ──
+    toolHtml,
+
+    // ── 3 ── The strip carries what the hero's collapsed "How this estimate
+    // works" disclosure carried, open by default instead of behind a summary.
+    limits: {
+      head: {
+        eyebrow: 'Scope',
+        heading: 'What stands behind the number, and what is left out',
+        sub: 'Every line says which of these it is. A cited fee and a market band are never added into one undifferentiated figure.',
+      },
+      facts: [
+        {
+          label: 'What it covers',
+          bodyHtml: `<strong>State permit fees are cited to the statute or fee schedule they came from, and carry no range. Fuel is indexed to the EIA weekly diesel price. Line haul, pilot cars and accessorials are a benchmark band from published market data, always shown as a range, and replaced outright by any rates YOU enter.</strong> Permits are cited across ${covered.length} states.`,
+        },
+        {
+          label: 'What it does not cover',
+          bodyHtml: `No margin is added, ever. A component we cannot price is named and left out, never counted as $0 — and ${HEAVY_HAUL_NOT_INCLUDED.length} things are excluded outright, each with the reason, beside the estimate.`,
+        },
+        {
+          label: 'What it costs',
+          bodyHtml:
+            'Nothing, and no account. The permit corpus is compiled in, the diesel reading is memoised in-process and the only network call in the feature is the free, keyless, public-domain US Census geocoder — so the tool answers with the database unreachable and calls nothing billable.',
+        },
+      ],
+    },
+
+    // ── 4 ──
+    steps: {
+      head: { eyebrow: 'How it works', heading: 'Three steps, and the form is two of them' },
+      items: [
+        {
+          title: 'Two addresses',
+          bodyHtml:
+            'Full US street addresses, resolved by the US Census geocoder — free, keyless and public domain, and it refuses an address it cannot place rather than matching a different town.',
+        },
+        {
+          title: 'The cargo, in your own units',
+          bodyHtml:
+            'Weight and the three dimensions. Switching between imperial and metric converts what you have already typed and never clears it. Axle count, trailer class and route class are derived from that rather than asked for.',
+        },
+        {
+          title: 'Read the basis, not just the total',
+          bodyHtml: `Every charge carries its rating and its evidence, the confidence score itemises what took points off it, and the lines we refuse to price are shown with a reason instead of a number.`,
+        },
+      ],
+    },
+
+    // ── 5 ── Two rows. Both figures are measurements recorded in the corpus.
+    rows: {
+      head: { eyebrow: 'Why this one', heading: 'Two things a delivered-cost estimate usually hides' },
+      items: [
+        {
+          heading: 'The mileage band is measured, not asserted',
+          bodyHtml: `<p>Two addresses give a lane total, and a lane total is fit to price line haul and unfit to price a permit — several states charge on the miles travelled inside the state, and a straight-line split invents whole states. So the lane is routed over the federal primary-road network and split against state lines, and the error was measured over 80 real lanes rather than assumed.</p>
+            <p>The bands below are the p95 figures rounded up. Give us the per-state miles you filed and both go to zero.</p>`,
+          figureHtml: factList([
+            { label: 'Lane total band, routed', value: `±${routed.totalBandPct}`, unit: '%' },
+            { label: 'Per-state band, routed', value: `±${routed.stateBandPct}`, unit: '%' },
+            { label: 'Band on your filed miles', value: `±${MILEAGE_TIERS.filed.totalBandPct}`, unit: '%' },
+          ]),
+        },
+        {
+          heading: 'A refusal beats a number we cannot defend',
+          bodyHtml: `<p>A cited fee carries no range because a statute states it. A benchmark always carries one because the market has no point value. And where the published evidence stops, the line says so and carries no figure at all — with what would produce a real one.</p>
+            <p>Detention and layover are the clearest case: both are real, both are published, and neither is in the total, because the hours belong to whoever keeps the truck waiting.</p>`,
+          figureHtml: factList([
+            { label: 'Band on a cited fee', value: `${TIER_DEFAULT_BAND_PCT.cited}`, unit: '%' },
+            { label: 'Band on an indexed fee', value: `±${TIER_DEFAULT_BAND_PCT.indexed}`, unit: '%' },
+            { label: 'Margin added to any of it', value: '$0.00' },
+          ]),
+        },
+      ],
+    },
+
+    // ── 6 ── Four cards: 4 / 2x2 / 4x1, never 3+1. Paths are literals because
+    // this module already imports FROM osowPermits; see that file's note.
+    related: {
+      head: {
+        eyebrow: 'Next',
+        heading: 'The four questions around a delivered figure',
+        sub: 'Each of these answers one part of it on its own, free and without an account.',
+      },
+      items: [
+        {
+          href: OSOW_TOOL_PATH,
+          title: 'Oversize permit calculator',
+          blurb: 'The permit half on its own, state by state, with the statute behind every line.',
+        },
+        {
+          href: '/tools/bridge-formula',
+          title: 'Bridge formula calculator',
+          blurb: 'Whether the axle layout is legal before anybody prices the move.',
+        },
+        {
+          href: '/tools/axle-weights',
+          title: 'Axle weight checker',
+          blurb: "The same rig against a state's own cited axle and gross limits.",
+        },
+        {
+          href: '/pilot-cars',
+          title: 'Pilot car directory',
+          blurb: 'Escort operators filtered by the states they run and the certificate they hold.',
+        },
+      ],
+    },
+
+    // ── 7 ──
+    faq: { head: { eyebrow: 'FAQ', heading: 'Questions' }, items: faqs },
+
+    extraCss: HH_CSS,
+    // `marketing-chat.js` and `theme-toggle.js` are the shell's already.
+    extraScripts: `<template id="hh-tier-legend"><details class="hh-legend"><summary>What the four ratings mean</summary><dl>${tierLegend}</dl></details></template>
   <template id="hh-leg-tpl"><div class="hh-leg">
     <label class="hh-field"><select class="hh-leg-state">${stateOptionsHtml}</select><span class="hh-lab">State</span></label>
     <label class="hh-field"><input class="hh-leg-miles" type="number" inputmode="decimal" step="any" min="0" placeholder=" " autocomplete="off"><span class="hh-lab">Miles in state</span></label>
     <button type="button" class="hh-legdrop" aria-label="Remove this state">&times;</button>
   </div></template>
-  <script src="/heavy-haul-quote.js" defer></script>
-  <script src="/marketing-chat.js" defer></script>
-  <script src="/theme-toggle.js" defer></script>
-</body>
-</html>`;
+  <script src="/heavy-haul-quote.js" defer></script>`,
+    // The primary action is a submit button; at phone width the floating chat
+    // launcher sits on top of it, and this class is what keeps it away.
+    bodyClassExtra: 'qf-mc-hide-sm',
+    jsonLd: [
+      jsonLdBreadcrumb([
+        { name: 'Free tools', path: '/tools' },
+        { name: 'Heavy-haul quote', path: HEAVY_HAUL_TOOL_PATH },
+      ]),
+      jsonLdWebApplication({
+        name: 'Heavy-Haul Delivered-Cost Estimator',
+        description: `Free heavy-haul delivered-cost estimator: cargo dimensions and weight, pickup and delivery addresses, and a line-by-line cost breakdown with a decomposable confidence score. State permit fees cited across ${covered.length} states.`,
+        path: HEAVY_HAUL_TOOL_PATH,
+      }),
+      jsonLdFaq(faqs),
+    ],
+  });
 }
 
 // ── Routes ─────────────────────────────────────────────────────────────────

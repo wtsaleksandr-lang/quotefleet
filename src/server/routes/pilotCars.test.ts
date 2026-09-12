@@ -21,6 +21,10 @@ import {
   renderProfilePage,
 } from './pilotCars.js';
 import { parseFilters, toPublicOperator, type OperatorRow } from '../pilotCars/model.js';
+import {
+  PILOT_CAR_CERTIFICATION,
+  PILOT_CAR_STATE_CODES,
+} from '../../calc/osow/pilotCar/certification.js';
 import { SITE_NAV_HTML, SITE_MOBILE_MENU_HTML, PREMIUM_FOOTER, renderStaticPage } from '../siteChrome.js';
 
 const read = (p: string) => readFileSync(resolve(process.cwd(), p), 'utf8');
@@ -233,7 +237,12 @@ describe('the manage page is a bearer link to one person\'s own data', () => {
 describe('house UI rules', () => {
   const html = renderIndexPage(EMPTY_FILTERS, { operators: [OP], total: 1, unavailable: false });
 
-  it('left-aligns the hero and its eyebrow — the shared .hero centres, so it is overridden', () => {
+  it('left-aligns the header band and its eyebrow', () => {
+    // The INDEX's hero is the shared tool-page template's header band now; the
+    // `.pc-hero` rules below still ship for the profile, join and manage pages,
+    // which keep this file's own shell, so both are asserted.
+    expect(html).toMatch(/\.qtt-band h1 \{[^}]*text-align: left/);
+    expect(html).toMatch(/\.qtt-eyebrow \{[^}]*text-align: left/);
     expect(html).toMatch(/\.pc-hero \{[^}]*text-align: left/);
     expect(html).toMatch(/\.pc-eyebrow \{[^}]*text-align: left/);
     expect(html).toMatch(/\.pc-hero h1 \{[^}]*text-align: left/);
@@ -243,8 +252,15 @@ describe('house UI rules', () => {
     expect(html).not.toMatch(/\.pc-[a-z-]* h[1-3] \{[^}]*text-align: center/);
   });
 
-  it('puts the eyebrow above the H1, at the top left', () => {
-    expect(html.indexOf('pc-eyebrow')).toBeLessThan(html.indexOf('<h1>'));
+  it('puts the eyebrow above the H1, at the top left — in the MARKUP, not the CSS', () => {
+    // Anchored on the band element rather than on a class name that also
+    // appears in the stylesheet, which any `<style>`-first document satisfies
+    // for free.
+    const band = html.slice(html.indexOf('<section class="qtt-band">'), html.indexOf('</h1>'));
+    expect(band.indexOf('qtt-eyebrow')).toBeGreaterThan(-1);
+    expect(band.indexOf('qtt-eyebrow')).toBeLessThan(band.indexOf('<h1>'));
+    // ...and the breadcrumb is above the band, on the page ground.
+    expect(html.indexOf('qtt-crumbs')).toBeLessThan(html.indexOf('<section class="qtt-band">'));
   });
 
   it('uses only design tokens — no raw hex or named colour in the page CSS', () => {
@@ -370,5 +386,112 @@ describe('the quote tools link in here, pre-filtered', () => {
   it('the heavy-haul page renders nothing at all when there is no escort to find', () => {
     expect(HH_JS).toContain("if (!res.escortDirectoryHref) return '';");
     expect(HH_JS).toContain('renderEscortDirectory(res)');
+  });
+});
+
+/**
+ * THE INDEX ON THE SHARED TOOL-PAGE TEMPLATE.
+ *
+ * The directory index is one of the eight surfaces the template exists to stop
+ * being a one-off. What is pinned here is the handful of properties that would
+ * silently stop being true if someone rebuilt the page by hand: the eight
+ * blocks in order, the FAQ matching its own schema exactly, and — because this
+ * is compliance-adjacent copy — that no answer asserts a rule our corpus cannot
+ * source.
+ */
+describe('the index is built on the shared tool-page template', () => {
+  const html = renderIndexPage(EMPTY_FILTERS, { operators: [OP], total: 1, unavailable: false });
+
+  it('renders the eight blocks, in the fixed order', () => {
+    const order = [
+      'class="qtt-crumbs"',
+      'class="qtt-band"',
+      'class="pc-filters"', // the tool, in the elevated card
+      'id="certification"', // the compiled table, above the explanatory blocks
+      'id="limits"',
+      'id="how"',
+      'id="detail"',
+      'id="related"',
+      'id="faq"',
+      '<footer class="premium-footer"',
+    ];
+    let cursor = -1;
+    for (const marker of order) {
+      const at = html.indexOf(marker);
+      expect(at, `${marker} is missing`).toBeGreaterThan(-1);
+      expect(at, `${marker} is out of order`).toBeGreaterThan(cursor);
+      cursor = at;
+    }
+  });
+
+  it('drops the two client scripts the index never needed', () => {
+    // The filter is a plain GET form the server renders. `/pilot-cars.js` only
+    // submits and deletes a record (join and manage) and `/suggest-field.js`
+    // only serves the join form's business-name field, so neither belongs here.
+    // The join page must still carry both.
+    expect(html).not.toContain('/pilot-cars.js');
+    expect(html).not.toContain('/suggest-field.js');
+    const join = renderJoinPage();
+    expect(join).toContain('/pilot-cars.js');
+    expect(join).toContain('/suggest-field.js');
+  });
+
+  it('emits FAQPage schema for exactly the questions it renders', () => {
+    const ld = [...html.matchAll(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/g)]
+      .map((m) => JSON.parse(m[1] as string) as Record<string, unknown>);
+    const faq = ld.find((o) => o['@type'] === 'FAQPage') as
+      | { mainEntity: Array<{ name: string; acceptedAnswer: { text: string } }> }
+      | undefined;
+    expect(faq, 'the index must emit FAQPage schema').toBeDefined();
+    const entities = faq!.mainEntity;
+    expect(entities.length).toBeGreaterThanOrEqual(4);
+    for (const q of entities) {
+      expect(q.acceptedAnswer.text.length).toBeGreaterThan(40);
+      const rendered = q.name
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+      expect(html, `FAQ question not rendered: ${q.name}`).toContain(rendered);
+    }
+    const folds = html.slice(html.indexOf('id="faq"')).match(/<details class="qh-fold"/g) ?? [];
+    expect(folds).toHaveLength(entities.length);
+  });
+
+  it('grounds every reciprocity figure in the compiled corpus, and asserts no rule of its own', () => {
+    const ld = [...html.matchAll(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/g)]
+      .map((m) => JSON.parse(m[1] as string) as Record<string, unknown>);
+    const faq = ld.find((o) => o['@type'] === 'FAQPage') as
+      | { mainEntity: Array<{ name: string; acceptedAnswer: { text: string } }> }
+      | undefined;
+    const text = (faq?.mainEntity ?? []).map((q) => `${q.name} ${q.acceptedAnswer.text}`).join(' ');
+
+    // The counts are RECOMPUTED from PILOT_CAR_CERTIFICATION at render time, so
+    // they cannot go stale the day a state is added. Recompute them here the
+    // same way and require the copy to match.
+    const tracked = PILOT_CAR_STATE_CODES.length;
+    const inbound = PILOT_CAR_STATE_CODES.filter((c) => PILOT_CAR_CERTIFICATION[c]?.inboundPublished);
+    const outbound = PILOT_CAR_STATE_CODES.filter((c) => PILOT_CAR_CERTIFICATION[c]?.outboundPublished);
+    expect(text).toContain(`${tracked} jurisdictions tracked here`);
+    expect(text).toContain(`${inbound.length} publish a list of whose certificates they accept`);
+    expect(text).toContain(`Only ${outbound.length} publish who accepts THEIRS`);
+    // Tennessee's escort-VEHICLE cap is the only per-state vehicle figure on the
+    // page, and it is read from the cited corpus rather than typed.
+    const tn = PILOT_CAR_CERTIFICATION.TN;
+    expect(text).toContain(`${(tn?.vehicleGvwrMaxLbs ?? 0).toLocaleString('en-US')} lb`);
+
+    // THE HONESTY GUARD. Canada is a known schema gap — the metric GVWR bands
+    // in the filter exist because provinces cap the escort vehicle by mass, and
+    // those figures are NOT in our cited corpus. No answer may mention one, and
+    // none may claim what a load requires.
+    for (const banned of [
+      /\bCanad(a|ian)\b/i,
+      /\bprovinc/i,
+      /\byour load (?:will |must )?needs? \d/i,
+      /\brequires? (?:an? )?escort (?:if|when|above|over)\b/i,
+    ]) {
+      expect(text, `FAQ asserts an unsourced rule: ${String(banned)}`).not.toMatch(banned);
+    }
   });
 });

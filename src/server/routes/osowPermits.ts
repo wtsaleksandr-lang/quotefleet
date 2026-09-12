@@ -77,10 +77,22 @@ import { US_STATES, US_STATE_CODES, stateByCode } from '../directory/usStates.js
 import { escortDirectoryHref } from '../pilotCars/model.js';
 import { publicCalcLimiter } from '../rateLimits.js';
 import { setPublicDirectoryCache } from '../directory/httpCache.js';
-import { FULL_SITE_HEADER, PREMIUM_FOOTER, HEADER_SCRIPTS, TOOL_PROMO_CTA } from '../siteChrome.js';
+import {
+  jsonLdBreadcrumb,
+  jsonLdFaq,
+  jsonLdWebApplication,
+} from '../osow/hubShell.js';
+import { factList, toolPage } from '../tools/toolPage.js';
 
-const SITE = 'https://quotefleet.net';
 export const OSOW_TOOL_PATH = '/tools/oversize-permits';
+
+/**
+ * Where the header band's "embed this tool" affordance points TODAY — the same
+ * destination `TOOL_PROMO_CTA` already sent readers to, so nothing 404s. When a
+ * real per-tool embed route exists this is the one line that changes; see
+ * `EmbedAffordance` in ../tools/toolPage.ts.
+ */
+const EMBED_SURFACE = '/pricing';
 
 function esc(s: unknown): string {
   return String(s == null ? '' : s).replace(/[&<>"']/g, (m) =>
@@ -612,23 +624,15 @@ export function priceOsowLane(input: OsowRequest): OsowApiResponse {
 // dark both work with no `data-theme` block of our own and no raw hex.
 
 const OSOW_CSS = `
-  .ow-shell { max-width: 1080px; margin: 0 auto; padding: 24px; }
-  /* Shared .hero centres its text. Left-align it, and centre the same 1032px
-     column the body uses so the H1 starts on the body's left edge instead of
-     overhanging the header card (the defect fixed on /glossary). */
-  .ow-hero { padding: 48px 24px 16px; text-align: left; }
-  .ow-hero .container-narrow { max-width: 1032px; margin: 0 auto; padding: 0; }
-  .ow-eyebrow { color: var(--accent); font-family: var(--font-mono); font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; margin: 0 0 8px; text-align: left; }
-  .ow-hero h1 { font-size: 40px; line-height: 1.1; margin: 0 0 8px; text-align: left; text-wrap: balance; }
-  .ow-hero p.lead { max-width: 780px; margin: 0; text-align: left; text-wrap: pretty; }
-
-  /* ── The honesty banner. Solid, never glass: it sits behind body text. ── */
-  .ow-truth { background: var(--warn-bg); border: 1px solid var(--warn); border-radius: var(--radius-lg); padding: 16px; margin: 16px 0 0; }
-  .ow-truth h2 { font-size: 16px; margin: 0 0 4px; color: var(--ink); }
-  .ow-truth p { margin: 0; color: var(--ink-soft); font-size: 14px; line-height: 1.55; }
-  .ow-truth strong { color: var(--ink); }
-
-  .ow-grid { display: grid; grid-template-columns: minmax(0, 420px) minmax(0, 1fr); gap: 24px; align-items: start; margin-top: 24px; }
+  /* ── WHAT THE TOOL-PAGE TEMPLATE NOW OWNS ────────────────────────────────
+     The document, the header band (which replaced this page's own '.ow-hero'),
+     the breadcrumb, the section-header stack, the focus ring, the reduced-motion
+     guard and the shell's width and padding all live in
+     '../tools/toolPage.ts'. What is left here is THE TOOL: the form, the
+     results and nothing else. The '.ow-*' class names are unchanged on purpose
+     — '/osow-calculator.js' and the e2e suite both drive them by name, and this
+     migration is presentation-layer work that must not move a figure. */
+  .ow-grid { display: grid; grid-template-columns: minmax(0, 420px) minmax(0, 1fr); gap: 24px; align-items: start; }
 
   .ow-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 16px; }
   .ow-card + .ow-card { margin-top: 16px; }
@@ -654,11 +658,17 @@ const OSOW_CSS = `
   .ow-field input:focus + .ow-lab, .ow-field select:focus + .ow-lab { color: var(--accent); }
 
   /* Route-class pills: 4 options in a 2-column grid, so they wrap 2x2 and a
-     single pill can never sit alone on a line. Selected = outline + tint. */
+     single pill can never sit alone on a line. Selected = outline + tint.
+
+     THE BORDER IS 2px IN EVERY STATE. It used to be 1px unselected and 2px
+     selected, so picking a route class moved the pill's own text one pixel and
+     nudged everything below it — the same defect the bridge-formula migration
+     found on its presets. Selection is now a COLOUR swap and nothing else, so
+     no geometry changes and nothing reflows. */
   .ow-pills { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 2px; }
-  .ow-pill { min-height: 44px; padding: 8px 12px; font: inherit; font-size: 13px; text-align: left; color: var(--ink-soft); background: transparent; border: 1px solid var(--border); border-radius: var(--radius); cursor: pointer; }
+  .ow-pill { min-height: 44px; padding: 8px 12px; font: inherit; font-size: 13px; text-align: left; color: var(--ink-soft); background: transparent; border: 2px solid var(--border); border-radius: var(--radius); cursor: pointer; }
   .ow-pill:hover { border-color: var(--border-strong); }
-  .ow-pill[aria-pressed="true"] { border-color: var(--accent); border-width: 2px; padding: 8px 12px; background: var(--accent-soft); color: var(--ink); }
+  .ow-pill[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-soft); color: var(--ink); }
 
   .ow-legs { display: grid; gap: 2px; }
   .ow-leg { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 116px) 44px; gap: 2px; }
@@ -678,14 +688,18 @@ const OSOW_CSS = `
   .ow-results { scroll-margin-top: 96px; }
   .ow-total { scroll-margin-top: 96px; background: var(--surface); border: 1px solid var(--border-strong); border-radius: var(--radius-lg); padding: 16px; }
   .ow-total .ow-tl { font-size: 12px; font-family: var(--font-mono); letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); margin: 0 0 4px; }
-  /* Flat ink, never the accent: the total must not collide with its surface. */
-  .ow-total .ow-tv { font-size: 40px; font-weight: 700; line-height: 1.1; color: var(--ink); margin: 0; }
+  /* Flat ink, never the accent: the total must not collide with its surface.
+     TABULAR FIGURES, because this number is recalculated on every submit and
+     proportional digits change its width as it changes value — measured on this
+     page, $1,223.18 and $10.00 rendered the dollar sign at two different x
+     positions. tabular-nums pins every digit to one advance width. */
+  .ow-total .ow-tv { font-size: 40px; font-weight: 700; font-variant-numeric: tabular-nums; line-height: 1.1; color: var(--ink); margin: 0; }
   .ow-total .ow-tsub { font-size: 13px; color: var(--ink-soft); margin: 4px 0 0; line-height: 1.55; }
 
   .ow-flags { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-top: 12px; }
   .ow-flag { border: 1px solid var(--border); border-radius: var(--radius); padding: 12px; background: var(--bg); }
   .ow-flag .k { font-size: 11px; font-family: var(--font-mono); letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); display: block; margin-bottom: 4px; }
-  .ow-flag .v { font-size: 16px; font-weight: 600; color: var(--ink); }
+  .ow-flag .v { font-size: 16px; font-weight: 600; font-variant-numeric: tabular-nums; color: var(--ink); }
   .ow-flag .n { font-size: 12px; color: var(--muted); line-height: 1.5; display: block; margin-top: 4px; }
 
   .ow-note { border-radius: var(--radius-lg); padding: 16px; margin-top: 16px; border: 1px solid var(--border); background: var(--surface); }
@@ -699,7 +713,7 @@ const OSOW_CSS = `
   .ow-state--review { border-color: var(--warn); }
   .ow-sh { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
   .ow-sh h3 { font-size: 17px; margin: 0; color: var(--ink); }
-  .ow-sh .amt { font-size: 17px; font-weight: 700; color: var(--ink); font-family: var(--font-mono); }
+  .ow-sh .amt { font-size: 17px; font-weight: 700; font-variant-numeric: tabular-nums; color: var(--ink); font-family: var(--font-mono); }
   /* TWO CONTENT-SIZED COLUMNS, not flex-wrap. A state carries 1-4 status badges
      depending on the load, and a wrapping flex row puts a lone badge on its own
      line at any width where three fit and four do not. A 2-column grid wraps
@@ -714,7 +728,7 @@ const OSOW_CSS = `
   .ow-lines { width: 100%; border-collapse: collapse; margin-top: 12px; font-size: 13px; }
   .ow-lines th, .ow-lines td { text-align: left; padding: 8px 8px 8px 0; border-bottom: 1px solid var(--border); vertical-align: top; color: var(--ink-soft); }
   .ow-lines th { font-size: 11px; font-family: var(--font-mono); letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); font-weight: 500; }
-  .ow-lines td.num, .ow-lines th.num { text-align: right; padding-right: 0; font-family: var(--font-mono); color: var(--ink); white-space: nowrap; }
+  .ow-lines td.num, .ow-lines th.num { text-align: right; padding-right: 0; font-family: var(--font-mono); font-variant-numeric: tabular-nums; color: var(--ink); white-space: nowrap; }
   .ow-lines .sub td { font-weight: 700; color: var(--ink); border-bottom: none; }
   .ow-lines .ln { display: block; font-size: 12px; color: var(--muted); line-height: 1.5; margin-top: 4px; }
   .ow-tablewrap { overflow-x: auto; }
@@ -739,13 +753,10 @@ const OSOW_CSS = `
 
   .ow-empty { color: var(--muted); font-size: 14px; line-height: 1.6; margin: 0; }
 
-  /* Foldable prose — keeps the page concise without losing content. */
-  details.qt-fold { margin: 8px 0 16px; }
-  details.qt-fold > summary { cursor: pointer; color: var(--accent); font-size: 13px; list-style: none; display: inline-flex; align-items: center; gap: 4px; }
-  details.qt-fold > summary::-webkit-details-marker { display: none; }
-  details.qt-fold > summary::before { content: '▸'; transition: transform .2s; }
-  details.qt-fold[open] > summary::before { transform: rotate(90deg); }
-  details.qt-fold > .qt-fold-body { padding: 8px 0 0; color: var(--muted); font-size: 14px; line-height: 1.5; }
+  /* The hero's own '.qt-fold' prose disclosure is GONE with the hero. What it
+     held — "state permit fees only, escort cost is not in the total" — is now
+     the answer/limits strip, which is block 3 of the template, open by default
+     and therefore more visible than the collapsed summary it replaces. */
   .ow-busy { color: var(--muted); font-size: 14px; margin: 0; }
 
   /* ── THE ALL-STATES SUMMARY — every state on one screen. ──────────────────
@@ -773,7 +784,7 @@ const OSOW_CSS = `
      the Status column off behind an inner scrollbar on a 1440px desktop. */
   .ow-sum th, .ow-sum td { text-align: left; padding: 8px 4px 8px 0; border-bottom: 1px solid var(--border); color: var(--ink-soft); white-space: normal; vertical-align: middle; }
   .ow-sum th { font-size: 11px; font-family: var(--font-mono); letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); font-weight: 500; }
-  .ow-sum td.num, .ow-sum th.num { text-align: right; font-family: var(--font-mono); color: var(--ink); white-space: nowrap; }
+  .ow-sum td.num, .ow-sum th.num { text-align: right; font-family: var(--font-mono); font-variant-numeric: tabular-nums; color: var(--ink); white-space: nowrap; }
   .ow-sum td.nil { color: var(--muted); }
   /* The state name stays put while the money columns scroll under it at phone
      width — a row of figures with no state against it is unreadable. Sticky in
@@ -820,7 +831,15 @@ const OSOW_CSS = `
   .ow-fold > summary, .ow-cites summary { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 44px; list-style: none; }
   .ow-fold > summary::-webkit-details-marker, .ow-cites summary::-webkit-details-marker { display: none; }
   .ow-fold > summary::marker, .ow-cites summary::marker { content: ''; }
-  .ow-fold > summary::after, .ow-cites summary::after { content: '⌄'; font-size: 14px; line-height: 1; color: var(--muted); transition: transform 0.2s cubic-bezier(0.22, 1, 0.36, 1); }
+  .ow-fold > summary::after, .ow-cites summary::after { content: '⌄'; font-size: 14px; line-height: 1; color: var(--muted); }
+  /* THE ONLY TRANSITION ON THIS PAGE, and it is declared INSIDE a
+     no-preference query rather than outside one — the positive form the
+     template uses, so a reader who has asked for less motion never has the
+     rule applied and then neutralised. The template's own reduce block is the
+     belt; this is the braces. */
+  @media (prefers-reduced-motion: no-preference) {
+    .ow-fold > summary::after, .ow-cites summary::after { transition: transform 0.2s cubic-bezier(0.22, 1, 0.36, 1); }
+  }
   .ow-fold[open] > summary::after, .ow-cites[open] summary::after { transform: rotate(180deg); }
   .ow-fold > summary { font-size: 12px; font-family: var(--font-mono); letter-spacing: 0.04em; color: var(--muted); cursor: pointer; }
   .ow-fold > summary:hover, .ow-fold > summary:focus-visible { color: var(--accent); }
@@ -846,7 +865,7 @@ const OSOW_CSS = `
      read as the same kind of claim. */
   .ow-yours { border: 1px dashed var(--accent); border-radius: var(--radius); background: transparent; padding: 12px; margin-top: 12px; }
   .ow-yourtag { display: inline-block; font-size: 11px; font-family: var(--font-mono); letter-spacing: 0.06em; text-transform: uppercase; color: var(--accent); border: 1px dashed var(--accent); border-radius: var(--radius-pill); padding: 4px 8px; margin: 0 0 8px; }
-  .ow-yourv { font-size: 24px; font-weight: 700; line-height: 1.2; color: var(--ink); font-family: var(--font-mono); margin: 0; }
+  .ow-yourv { font-size: 24px; font-weight: 700; font-variant-numeric: tabular-nums; line-height: 1.2; color: var(--ink); font-family: var(--font-mono); margin: 0; }
   .ow-yours p { font-size: 13px; line-height: 1.55; color: var(--ink-soft); margin: 4px 0 0; overflow-wrap: anywhere; }
   .ow-yours ul { margin: 8px 0 0; padding-left: 20px; display: grid; gap: 4px; }
   .ow-yours li { font-size: 13px; line-height: 1.55; color: var(--ink-soft); }
@@ -872,11 +891,6 @@ const OSOW_CSS = `
     .ow-grid { grid-template-columns: minmax(0, 1fr); }
   }
   @media (max-width: 640px) {
-    .ow-hero h1 { font-size: 28px; }
-    .ow-hero { padding: 32px 16px 12px; }
-    /* 80px of bottom clearance so the last line of the page never ends up under
-       the fixed chat launcher, which sits bottom-right at phone widths. */
-    .ow-shell { padding: 16px 16px 80px; }
     .ow-total .ow-tv { font-size: 32px; }
     .ow-row3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
     .ow-leg { grid-template-columns: minmax(0, 1fr) minmax(0, 92px) 44px; }
@@ -939,30 +953,7 @@ export function renderOsowToolPage(): string {
     (n) => `<li><strong>${esc(n.item)}.</strong> ${esc(n.why)}</li>`,
   ).join('');
 
-  const body = `
-  <section class="hero ow-hero">
-    <div class="container-narrow">
-      <p class="ow-eyebrow">Free tool · no account needed</p>
-      <h1>Oversize &amp; Overweight State Permit Calculator</h1>
-      <p class="lead">Add the states your load crosses and the miles inside each one, and get the single-trip OS/OW permit fee each state charges — every line traced to the statute or fee schedule it came from.</p>
-      <!-- ONE STATEMENT OF THE CLAIM, NOT THREE. The heading made it, the
-           paragraph repeated it verbatim through OSOW_HEADLINE_DISCLAIMER, and
-           the results column restated it a third time in an always-open
-           exclusions list. The heading keeps the sentence; the paragraph now
-           only lists what is left out; the exclusions list is a disclosure. The
-           disclaimer that matters most — the one 4px under the number — is
-           unchanged and still renders beside every total this page prints. -->
-      <details class="qt-fold">
-        <summary>About this calculator</summary>
-        <div class="qt-fold-body">
-          <p><strong>STATE PERMIT FEES ONLY: no line haul, no fuel, no margin.</strong> It also excludes the cost of any pilot car a state requires — we hold no pilot-car rates, so enter your own and we apply it as a separate figure, never inside the permit total. On a long lane one escort can cost more than every permit below combined.</p>
-        </div>
-      </details>
-    </div>
-  </section>
-
-  <main class="ow-shell">
-    <div class="ow-grid">
+  const toolHtml = `<div class="ow-grid">
       <form class="ow-form" id="ow-form" novalidate>
         <div class="ow-card">
           <div class="ow-sec">${cue('cue-load')}<h2>The load</h2></div>
@@ -1055,80 +1046,224 @@ export function renderOsowToolPage(): string {
           <ul>${notIncludedHtml}</ul>
         </details>
       </section>
-    </div>
-  </main>`;
-
-  const jsonLd = [
-    {
-      '@context': 'https://schema.org',
-      '@type': 'WebApplication',
-      name: 'Oversize & Overweight State Permit Calculator',
-      applicationCategory: 'BusinessApplication',
-      operatingSystem: 'Any',
-      url: `${SITE}${OSOW_TOOL_PATH}`,
-      offers: { '@type': 'Offer', price: '0', priceCurrency: 'USD' },
-      description: `Single-trip OS/OW state permit fees across ${covered.length} US states, with the statute or fee schedule behind every line. State permit fees only — not a freight rate.`,
-    },
-    {
-      '@context': 'https://schema.org',
-      '@type': 'BreadcrumbList',
-      itemListElement: [
-        { '@type': 'ListItem', position: 1, name: 'Home', item: `${SITE}/` },
-        { '@type': 'ListItem', position: 2, name: 'Free Tools', item: `${SITE}/tools` },
-        {
-          '@type': 'ListItem',
-          position: 3,
-          name: 'Oversize Permit Calculator',
-          item: `${SITE}${OSOW_TOOL_PATH}`,
-        },
-      ],
-    },
-  ];
+    </div>`;
 
   const title = `Oversize & Overweight Permit Calculator — ${covered.length} States | QuoteFleet`;
   const description = `Free OS/OW state permit fee calculator. Enter your load and per-state miles for a cited single-trip permit total across ${covered.length} states. State permit fees only — not a freight quote, and escort cost is not included.`;
 
-  return `<!doctype html>
-<html lang="en">
-<head>
-  <meta charset="utf-8">
-  <script>(function(){try{var t=localStorage.getItem('qf-theme');if(t==='dark'||(!t&&window.matchMedia&&matchMedia('(prefers-color-scheme:dark)').matches))document.documentElement.setAttribute('data-theme','dark');else document.documentElement.setAttribute('data-theme','light');}catch(e){document.documentElement.setAttribute('data-theme','light');}})();</script>
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>${esc(title)}</title>
-  <meta name="description" content="${esc(description)}">
-  <link rel="canonical" href="${SITE}${OSOW_TOOL_PATH}">
-  <link rel="stylesheet" href="/style.css">
-  <link rel="stylesheet" href="/nav-unify.css">
-  <style>${OSOW_CSS}</style>
-  <link rel="icon" href="/favicon.ico" sizes="any">
-  <link rel="icon" type="image/png" sizes="32x32" href="/brand/favicon-32.png">
-  <link rel="icon" type="image/png" sizes="16x16" href="/brand/favicon-16.png">
-  <link rel="apple-touch-icon" sizes="180x180" href="/brand/apple-touch-icon-180.png">
-  <link rel="manifest" href="/site.webmanifest">
-  <meta name="theme-color" content="#F6F8FA">
-  <meta property="og:title" content="${esc(title)}">
-  <meta property="og:description" content="${esc(description)}">
-  <meta property="og:image" content="${SITE}/brand/og-image-1200x630.png">
-  <meta name="twitter:card" content="summary_large_image">
-  <meta name="twitter:image" content="${SITE}/brand/og-image-1200x630.png">
-  ${jsonLd.map((o) => `<script type="application/ld+json">${JSON.stringify(o)}</script>`).join('\n  ')}
-</head>
-<body class="qf-mc-hide-sm">
-  ${FULL_SITE_HEADER}
-  ${body}
-  ${TOOL_PROMO_CTA}
-  ${PREMIUM_FOOTER}
-  ${HEADER_SCRIPTS}
-  <template id="ow-leg-tpl"><div class="ow-leg">
+  /**
+   * THE FAQ, AND THE RULE IT IS WRITTEN UNDER.
+   *
+   * This is a compliance-adjacent tool. Every answer below is grounded in one
+   * of exactly three things and NOTHING else:
+   *
+   *   - a constant or a data shape in this repository (each one named in the
+   *     comment above the question it backs);
+   *   - a figure this tool itself computes and prints;
+   *   - a general, non-jurisdictional statement about how the tool works.
+   *
+   * Where an honest answer would need a jurisdiction-specific legal claim we
+   * cannot source from our own corpus — what size triggers a permit in a given
+   * state, when that state requires an escort, whether a route survey is due —
+   * the question is NOT asked here. Those answers belong to the state's own
+   * permit office and the page says so rather than guessing. There are no
+   * Canadian questions for the same reason: the corpus is US-only.
+   */
+  const faqs = [
+    // OSOW_NOT_INCLUDED, this file — the exclusions are LISTED from the
+    // constant rather than retyped, so the answer cannot drift from the API's.
+    //
+    // It deliberately does NOT quote `OSOW_HEADLINE_DISCLAIMER` verbatim. That
+    // sentence is printed 4px under the computed total by the client script,
+    // and the page's standing rule (asserted in the e2e suite) is that the
+    // claim is made ONCE. An FAQ that repeats it word for word is the third
+    // restatement the rule exists to prevent.
+    {
+      q: 'Is this what the move will cost?',
+      a: `No — it prices the single-trip permit fee each state charges, and nothing else. ${OSOW_NOT_INCLUDED.length} things that cost real money sit outside it: ${OSOW_NOT_INCLUDED.map((n) => n.item.toLowerCase()).join('; ')}. Each one is listed beside the total with the reason it is out.`,
+    },
+    // src/calc/osow/stateMileage.ts, and the measured geodesic-split error in
+    // src/calc/heavyHaul/corridor.ts (MILEAGE_TIERS.geodesicSplit).
+    {
+      q: 'Why does it ask for the miles inside each state instead of working them out?',
+      a: 'Because several states price the overweight permit on the miles travelled inside that state, and this tool does not route your lane. Splitting a lane total by each state\'s share of a straight line is the obvious shortcut and we measured it: per-state error ran from −100% — a state missed altogether — to +780%, and on one Houston-to-Buffalo lane it invented a $285 Louisiana permit for a state the route never enters. The figures you type are the ones that go on the permit application, which makes them the miles the state actually bills.',
+    },
+    // priceOsowLane() -> `uncovered`, and the partial-total rendering.
+    {
+      q: 'What happens to a state you hold no fee schedule for?',
+      a: `It comes back named and unpriced — never as $0 — and the figure at the top stops calling itself a lane total, labels itself a partial and says how many states were priced and how many were not. We hold a cited schedule for ${covered.length} of the ${options.length} states and districts the form offers. Leaving a state silently out of the sum would be the single most misleading thing this tool could do.`,
+    },
+    // IMMATERIAL_CONFLICT_THRESHOLD_USD, src/calc/osow/engine.ts.
+    {
+      q: 'Two official sources give different fees. Which one do you use?',
+      a: `Where they disagree by $${IMMATERIAL_CONFLICT_THRESHOLD_USD} or less we quote the HIGHER figure, price the lane and list the disagreement so you can see exactly which number moved and why. Where the gap is bigger than that, nothing is picked: the state is flagged for manual review with both readings and both citations, because choosing between two official documents is not ours to do.`,
+    },
+    // escorts.costIncluded === false, and escortCost.ts, which holds no rates.
+    {
+      q: 'Does the total include the pilot cars a state requires?',
+      a: 'No, and it never will — no escort money is inside the permit total, however it is priced. The calculator reports the escort COUNT each state\'s own rules produce for your load. Cost is a separate figure and only appears if you enter your own pilot-car rate: we hold no pilot-car rates and will not invent one, because pilot cars are private vendors and your negotiated rate beats any range we could make up.',
+    },
+    // A statement about the tool's scope, not about any state's rules.
+    {
+      q: 'Can I apply for the permit here?',
+      a: 'No. This prices the single-trip permit each state charges so you can quote the move; the application itself goes to each state\'s own permitting office, and that office is also who decides the route, the escorts and the timing on the day. Where we know a state has more than one issuing authority — a toll road, a bridge authority, a city — that state\'s notes say so.',
+    },
+  ];
+
+  return toolPage({
+    title,
+    description,
+    path: OSOW_TOOL_PATH,
+
+    // ── 1 ── The header band. The H1 is the string this URL has always
+    // carried; the page has SEO weight and a reworded H1 buys nothing.
+    crumbs: [{ name: 'Free tools', path: '/tools' }, { name: 'Oversize permit calculator' }],
+    eyebrow: 'Free tool · no account needed',
+    h1: 'Oversize & Overweight State Permit Calculator',
+    lead: 'Add the states your load crosses and the miles inside each one, and get the single-trip OS/OW permit fee each state charges — every line traced to the statute or fee schedule it came from.',
+    embed: { href: EMBED_SURFACE, label: 'Embed this tool' },
+
+    // ── 2 ──
+    toolHtml,
+
+    // ── 3 ── The strip replaces the hero's collapsed "About this calculator"
+    // disclosure. Same claim, open by default rather than behind a summary.
+    limits: {
+      head: {
+        eyebrow: 'Scope',
+        heading: 'What this prices, and where the number stops',
+        // Says the boundary WITHOUT restating the sentence the client script
+        // prints 4px under the computed total. One claim, made once.
+        sub: 'Three facts are the whole boundary: what is priced here, what is deliberately left out, and what it costs you.',
+      },
+      facts: [
+        {
+          label: 'What it covers',
+          bodyHtml: `The single-trip oversize and overweight permit each state charges, across the <strong>${covered.length} states</strong> the engine holds a cited fee schedule for, plus the escort COUNT each state's own rules produce for your load. Every fee line names the statute or fee schedule it came from and that document's revision date.`,
+        },
+        {
+          label: 'What it does not cover',
+          bodyHtml:
+            '<strong>STATE PERMIT FEES ONLY: no line haul, no fuel, no margin.</strong> It also excludes the cost of any pilot car a state requires — we hold no pilot-car rates, so enter your own and we apply it as a separate figure, never inside the permit total. On a long lane one escort can cost more than every permit below combined.',
+        },
+        {
+          label: 'What it costs',
+          bodyHtml:
+            'Nothing, and no account. Every input is in the request and every fee is compiled in, so the page renders and the endpoint answers with the database unreachable — and neither calls anything billable.',
+        },
+      ],
+    },
+
+    // ── 4 ──
+    steps: {
+      head: { eyebrow: 'How it works', heading: 'Three steps, in order' },
+      items: [
+        {
+          title: 'Describe the load',
+          bodyHtml:
+            'Gross weight is what every state prices the overweight permit from. Width, height and overall length decide the oversize fee band and the escort rules. Leave one blank and the states that need it say so rather than guessing.',
+        },
+        {
+          title: 'Type the miles inside each state',
+          bodyHtml:
+            'These are <strong>your</strong> miles, not ours — the per-state figures your PC*Miler or ProMiles run already produced for the permit application. We do not route the lane and never imply that we did.',
+        },
+        {
+          title: 'Read the table, not just the total',
+          bodyHtml: `Every state gets a row: oversize, overweight, base and fees, escorts, subtotal and status, with a totals row under it. A state flagged for manual review shows the unsettled sentence that caused it, and every citation is one click away.`,
+        },
+      ],
+    },
+
+    // ── 5 ── Two rows. Each figure is FACTS, computed here, not decoration.
+    rows: {
+      head: { eyebrow: 'Why this one', heading: 'Two things a free permit calculator usually gets wrong' },
+      items: [
+        {
+          heading: 'A gap is named, never priced at $0',
+          bodyHtml: `<p>Every US state and DC can be added to a lane, including the ones we hold no schedule for. Hiding them would make "we do not have this state's fee schedule" look like "this state charges nothing", and a lane quietly missing a state is the most misleading output this tool could produce.</p>
+            <p>So an uncovered state comes back named and unpriced, and the headline figure relabels itself a partial rather than passing off an incomplete sum as a lane total.</p>`,
+          figureHtml: factList([
+            { label: 'States with a cited fee schedule', value: String(covered.length) },
+            { label: 'States and districts the form offers', value: String(options.length) },
+            { label: 'An uncovered state priced at $0', value: 'Never' },
+          ]),
+        },
+        {
+          heading: 'Escort cost is never inside the permit total',
+          bodyHtml: `<p>States set the escort REQUIREMENT; pilot cars are private vendors and no state publishes a rate for one. So the requirement is reported as a count from each state's own rules, and money only ever attaches to it from a rate you supply.</p>
+            <p>A figure derived from your rate is drawn differently from a cited one — dashed outline, its own <em>your rate</em> tag — because it is your arithmetic and we did not source it. <a href="/pilot-cars">Find a certified escort operator for the lane →</a></p>`,
+          figureHtml: factList([
+            { label: 'Escort money inside the permit total', value: '$0.00' },
+            { label: 'Pilot-car rates we hold of our own', value: 'None' },
+            { label: 'Rate fields you can supply', value: '4' },
+          ]),
+        },
+      ],
+    },
+
+    // ── 6 ── Four cards, so the grid goes 4 / 2x2 / 4x1 and never orphans one.
+    // The paths are literals rather than imports on purpose: `pilotCars.ts` and
+    // `heavyHaulQuote.ts` both import FROM this module, so importing their path
+    // constants back would close a cycle. `osowTools.ts` does the same.
+    related: {
+      head: {
+        eyebrow: 'Next',
+        heading: 'Once you know the permit',
+        sub: 'A permit price is one of four questions on an oversize move.',
+      },
+      items: [
+        {
+          href: '/tools/heavy-haul-quote',
+          title: 'Heavy-haul quote tool',
+          blurb: 'The delivered cost around these permits — line haul, fuel and accessorials, each rated by evidence.',
+        },
+        {
+          href: '/tools/bridge-formula',
+          title: 'Bridge formula calculator',
+          blurb: 'Every group of two or more consecutive axles against the federal formula, with the headroom left.',
+        },
+        {
+          href: '/tools/axle-weights',
+          title: 'Axle weight checker',
+          blurb: "The same rig against a state's own cited axle and gross limits, statute on every line.",
+        },
+        {
+          href: '/pilot-cars',
+          title: 'Pilot car directory',
+          blurb: 'Escort operators filtered by the states they run and the certificate they hold in each one.',
+        },
+      ],
+    },
+
+    // ── 7 ──
+    faq: { head: { eyebrow: 'FAQ', heading: 'Questions' }, items: faqs },
+
+    extraCss: OSOW_CSS,
+    // `marketing-chat.js` and `theme-toggle.js` are the shell's already.
+    extraScripts: `<template id="ow-leg-tpl"><div class="ow-leg">
     <label class="ow-field"><select class="ow-leg-state">${stateOptionsHtml}</select><span class="ow-lab">State</span></label>
     <label class="ow-field"><input class="ow-leg-miles" type="number" inputmode="decimal" step="any" min="0" placeholder=" " autocomplete="off"><span class="ow-lab">Miles in state</span></label>
     <button type="button" class="ow-legdrop" aria-label="Remove this state">&times;</button>
   </div></template>
-  <script src="/osow-calculator.js" defer></script>
-  <script src="/marketing-chat.js" defer></script>
-  <script src="/theme-toggle.js" defer></script>
-</body>
-</html>`;
+  <script src="/osow-calculator.js" defer></script>`,
+    // The primary action on this page is a submit button, and at phone width
+    // the floating chat launcher sits on top of it. This class is what
+    // marketing-chat.js reads to stay out of the way; the template appends it.
+    bodyClassExtra: 'qf-mc-hide-sm',
+    jsonLd: [
+      jsonLdBreadcrumb([
+        { name: 'Free tools', path: '/tools' },
+        { name: 'Oversize permit calculator', path: OSOW_TOOL_PATH },
+      ]),
+      jsonLdWebApplication({
+        name: 'Oversize & Overweight State Permit Calculator',
+        description: `Single-trip OS/OW state permit fees across ${covered.length} US states, with the statute or fee schedule behind every line. State permit fees only — not a freight rate.`,
+        path: OSOW_TOOL_PATH,
+      }),
+      jsonLdFaq(faqs),
+    ],
+  });
 }
 
 // ── Routes ─────────────────────────────────────────────────────────────────

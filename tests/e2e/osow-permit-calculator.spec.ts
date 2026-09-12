@@ -717,23 +717,19 @@ test.describe('OS/OW calculator — the empty state a first-time visitor meets',
     // the five-item exclusion list is a disclosure, and the sentence beside the
     // number appears with the number.
     //
-    // THE BANNER IS NOW A FOLD. #518 replaced the always-open `.ow-truth` box
-    // with `details.qt-fold` — the same "About this…" disclosure every tool page
-    // on the site now carries (heavyHaulQuote / osowPermits / pilotCars /
-    // seasonalRestrictions), and the page's own source comment records the
-    // reason: the claim was being made three times and the fold is the one that
-    // is not the heading and not the results-column list. The CONTRACT is
-    // unchanged, so this asserts it harder than the bare visibility check it
-    // replaces: exactly one such disclosure on the page, and the claim itself is
-    // still inside it. `.ow-truth` only proved a box existed; if the sentence had
-    // been deleted from it the old assertion would still have passed.
-    const claim = page.locator('details.qt-fold');
+    // THE BANNER IS NOW THE ANSWER/LIMITS STRIP. #518 moved the always-open
+    // `.ow-truth` box into `details.qt-fold`; the tool-page-template migration
+    // moves it once more, into block 3 of the shared template — which is OPEN
+    // by default, so the claim no longer needs a click to be read. The CONTRACT
+    // is unchanged and is asserted harder than before: the strip must be
+    // VISIBLE with the sentence inside it, and there must be no disclosure
+    // wrapped around it.
+    const claim = page.locator('.qtt-strip');
     await expect(claim).toHaveCount(1);
     await expect(claim).toBeVisible();
-    await expect(claim.locator('summary')).toContainText('About this calculator');
-    await claim.locator('summary').click();
     await expect(claim).toContainText('STATE PERMIT FEES ONLY: no line haul, no fuel, no margin');
     await expect(claim).toContainText('never inside the permit total');
+    await expect(claim.locator('details')).toHaveCount(0);
     const restatements = await page.evaluate(
       () => (document.body.textContent ?? '').match(/not a freight quote/gi)?.length ?? 0,
     );
