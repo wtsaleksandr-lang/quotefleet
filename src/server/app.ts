@@ -76,6 +76,7 @@ import { hostInfoMiddleware } from './hostInfo.js';
 import { applyAuthChrome, applyFullSiteHeader, verifySiteChromeSlots } from './siteChrome.js';
 import { applyFmcsaFreshness } from './directory/fmcsaFreshness.js';
 import { applyHomeSections, verifyHomeSectionSlots } from './home/homeSections.js';
+import { replaceLiveOnce } from './htmlInject.js';
 import { registerPartnersRoutes } from './routes/partners.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -97,9 +98,20 @@ function allowsExternalFraming(req: express.Request): boolean {
 function applyPageSkin(html: string, extraCss: string[], bodyClass: string): string {
   const styles = extraCss.map((href) => `  <link rel="stylesheet" href="${href}">`).join('\n');
   const classes = ['qf-public-wft', bodyClass].filter(Boolean).join(' ');
-  return html
-    .replace('<link rel="stylesheet" href="/style.css">', `<link rel="stylesheet" href="/style.css">\n  <link rel="stylesheet" href="/public-pages-wefixtrades.css">\n${styles}`)
-    .replace('<body>', `<body class="${classes}">`);
+  // `replaceLiveOnce`, not `.replace`: both needles are short, ordinary markup
+  // that also appears inside these pages' head comments and inline scripts, and
+  // a plain first-match replace aims at whichever comes first TEXTUALLY. Aiming
+  // at a commented-out copy applies the skin inside the comment — the page then
+  // ships with no /public-pages-wefixtrades.css and no qf-public-wft body
+  // class, with nothing raised. Missing the needle entirely is equally silent
+  // today; both are loud now. See htmlInject.ts.
+  const withCss = replaceLiveOnce(
+    html,
+    '<link rel="stylesheet" href="/style.css">',
+    `<link rel="stylesheet" href="/style.css">\n  <link rel="stylesheet" href="/public-pages-wefixtrades.css">\n${styles}`,
+    'page skin stylesheets',
+  );
+  return replaceLiveOnce(withCss, '<body>', `<body class="${classes}">`, 'page skin body class');
 }
 
 function applyDpaPageSkin(html: string): string {
