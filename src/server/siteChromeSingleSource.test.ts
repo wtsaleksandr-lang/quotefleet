@@ -32,9 +32,13 @@ import { readFileSync, readdirSync } from 'node:fs';
 import { resolve } from 'node:path';
 import {
   FOOTER_COLUMNS,
+  FULL_SITE_HEADER,
+  HEADER_SCRIPTS,
   PREMIUM_FOOTER,
+  SITE_BURGER_BTN,
   SITE_FOOTER_SLOT,
   SITE_HEADER_SLOT,
+  SITE_MOBILE_MENU_HTML,
   SiteChromeError,
   applySiteChrome,
   footerColumnLadderReport,
@@ -417,6 +421,171 @@ describe('the interaction contract survived the restyle', () => {
       expect(html, file).toContain(`<a class="nav-link" href="${href}">`);
       expect(count(html, '<footer'), `${file} must not grow a footer`).toBe(0);
       expect(html, file).toContain('class="qf-theme-btn"');
+    }
+  });
+});
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   WAVE 6 — THE DRAWER OVERLAYS THE PAGE. Reported as "it opens without any
+   premium android effect and when I scroll down I can actually see the hero
+   section of the website under the menu, so it's pushing the website down
+   instead of overlapping it".
+
+   Both halves of that are ONE fact: the panel was laid out in normal flow as
+   the last child of a `position: sticky` header, so opening it grew the
+   header's flow box (the page moved down) and the document underneath was
+   still free to scroll (the hero slid up behind it). Measured on main at 375:
+   +762px of document on /, +786px on /directory and /tools, and a 500px wheel
+   with the drawer open moved the content 500px every time.
+
+   After: the panel is `position: fixed`, the body is pinned while it is open,
+   and the same wheel moves the page 0px on all three — with 0 of 225,000
+   sampled pixels changing below the drawer, and CLS 0 on open AND on close.
+
+   These are the declarations that hold that, pinned here so the next sheet to
+   touch this drawer cannot quietly put it back in flow.
+   ═══════════════════════════════════════════════════════════════════════════ */
+describe('the mobile drawer overlays the page instead of displacing it', () => {
+  const wave6 = (() => {
+    const at = NAV_UNIFY.indexOf('WAVE 6');
+    expect(at, 'nav-unify.css has no WAVE 6 block').toBeGreaterThan(-1);
+    return NAV_UNIFY.slice(at);
+  })();
+
+  it('takes the panel out of flow and puts it above the chat launcher', () => {
+    // The fix itself. `position: fixed` on the OPEN state — stated with the id
+    // because seven sheets style `.site-mobile-menu`, three of them injected
+    // after this one, most of them with !important.
+    expect(wave6).toMatch(/#site-mobile-menu:not\(\[hidden\]\)\s*\{[^}]*position: fixed !important/);
+    expect(wave6).toMatch(/#site-menu-scrim\s*\{[^}]*position: fixed/);
+    // Above the marketing chat launcher's 2147483000 root-stacking-context FAB.
+    // Declared in the script, not the sheet: the header's promotion rides the
+    // same inline-!important pin as its position (see the next test).
+    expect(HEADER_SCRIPTS).toContain('2147483004');
+    // And the drawer must never be reachable above the collapse point.
+    expect(wave6).toMatch(/min-width: 1024px[\s\S]*?#site-mobile-menu \{ display: none !important/);
+  });
+
+  it('locks the page behind it without losing the scroll position', () => {
+    // Neither cheap lock survives `html, body { height: 100% }` plus the
+    // homepage's `body { overflow-y: auto }`: both clamp scrollY to 0 on /.
+    expect(wave6).toMatch(/html\[data-qf-menu="open"\] body\s*\{[^}]*position: fixed !important/);
+    expect(wave6).toMatch(/html\[data-qf-menu="open"\] body\s*\{[^}]*top: calc\(var\(--qf-lock-y/);
+    // A fixed body with the homepage's own overflow would become a second
+    // scroll container and leak the lock straight back in.
+    expect(wave6).toMatch(/html\[data-qf-menu="open"\] body\s*\{[^}]*overflow: visible !important/);
+    // The pinned header leaves flow; --qf-lock-pad is what puts it back.
+    expect(wave6).toMatch(/padding-top: var\(--qf-lock-pad/);
+    // The script measures, pins, and restores.
+    expect(HEADER_SCRIPTS).toContain('--qf-lock-y');
+    expect(HEADER_SCRIPTS).toContain('--qf-lock-pad');
+    expect(HEADER_SCRIPTS).toContain('--qf-sbw');
+    expect(HEADER_SCRIPTS).toContain('window.scrollTo(0, lockY)');
+    // The header pin is inline-!important, not a rule: nav-ia.css restates the
+    // homepage header at (0,4,2) with `position: sticky !important` and loads
+    // last, and this element cannot take an id (three tests pin the literal
+    // `<header class="site-header">`).
+    expect(HEADER_SCRIPTS).toMatch(/setProperty\(PIN\[i\]\[0\], PIN\[i\]\[1\], 'important'\)/);
+  });
+
+  it('frosts the panel, with an OPAQUE fallback as the base declaration', () => {
+    // Progressive enhancement, so a browser without backdrop-filter gets a
+    // solid sheet rather than body text floating on the hero — and so the
+    // fallback cannot rot: it is the rule that always applies.
+    expect(wave6).toMatch(/#site-mobile-menu:not\(\[hidden\]\)\s*\{[^}]*background-color: var\(--chrome-panel-bg\) !important/);
+    expect(wave6).toMatch(/#site-mobile-menu:not\(\[hidden\]\)\s*\{[^}]*backdrop-filter: none !important/);
+    const supports = wave6.slice(wave6.indexOf('@supports ((backdrop-filter'));
+    expect(supports, 'the blur must live INSIDE @supports').toMatch(/backdrop-filter: blur\(var\(--qf-menu-blur\)\)/);
+    expect(supports).toMatch(/-webkit-backdrop-filter: blur\(var\(--qf-menu-blur\)\)/);
+    expect(supports).toMatch(/background-color: var\(--qf-menu-tint\) !important/);
+    // Both themes AND the un-stamped state, which is what most visitors get.
+    expect(wave6).toMatch(/html\[data-theme="dark"\]\s*\{[^}]*--qf-menu-tint/);
+    expect(wave6).toMatch(/@media \(prefers-color-scheme: dark\)[\s\S]{0,400}--qf-menu-tint/);
+  });
+
+  it('animates on two durations and returns to instant under reduced motion', () => {
+    // The design law's two durations, used the conventional way round.
+    expect(wave6).toMatch(/--qf-menu-dur-in: \.3s;/);
+    expect(wave6).toMatch(/--qf-menu-dur-out: \.2s;/);
+    // The one added curve is scoped to this block and justified in it.
+    expect(wave6).toMatch(/--qf-menu-ease-emphasized: cubic-bezier\(0\.2, 0, 0, 1\);/);
+    expect(NAV_UNIFY.slice(0, NAV_UNIFY.indexOf('WAVE 6')),
+      'the emphasised curve must not leak outside the drawer')
+      .not.toContain('--qf-menu-ease-emphasized');
+    const reduced = wave6.slice(wave6.indexOf('@media (prefers-reduced-motion: reduce)'));
+    expect(reduced).toContain('#site-mobile-menu:not([hidden])');
+    expect(reduced).toContain('#site-menu-scrim');
+    expect(reduced).toContain('#site-burger .qf-burger-bar');
+    expect(reduced).toMatch(/transition: none !important/);
+    // The script has to shorten with it, or the panel sits invisible-but-present
+    // for 200ms after every close.
+    expect(HEADER_SCRIPTS).toContain("matchMedia('(prefers-reduced-motion: reduce)')");
+    expect(HEADER_SCRIPTS).toMatch(/reduce\.matches \? 0 : EXIT_MS/);
+  });
+
+  it('morphs the burger rather than swapping two glyphs', () => {
+    expect(SITE_BURGER_BTN).toContain('qf-burger-bar');
+    expect(count(SITE_BURGER_BTN, 'qf-burger-bar')).toBe(3);
+    // `display` is not animatable, which is what made the old two-icon swap a
+    // hard cut.
+    expect(SITE_BURGER_BTN).not.toContain('ico-open');
+    expect(SITE_BURGER_BTN).not.toContain('ico-close');
+    expect(wave6).toMatch(/#site-burger\[aria-expanded="true"\] \.qf-burger-bar:nth-child\(1\) \{ transform: translateY\(7px\) rotate\(45deg\)/);
+    expect(wave6).toMatch(/#site-burger\[aria-expanded="true"\] \.qf-burger-bar:nth-child\(3\) \{ transform: translateY\(-7px\) rotate\(-45deg\)/);
+  });
+
+  it('names the panel, traps focus over it, and hands focus back', () => {
+    const header = renderStaticPage('landing.html');
+    expect(header).toContain('id="site-menu-scrim"');
+    expect(header).toMatch(/id="site-mobile-menu"[^>]*role="navigation"/);
+    expect(header).toMatch(/id="site-mobile-menu"[^>]*aria-label="Site menu"/);
+    expect(header).toMatch(/id="site-mobile-menu"[^>]*tabindex="-1"/);
+    // The burger is INSIDE the cycle: it is the close control and it lives
+    // outside the panel, so a trap that excluded it would strand a keyboard
+    // visitor with no way to close what they opened. Same reason the panel is
+    // not `aria-modal` — that would hide the close control from assistive tech.
+    expect(header).not.toContain('aria-modal');
+    expect(HEADER_SCRIPTS).toContain("if (e.key !== 'Tab') return;");
+    expect(HEADER_SCRIPTS).toMatch(/e\.key === 'Escape' && isOpen/);
+    expect(HEADER_SCRIPTS).toMatch(/sc\.addEventListener\('click'/);
+    expect(HEADER_SCRIPTS).toMatch(/giveBackFocus !== false\) b\.focus\(\)/);
+    // Following a link closes WITHOUT taking focus — the page is navigating.
+    expect(HEADER_SCRIPTS).toMatch(/closest\('a'\)\) close\(false\)/);
+    const wave6Focus = wave6.slice(wave6.indexOf('#site-mobile-menu a:focus-visible'));
+    expect(wave6Focus).toMatch(/outline: 2px solid var\(--accent\) !important/);
+  });
+
+  it('keeps the navigation usable with JavaScript disabled', () => {
+    // Every route into this drawer AND into the three desktop mega-panels is a
+    // script, and both ship `hidden`, which CSS cannot undo on a click. So with
+    // scripting off the burger is removed and the drawer renders as a plain
+    // expanded list in the header's flow — the groups are <details>, so they
+    // still open and close on their own.
+    expect(SITE_MOBILE_MENU_HTML).toContain('<noscript><link rel="stylesheet" href="/nav-nojs.css"></noscript>');
+    const nojs = read('src/server/public/nav-nojs.css');
+    expect(nojs).toMatch(/#site-burger,\s*\n#site-menu-scrim \{ display: none !important; \}/);
+    expect(nojs).toMatch(/#site-mobile-menu\[hidden\] \{[^}]*display: flex !important/);
+    expect(nojs).toMatch(/#site-mobile-menu\[hidden\] \{[^}]*position: static !important/);
+    // Opaque in flow: there is nothing to float it over once it is on the page.
+    expect(nojs).toMatch(/#site-mobile-menu\[hidden\] \{[^}]*background-color: var\(--chrome-panel-bg\) !important/);
+    expect(nojs).toMatch(/\.nav-dd:focus-within > \.nav-dd-panel\[hidden\] \{ display: grid !important; \}/);
+  });
+
+  it('ships the drawer on all four shells, from the one constant', () => {
+    // The scrim and the <noscript> travel WITH the panel, so a shell cannot
+    // acquire one without the others — either by interpolating the drawer
+    // constant itself (the directory subsite builds its own <header>) or by
+    // interpolating FULL_SITE_HEADER, which already contains it.
+    expect(FULL_SITE_HEADER).toContain(SITE_MOBILE_MENU_HTML);
+    expect(FULL_SITE_HEADER).toContain(SITE_BURGER_BTN);
+    for (const [name, src] of [
+      ['directory/pages.ts', read('src/server/directory/pages.ts')],
+      ['osow/hubShell.ts', read('src/server/osow/hubShell.ts')],
+      ['routes/pilotCars.ts', read('src/server/routes/pilotCars.ts')],
+    ] as const) {
+      const wired = src.includes('SITE_MOBILE_MENU_HTML') || src.includes('FULL_SITE_HEADER');
+      expect(wired, `${name} must render the drawer from the shared chrome`).toBe(true);
+      expect(src, `${name} must ship the drawer's script`).toContain('HEADER_SCRIPTS');
     }
   });
 });

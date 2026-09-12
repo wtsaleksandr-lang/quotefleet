@@ -1,0 +1,63 @@
+/* nav-nojs.css — THE NAVIGATION, FOR A VISITOR WITH SCRIPTING OFF.
+
+   Loaded from ONE place and one only: a <noscript> in SITE_MOBILE_MENU_HTML
+   (siteChrome.ts), so a browser running scripts never requests it.
+
+   WHY IT HAS TO EXIST. Both nav surfaces ship `hidden` and are revealed by
+   script — the mobile drawer by #site-burger, the three desktop mega-panels by
+   their [data-nav-dd] controllers. `hidden` is not something a stylesheet can
+   take off on a click, so with scripting disabled the phone header was a logo
+   and a dead button, and the desktop header was three dead triggers plus a
+   single live "Pricing" link. Nineteen destinations, none reachable.
+
+   WHAT IT DOES INSTEAD. It stops pretending the controls work. The burger and
+   the scrim are removed outright and the drawer is rendered as what it always
+   was underneath: an expanded list, in the flow of the header, pushing the page
+   down — which is the correct behaviour for a panel that can never be closed
+   again, and is why every `position: fixed` declaration in the WAVE 6 block is
+   undone here rather than inherited. The groups stay usable because they are
+   <details>: opening and closing them is the browser's own behaviour and needs
+   no script. On desktop the mega-panels open on :hover and :focus-within, so
+   both a mouse and the Tab key reach every link in them.
+
+   Everything is stated by id or at the panel's own specificity for the same
+   reason the WAVE 6 block is: seven sheets style these elements, several of
+   them with !important, and this one has to win on every surface. */
+
+/* ── Phone / tablet: the drawer is just a list ──────────────────────────── */
+#site-burger,
+#site-menu-scrim { display: none !important; }
+
+@media (max-width: 1023px) {
+  #site-mobile-menu[hidden] {
+    display: flex !important;
+    flex-direction: column;
+    position: static !important;
+    inset: auto !important;
+    z-index: auto !important;
+    max-height: none !important;
+    overflow: visible !important;
+    opacity: 1 !important;
+    transform: none !important;
+    transition: none !important;
+    margin: var(--space-1) var(--space-2) var(--space-2) !important;
+    padding: var(--space-1) !important;
+    border-radius: var(--radius) !important;
+    /* Opaque: there is nothing to float this sheet over once it is in flow,
+       and a translucent list sitting ON the page would be the readability
+       problem the frost exists to avoid. */
+    background-color: var(--chrome-panel-bg) !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    border: 1px solid var(--border-strong) !important;
+    box-shadow: var(--qf-shadow-lift) !important;
+  }
+  #site-mobile-menu[hidden] a[hidden],
+  #site-mobile-menu[hidden] .mm-group > a[hidden] { display: none !important; }
+}
+
+/* ── Desktop: the mega-panels open on hover and on keyboard focus ───────── */
+@media (min-width: 1024px) {
+  .nav-dd:hover > .nav-dd-panel[hidden],
+  .nav-dd:focus-within > .nav-dd-panel[hidden] { display: grid !important; }
+}
