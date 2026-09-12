@@ -740,3 +740,30 @@ html body.qf-wft .premium-footer .footer-bottom {
     padding-bottom: calc(80px + env(safe-area-inset-bottom, 0px)) !important;
   }
 }
+
+/* ── Wave 5c: THE HOMEPAGE BUNDLE'S COPY OF THE MARKS-NOTE TONE ─────────────
+   Same result as `.premium-footer .qf-foot-marks .qf-foot-marks-line a` in
+   style.css, restated at the specificity this bundle requires — the standing
+   pattern for footer chrome here, and the reason this sheet exists.
+
+   THE NUMBER IT HAS TO CLEAR, read off the live page with
+   CSS.getMatchedStylesForNode rather than inferred: landing-wefixtrades-cleanup
+   .css:1241 paints EVERY light-theme link on the homepage with
+     html[data-theme="light"] body.qf-wft a:not(.btn):not(.nav-link):not(.signin):not(.demo-link)
+     { color: var(--accent) !important }
+   at (0,6,3). style.css reaches the mailto at (0,3,1), so in DARK it wins and
+   in LIGHT it lost — the removal address rendered brand blue against a
+   --footer-quiet sentence, which is the same "reads as bold" problem the round
+   was asked to fix, just in a different colour.
+
+   The selector below is that blanket rule with this one element carved out of
+   it, which is why it carries the same :not() chain: (0,8,3) states the
+   exception without changing what the blanket does everywhere else. The link
+   keeps its underline, so removing the colour cue does not cost the affordance.
+   Measured on the footer ground: 7.17:1, over the 4.5 floor. */
+html[data-theme="light"] body.qf-wft .premium-footer .qf-foot-marks a:not(.btn):not(.nav-link):not(.signin):not(.demo-link) {
+  color: var(--footer-quiet) !important;
+  font-weight: 400 !important;
+  text-decoration: underline !important;
+  text-decoration-color: currentColor !important;
+}

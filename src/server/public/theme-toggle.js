@@ -17,11 +17,18 @@
   /* Brand logos ship in two cuts: `*-ondark.png` (light truck/wordmark, for the
      dark theme) and the default `*.png` (dark-outline truck, for light bg). Swap
      any /brand/*-ondark logo to its light cut in light mode so the mark stays
-     legible on white, and restore it in dark. Both variants are captured once. */
+     legible on white, and restore it in dark. Both variants are captured once.
+
+     `data-logo-fixed` OPTS AN IMAGE OUT. The swap assumes the mark sits on the
+     PAGE ground, which follows the theme. Some grounds do not: the marketing
+     footer paints --surface-dark in both themes, so swapping its lockup to the
+     navy cut in light mode put a dark mark on a near-black band. An image that
+     declares the attribute keeps the src it shipped with, in every theme. */
   function swapLogos(theme) {
     var imgs = document.querySelectorAll('img[src*="/brand/"]');
     for (var i = 0; i < imgs.length; i++) {
       var img = imgs[i];
+      if (img.hasAttribute('data-logo-fixed')) continue; // ground is theme-invariant
       if (!img.hasAttribute('data-logo-dark')) {
         var s = img.getAttribute('src') || '';
         if (s.indexOf('-ondark') === -1) continue; // only theme-paired logos

@@ -2416,3 +2416,188 @@ html[data-theme="dark"],
 @media (min-width: 901px) {
   .qf-footer-payrow { padding-right: 80px; }
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   WAVE 5c — FOOTER POLISH, ROUND 2 (Alex, 2026-09). Five asks, all of them
+   about how the footer READS rather than what it says: the disclosures should
+   open the way a phone's do, the marks disclaimer should be the quietest thing
+   in the block instead of the second-loudest, the processor line should look
+   like the marks it stands next to, and a column heading should not be
+   mistakable for one of its own links.
+
+   APPENDED AT EOF, like every wave in this file — check-spacing.mjs and
+   check-hardcoded-colors.mjs baseline by FILE:LINE, so a mid-file insert
+   renumbers every tolerated entry below it. NOTE: neither guard reads CSS
+   living in a .ts template literal, so the matching DIRECTORY_CSS block was
+   hand-audited against the same rules; a green guard run says nothing about it.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ── 1. THE DISCLOSURES ANIMATE, NATIVELY ───────────────────────────────────
+   Still <details>/<summary>. Nothing about the semantics moves: the browser
+   owns the toggle, Enter/Space still work, the disclosure state is still
+   exposed without an aria-* attribute of ours, find-in-page still reaches a
+   closed column, and every internal link STAYS IN THE DOM when collapsed —
+   which is the whole reason these are native disclosures and not an accordion.
+
+   HEIGHT IS ANIMATED BY THE UA, NOT BY US. `interpolate-size: allow-keywords`
+   makes `block-size: 0 -> auto` a real interpolation, and `::details-content`
+   is the box the UA already wraps the panel in, so there is no wrapper div to
+   measure, no ResizeObserver, no inline style written from script, and nothing
+   to go stale when a column's content changes. `content-visibility` rides along
+   with `transition-behavior: allow-discrete` so the panel stays painted for the
+   whole closing pass instead of vanishing on frame one.
+
+   THE @supports GATE IS THE FALLBACK. A browser missing either feature skips
+   this block entirely and gets exactly today's behaviour — instant open, instant
+   close, links present either way. There is no JS path to degrade, because
+   there is no JS in the animation.
+
+   MOTION BUDGET: .2s ease, which is `--motion-state` (style.css:1875) — the
+   same duration and the same easing the chevron beside it already uses. The
+   token cannot be used directly because it expands to `all .2s ease` and this
+   transition names its properties, so the value is restated, not invented. No
+   third duration, no bespoke curve.
+
+   `interpolate-size` IS INHERITED, so it is switched back off at the panel
+   contents. Leaving it on would hand `allow-keywords` to every link inside —
+   and `.premium-footer a` runs `transition: all .2s ease`, which is exactly the
+   shape that starts animating intrinsic sizes nobody asked to animate. */
+.qf-fdisc { interpolate-size: allow-keywords; }
+.qf-fdisc-body { interpolate-size: numeric-only; }
+@supports (interpolate-size: allow-keywords) and (selector(::details-content)) {
+  .qf-fdisc::details-content {
+    block-size: 0;
+    /* clip, not hidden: hidden would make the panel a scroll container. */
+    overflow: clip;
+    transition: block-size .2s ease, content-visibility .2s ease;
+    transition-behavior: allow-discrete;
+  }
+  .qf-fdisc[open]::details-content { block-size: auto; }
+  /* HEADER_SCRIPTS closes the columns on phones as soon as the page parses.
+     That one pass must be instant, or the footer plays a collapse on load and
+     drags the legal block up with it. The flag is dropped a frame later. */
+  :root[data-fdisc-boot] .qf-fdisc::details-content { transition: none; }
+  @media (prefers-reduced-motion: reduce) {
+    .qf-fdisc::details-content { transition: none; }
+  }
+}
+
+/* ── 4. HEADINGS THAT READ AS HEADINGS ──────────────────────────────────────
+   Open a column and the label sat 8px above its first link — the SAME 8px the
+   links sit apart from each other — so the eye had only an 11px/13px size step
+   and a colour step to go on, and the heading read as row zero of the list.
+
+   THE FIX IS MOSTLY THE GAP, because in this system a divider IS a gap: no
+   rule, no border, no tinted bar under the label. 8px of panel padding puts the
+   heading 16px off its first link against 8px between links — twice the
+   spacing, which is the thing an eye reads without being told. Weight goes
+   700 -> 800 and tracking .10em -> .14em on top, so the label also carries a
+   different texture, not just a different position.
+
+   The padding lives INSIDE `::details-content`, so a closed column still
+   measures zero and the phone footer keeps the height PR #565 bought it.
+   Headings stay left-aligned and keep `text-wrap: balance` (nav-unify.css:1196,
+   DIRECTORY_CSS) so none of them orphans a word at 375 or 320.
+
+   The selectors carry the summary so they outrank the per-surface tone rules in
+   sheets that load AFTER this one — `.premium-footer .footer-col h4` at (0,2,0)
+   in nav-unify.css and `.site-footer .dirfoot-head` at (0,2,0) in DIRECTORY_CSS
+   both declare letter-spacing, and this file is linked first on every surface. */
+.qf-fdisc-body { padding-top: var(--space-1); }
+/* MEASURED SPECIFICITY, NOT GUESSED. `.premium-footer .footer-col h4` in
+   nav-unify.css declares `letter-spacing: .1em` at (0,2,1) — the same weight as
+   `.premium-footer .qf-fdisc-sum h4`, and that sheet is linked AFTER this one on
+   every marketing surface, so a tie loses. `.footer-col` is carried here purely
+   to reach (0,3,1). The directory's `.dirfoot-head` sits at (0,2,0) in
+   DIRECTORY_CSS, which (0,3,0) already outranks. Verified with
+   CSS.getMatchedStylesForNode on / and /directory, not by reading the sheets. */
+.premium-footer .footer-col .qf-fdisc-sum h4,
+.site-footer .qf-fdisc-sum .dirfoot-head {
+  font-weight: 800;
+  letter-spacing: .14em;
+}
+
+/* ── 3. THE PROCESSOR MARK ──────────────────────────────────────────────────
+   siteChrome.ts#STRIPE_MARK explains why this is a badge beside the list rather
+   than a seventh item in it. Here it only has to LOOK like one: the tile is the
+   `.qf-paymark` tile, so it inherits the same 1px --border hairline, the same
+   6px radius and — the part the ask is actually about — the same 22px height as
+   its six siblings, from the same declaration.
+
+   WIDTH IS THE ONLY THING THAT CHANGES. The tile sizes to its content with the
+   strip's own 8px token either side, and the glyph takes `width: auto` against
+   the height it already inherits from `.qf-paymark .qf-pm` (style.css:2288), so
+   the rendered HEIGHT is byte-identical to the other marks and the width falls
+   out of the viewBox. `aspect-ratio` states the same ratio a second time,
+   because an inline SVG carrying no width/height attributes has no intrinsic
+   size to fall back on if a UA declines to derive one.
+
+   The colour !important is the same story as `.qf-paymark` above it: the
+   public-pages skin ships blanket overrides across this subtree, and an
+   !important is only beaten by a more specific !important. (0,3,0) here. */
+.qf-paymark--proc { width: auto; padding: 0 var(--space-1); }
+.qf-paymark--proc .qf-pm { width: auto; aspect-ratio: 82 / 16; }
+.qf-footer-payrow .qf-payrow-methods .qf-paymark--proc { color: var(--ink) !important; }
+
+/* ── 2. THE CARRIER-MARKS DISCLAIMER, MOVED AND QUIETED ─────────────────────
+   Last element in the footer now, under the GDPR/CCPA and per-tenant claims.
+   PRESENT, IN FLOW, VISIBLE WITH NO INTERACTION, AT EVERY WIDTH AND IN BOTH
+   THEMES — it is a nominative-use disclaimer and it only works if it is read.
+   It is not in a <details>, it is not display:none, it is not opacity-0 and it
+   is not behind a disclosure at any breakpoint. Do not move it into one.
+
+   ONE STEP OF TYPE, AND THAT IS THE WHOLE BUDGET: 11.5px -> 11px, the floor
+   this block is allowed. Everything else comes from POSITION and WEIGHT, which
+   is where "less prominent" is supposed to come from for a legal line.
+
+   THE MAILTO STOPS SHOUTING. It was rendering pure #FFF against a --footer-quiet
+   sentence — a 2.5x luminance step that read as bold even at font-weight 400,
+   which is what made the line the loudest thing in the block. It now takes the
+   sentence's own tone and declares an underline instead, so it is unmistakably
+   a link without being the brightest run in the footer. Measured on the footer
+   ground: 7.17:1, well over the 4.5 floor.
+
+   TWO BOXES, because they do different jobs: the outer div takes the same
+   `--container-max` + auto-margin geometry as `.footer-bottom` and
+   `.qf-footer-payrow` so the note's left edge lines up with the site map above
+   it, and the inner p keeps the 78ch measure its sibling `.qf-ds-note` uses. A
+   single box cannot do both — capping the outer box at 78ch would centre a
+   narrow block in a wide footer and break that alignment. */
+.qf-foot-marks {
+  max-width: var(--container-max);
+  margin: var(--space-1) auto 0;
+  text-align: left;
+}
+.qf-foot-marks-line {
+  max-width: 78ch;
+  margin: 0;
+  font-size: 11px;
+  font-weight: 400;
+  line-height: 1.4;
+}
+/* THE NUMBERS THIS SELECTOR IS BUILT TO BEAT, read off the live page with
+   CSS.getMatchedStylesForNode rather than inferred from the sheets:
+     body.qf-wft .premium-footer a            color: #B4C2FC !important   (0,2,2)
+     body.qf-wft a, body.qf-public-wft a …    color: --qf-color-white !imp (0,1,2)
+     body.qf-wft .premium-footer a            text-decoration-color: rgba(255,255,255,0)
+   The first is why the mailto rendered as bright accent blue and the third is
+   why an underline declared at (0,2,1) painted in fully transparent ink. The
+   `.qf-foot-marks-line` class on the <p> exists to reach (0,3,1), which clears
+   all three; an !important is only ever beaten by a more specific !important.
+   `currentColor` on the decoration keeps the underline tied to the text so a
+   future tone change cannot separate them again. */
+.premium-footer .qf-foot-marks .qf-foot-marks-line { color: var(--footer-quiet) !important; }
+.premium-footer .qf-foot-marks .qf-foot-marks-line a {
+  color: var(--footer-quiet) !important;
+  font-weight: 400;
+  text-decoration: underline;
+  text-decoration-color: currentColor !important;
+  text-underline-offset: 2px;
+}
+/* Above the launcher band the pay row buys its clearance horizontally
+   (style.css:2416). The note now sits BELOW it and must not give that width
+   back — it is left-aligned and capped at 78ch, so it never reaches the corner,
+   but the gutter is stated so a future measure change cannot walk into it. */
+@media (min-width: 901px) {
+  .qf-foot-marks { padding-right: 80px; }
+}

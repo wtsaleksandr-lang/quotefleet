@@ -27,19 +27,47 @@
 import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { DIRECTORY_DATA_SOURCES, FOOTER_PAY_ROW, PREMIUM_FOOTER, renderStaticPage } from './siteChrome.js';
+import { CARRIER_MARKS_NOTE, DIRECTORY_DATA_SOURCES, FOOTER_PAY_ROW, PREMIUM_FOOTER, renderStaticPage } from './siteChrome.js';
 
 const publicDir = resolve(process.cwd(), 'src/server/public');
 const srcDir = resolve(process.cwd(), 'src/server');
 
 describe('footer accepted-payment + trust strip', () => {
-  it('is the LAST child of the premium footer, below the copyright row', async () => {
+  it('sits below the copyright row, above only the carrier-marks disclaimer', async () => {
     expect(PREMIUM_FOOTER).toContain(FOOTER_PAY_ROW);
-    expect(PREMIUM_FOOTER.endsWith(`${FOOTER_PAY_ROW}</footer>`)).toBe(true);
+    // The strip used to close the footer. As of the 2026-09 round-2 polish the
+    // carrier names/marks disclaimer moved BELOW it — Alex asked for that line
+    // to be the quietest thing in the block, and position is most of how that
+    // was bought (siteChrome.ts#footerBottomHtml). Nothing else may follow it.
+    expect(PREMIUM_FOOTER.endsWith(
+      `${FOOTER_PAY_ROW}<div class="qf-foot-marks"><p class="qf-foot-marks-line">${CARRIER_MARKS_NOTE}</p></div></footer>`,
+    )).toBe(true);
     // The copyright row still precedes it — the strip is added, not a swap.
     expect(PREMIUM_FOOTER.indexOf('footer-bottom')).toBeLessThan(
       PREMIUM_FOOTER.indexOf('qf-footer-payrow'),
     );
+  });
+
+  /**
+   * THE DISCLAIMER IS NOT ALLOWED TO BECOME A DISCLOSURE.
+   *
+   * "Less prominent" has exactly one failure mode worth a test: someone reads
+   * it as "get it out of the way" and tucks the line into a <details>, a
+   * hover reveal or a display:none. It is a trademark nominative-use statement
+   * — it has to be readable without interaction or it has not been made. So
+   * this pins the two things that would defeat that in markup, and style.css
+   * carries the type floor (11px, --footer-quiet, measured 7.17:1).
+   */
+  it('keeps the carrier-marks disclaimer in flow, out of any disclosure', () => {
+    const at = PREMIUM_FOOTER.indexOf('qf-foot-marks');
+    expect(at).toBeGreaterThan(-1);
+    // Nothing between the last </details> and the note may open another one.
+    expect(PREMIUM_FOOTER.slice(at)).not.toContain('<details');
+    expect(PREMIUM_FOOTER.slice(at)).not.toContain('<summary');
+    // The removal address is still a live mailto, not plain text.
+    expect(PREMIUM_FOOTER).toContain('<a href="mailto:legal@quotefleet.net">legal@quotefleet.net</a>');
+    // The sentence is unchanged, word for word.
+    expect(PREMIUM_FOOTER).toContain(CARRIER_MARKS_NOTE);
   });
 
   it('ships BYTE-IDENTICAL on landing.html and the directory subsite footer', async () => {
@@ -64,7 +92,19 @@ describe('footer accepted-payment + trust strip', () => {
 
   it('shows exactly the six payment methods a customer can genuinely use', () => {
     const labels = [...FOOTER_PAY_ROW.matchAll(/aria-label="([^"]+)"/g)].map((m) => m[1]);
+    // Six METHODS, then the processor. "Powered by Stripe" is the last label
+    // and is deliberately NOT one of the `.qf-paymarks` list items: Stripe is
+    // who processes the payment, not something a customer can pay WITH, and
+    // the list is the answer to "what can I pay with".
     expect(labels).toEqual([
+      'Visa', 'Mastercard', 'American Express', 'Apple Pay', 'Google Pay', 'Link',
+      'Powered by Stripe',
+    ]);
+    const methods = FOOTER_PAY_ROW.slice(
+      FOOTER_PAY_ROW.indexOf('<ul class="qf-paymarks"'),
+      FOOTER_PAY_ROW.indexOf('</ul>'),
+    );
+    expect([...methods.matchAll(/aria-label="([^"]+)"/g)].map((m) => m[1])).toEqual([
       'Visa', 'Mastercard', 'American Express', 'Apple Pay', 'Google Pay', 'Link',
     ]);
   });
@@ -115,10 +155,17 @@ describe('footer accepted-payment + trust strip', () => {
     // Stripe's own wallet — without this line the processor is invisible and the
     // row reads as if Stripe were a missing option rather than the whole row.
     expect(FOOTER_PAY_ROW).toContain('Powered by Stripe');
-    expect(FOOTER_PAY_ROW).toContain('class="qf-payrow-proc"');
-    // Text only — a Stripe wordmark/logo would be a brand asset, and the strip
-    // is specified as monochrome inline markup with no external requests.
+    // It is a MARK now, not a caption (Alex, 2026-09: make it look like the
+    // marks beside it). Same contract as those marks and for the same reason:
+    // inline SVG drawn from currentColor, no external asset, no brand colour,
+    // no raster — a downloaded Stripe badge is white-on-dark and cannot theme.
+    expect(FOOTER_PAY_ROW).toContain('class="qf-paymark qf-paymark--proc"');
+    expect(FOOTER_PAY_ROW).toContain('aria-label="Powered by Stripe"');
+    expect(FOOTER_PAY_ROW).not.toContain('qf-payrow-proc');
     expect(FOOTER_PAY_ROW).not.toMatch(/<img/);
+    // Same sixteen viewBox units tall as the other marks, so one CSS height
+    // gives the whole strip one baseline. Only the width differs.
+    expect(FOOTER_PAY_ROW).toMatch(/class="qf-pm qf-pm-proc" viewBox="0 0 \d+ 16"/);
     const landing = renderStaticPage('landing.html');
     expect(landing).toContain('Powered by Stripe');
   });

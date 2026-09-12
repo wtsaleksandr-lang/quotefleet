@@ -388,6 +388,52 @@ export function authSiteHeader(link: AuthChromeLink): string {
  */
 const APPLE_MARK = `M17.05 12.04c-.03-2.72 2.22-4.03 2.32-4.09-1.27-1.85-3.24-2.1-3.94-2.13-1.68-.17-3.28.99-4.13.99-.85 0-2.16-.97-3.55-.94-1.83.03-3.51 1.06-4.45 2.7-1.9 3.29-.48 8.16 1.36 10.83.9 1.31 1.97 2.77 3.38 2.72 1.36-.06 1.87-.88 3.51-.88 1.64 0 2.1.88 3.53.85 1.46-.02 2.38-1.33 3.27-2.64 1.03-1.51 1.46-2.98 1.48-3.06-.03-.01-2.84-1.09-2.87-4.33zM14.32 4.15c.75-.91 1.25-2.17 1.11-3.43-1.08.04-2.38.72-3.15 1.62-.69.8-1.3 2.08-1.14 3.31 1.2.09 2.43-.61 3.18-1.5z`;
 
+/**
+ * THE PROCESSOR ATTRIBUTION, AS A MARK RATHER THAN A SENTENCE (Alex, 2026-09).
+ *
+ * It used to be `<span class="qf-payrow-proc">Powered by Stripe</span>` — plain
+ * text sitting beside six drawn marks, which read as a caption that had been
+ * left behind rather than as part of the row. The ask was for it to look like
+ * the marks it stands next to. So it is now drawn the same way they are: one
+ * inline SVG, `currentColor`, no external request, no brand colour, in the same
+ * bordered tile at the same rendered HEIGHT as its six siblings.
+ *
+ * IT IS NOT A SEVENTH `.qf-paymark` LI, and that is the whole design decision.
+ * Two independent reasons, both measured:
+ *
+ *   • ARITHMETIC. `.qf-paymarks` is `flex-wrap: nowrap` precisely so a mark can
+ *     never be orphaned onto a line of its own, and the row is sized to the
+ *     narrowest supported viewport: six tiles plus five gaps against the
+ *     content box at 320px. A tile carrying a two-word phrase is roughly two
+ *     and a half tiles wide; inside that list it overflows at 375 AND at 320,
+ *     and the only ways out are wrapping the list (orphan) or shrinking the
+ *     phrase below the legibility floor. Outside the list it costs nothing:
+ *     `.qf-payrow-methods` is already a COLUMN below 720px, so the badge takes
+ *     a line the old text span was taking anyway.
+ *   • MEANING. The marks answer "what can I pay with"; this answers "who
+ *     processes it". Stripe is not a payment method — dropping a bare `stripe`
+ *     wordmark into the accepted-payments list would state something we do not
+ *     mean. Keeping "Powered by" keeps the sentence true, which is why the
+ *     phrase is drawn rather than abbreviated to the logo.
+ *
+ * WIDTH IS SPENT, HEIGHT IS NOT. The viewBox is wider than the 32x16 the other
+ * marks use because the content is a phrase, but it is the same SIXTEEN units
+ * tall and renders at the same CSS height, so every mark in the strip shares
+ * one baseline and one optical weight. "Powered by" is the lighter, smaller
+ * half and "stripe" the heavy one, in the proportion the supplied reference
+ * badge uses; the outlined, rounded tile is the `.qf-paymark` tile the other
+ * six already wear, which is the same idiom the reference draws by hand.
+ *
+ * `textLength` PINS EACH RUN. SVG `<text>` inherits the page font, so a font
+ * stack that resolves wider on one platform would push a glyph past the
+ * viewBox. Both runs declare the width they are allowed to occupy and the UA
+ * fits the tracking to it, so the badge measures the same everywhere.
+ */
+const STRIPE_MARK = `<svg class="qf-pm qf-pm-proc" viewBox="0 0 82 16" role="img" aria-label="Powered by Stripe">`
+  + `<text x="1" y="11.3" font-size="7.6" font-weight="600" textLength="36">Powered by</text>`
+  + `<text x="44" y="12.4" font-size="11.5" font-weight="800" textLength="36">stripe</text>`
+  + `</svg>`;
+
 export const FOOTER_PAY_ROW = `<div class="qf-footer-payrow">`
   + `<div class="qf-payrow-methods"><span class="qf-payrow-label">Accepted payments</span>`
   + `<ul class="qf-paymarks" role="list">`
@@ -398,7 +444,7 @@ export const FOOTER_PAY_ROW = `<div class="qf-footer-payrow">`
   + `<li class="qf-paymark"><svg class="qf-pm" viewBox="0 0 32 16" role="img" aria-label="Google Pay"><text x="7" y="12.2" text-anchor="middle" font-size="12.5" font-weight="700">G</text><text x="12.5" y="11.7" font-size="9.5" font-weight="600" letter-spacing="-.1">Pay</text></svg></li>`
   + `<li class="qf-paymark"><svg class="qf-pm" viewBox="0 0 32 16" role="img" aria-label="Link"><text x="16" y="12" text-anchor="middle" font-size="11" font-weight="700" letter-spacing="-.2">link</text></svg></li>`
   + `</ul>`
-  + `<span class="qf-payrow-proc">Powered by Stripe</span>`
+  + `<span class="qf-paymark qf-paymark--proc">${STRIPE_MARK}</span>`
   + `</div>`
   + `<ul class="qf-payrow-trust" role="list">`
   + `<li>Card details never touch our servers</li>`
@@ -783,6 +829,21 @@ const FOOTER_COLUMNS_HTML = FOOTER_COLUMNS.map(
  * width. It is set smaller and tighter than it was — that is a type decision,
  * and both themes are measured at =>4.5:1 against the footer ground.
  *
+ * THE MARKS NOTE IS LAST NOW, AND IT IS STILL UNCONDITIONALLY VISIBLE (Alex,
+ * 2026-09: make it less prominent). It used to sit second, directly under the
+ * copyright and ABOVE the payment strip, which put the quietest sentence in the
+ * footer in the loudest position the block has. It now closes the footer, below
+ * the GDPR/CCPA and per-tenant-isolation claims.
+ *
+ * "LESS PROMINENT" IS BOUGHT WITH POSITION AND WEIGHT, NOT WITH SIZE OR
+ * CONCEALMENT. This is a trademark nominative-use disclaimer: it has to be
+ * READ to do its job, so it stays a plain <p> in normal document flow — never
+ * inside a <details>, never display:none, never a hover reveal, never behind a
+ * "read more", at any width, in either theme. The type drops exactly one step
+ * (11.5px -> 11px, the floor this block is allowed) and the mailto stops being
+ * pure white — see `.qf-foot-marks` in style.css for the measured contrast. Not
+ * one word of the sentence changed.
+ *
  * TWO FLAGS, BOTH CONTENT DECISIONS THAT PREDATE THIS FUNCTION:
  *   • `marksNote` — the carrier names/marks line carries a mailto: removal
  *     address, and the directory chrome must contain NO mailto: anywhere
@@ -805,14 +866,40 @@ export function footerBottomHtml(opts: {
     + `<span class="qf-foot-operator">A product of MR Holdings &amp; Trade LLC.</span>`
     + (opts.legalLinks ? ` <span class="qf-foot-links"><a href="/">Home</a><a href="/terms">Terms</a><a href="/privacy">Privacy</a></span>` : '')
     + `</p>`
-    + (opts.marksNote ? `<p class="qf-foot-line qf-foot-operator">${CARRIER_MARKS_NOTE}</p>` : '')
     + `${FOOTER_OOG_CTA}`
     + `</div>`
     + (opts.dataSources ? DIRECTORY_DATA_SOURCES : '')
-    + FOOTER_PAY_ROW;
+    + FOOTER_PAY_ROW
+    + (opts.marksNote ? `<div class="qf-foot-marks"><p class="qf-foot-marks-line">${CARRIER_MARKS_NOTE}</p></div>` : '');
 }
 
-export const PREMIUM_FOOTER = `<footer class="premium-footer"><div class="premium-footer-inner" data-cols="${FOOTER_LADDER.columns}"${FOOTER_LADDER.phoneSpansLast ? ' data-cols-odd' : ''}><div class="footer-brand"><a href="/" class="qf-footer-brand" aria-label="QuoteFleet home"><img class="qf-footer-logo" src="/brand/logo-full-ondark.png" alt="QuoteFleet — freight rate calculator" width="168" height="113" decoding="async"></a><div class="qf-footer-brandtext"><a href="/" class="qf-footer-wordmark">QuoteFleet</a><p class="qf-footer-tagline">Branded rate calculator pages, PDF quotes, and optional AI chat for trucking service providers.</p></div></div>${FOOTER_COLUMNS_HTML}</div>${footerBottomHtml({ marksNote: true })}</footer>`;
+/**
+ * THE FOOTER LOCKUP KEEPS THE WHITE CUT IN BOTH THEMES — `data-logo-fixed`.
+ *
+ * Alex, 2026-09: "white on the dark site and black on the bright site". That is
+ * a rule about the GROUND, and on this element the ground does not move: the
+ * marketing footer is `--footer-bg` = `--surface-dark`, declared once at :root
+ * and NOT re-declared per theme, so the band paints the same near-black under
+ * data-theme="dark", under data-theme="light" and under the un-stamped default.
+ * Every ink token in here (`--footer-ink`, `--footer-link`, `--footer-quiet`)
+ * is near-white in both themes for exactly that reason.
+ *
+ * SO THE RULE WAS ALREADY BEING BROKEN, IN THE DIRECTION NOBODY EXPECTED.
+ * theme-toggle.js#swapLogos rewrites any `/brand/*-ondark` src to its light cut
+ * whenever the theme is light — correct for the header, which sits on a themed
+ * page ground, and wrong here, because it swapped the white-outline truck for
+ * the navy-outline one ON A NEAR-BLACK BAND. Measured in light mode this was a
+ * dark mark on a dark ground: the hard contrast rule, inverted.
+ *
+ * `data-logo-fixed` opts this one image out of that global swap, which is both
+ * the fix and the honest statement of intent: the cut follows the GROUND, and
+ * this ground is dark. Doing it with an attribute rather than a CSS
+ * `content: url()` override means the src NEVER changes after parse, so there
+ * is no wrong-logo flash to avoid in the first place, and `width`/`height` stay
+ * on the element so nothing reflows. If the footer band is ever themed, delete
+ * the attribute and the existing swap does the right thing again.
+ */
+export const PREMIUM_FOOTER = `<footer class="premium-footer"><div class="premium-footer-inner" data-cols="${FOOTER_LADDER.columns}"${FOOTER_LADDER.phoneSpansLast ? ' data-cols-odd' : ''}><div class="footer-brand"><a href="/" class="qf-footer-brand" aria-label="QuoteFleet home"><img class="qf-footer-logo" src="/brand/logo-full-ondark.png" data-logo-fixed alt="QuoteFleet — freight rate calculator" width="168" height="113" decoding="async"></a><div class="qf-footer-brandtext"><a href="/" class="qf-footer-wordmark">QuoteFleet</a><p class="qf-footer-tagline">Branded rate calculator pages, PDF quotes, and optional AI chat for trucking service providers.</p></div></div>${FOOTER_COLUMNS_HTML}</div>${footerBottomHtml({ marksNote: true })}</footer>`;
 
 // Burger + Solutions-dropdown behaviour, mirrored from landing.html so the
 // injected header is interactive. Idempotent #year setter included.
@@ -909,6 +996,7 @@ export const HEADER_SCRIPTS = `<script>
   (function () {
     var cols = Array.prototype.slice.call(document.querySelectorAll('.qf-fdisc'));
     if (!cols.length) return;
+    var root = document.documentElement;
     var phone = window.matchMedia('(max-width: 640px)');
     cols.forEach(function (d) {
       d.addEventListener('toggle', function () {
@@ -922,7 +1010,18 @@ export const HEADER_SCRIPTS = `<script>
         d.open = !phone.matches;
       });
     }
+    /* THE FIRST SYNC MUST NOT ANIMATE. The columns ship open and this closes
+       them on phones, so with the open/close transition live the footer would
+       play a collapse the moment the page finished parsing and shove the legal
+       block up behind it. The flag suppresses the transition for that one pass
+       and is dropped on the frame after, so every LATER toggle — a tap, a
+       keypress, a rotation — animates. With JS off the flag is never set, so
+       the CSS animates on its own and the disclosures still work. */
+    root.setAttribute('data-fdisc-boot', '');
     sync();
+    function unboot() { root.removeAttribute('data-fdisc-boot'); }
+    if (window.requestAnimationFrame) requestAnimationFrame(function () { requestAnimationFrame(unboot); });
+    else unboot();
     if (phone.addEventListener) phone.addEventListener('change', sync);
     else if (phone.addListener) phone.addListener(sync);
   })();
