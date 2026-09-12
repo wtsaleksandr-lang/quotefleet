@@ -175,11 +175,41 @@ export const SITE_NAV_HTML = `<nav class="site-nav" aria-label="Main navigation"
   + `<a href="/pricing">Pricing</a>`
   + `</nav>`;
 
-/** The same structure as a collapsible mobile drawer. Each menu is a <details>
- *  so it collapses cleanly at 375px, and each panel column becomes a `.mm-sub`
- *  sub-heading — the drawer used to be a flat 11-link dump under Carriers with
- *  no grouping at all, which is what made it unscannable on a phone. */
-export const SITE_MOBILE_MENU_HTML = `<div class="site-mobile-menu" id="site-mobile-menu" hidden>`
+/**
+ * THE DRAWER IS AN OVERLAY, AND THE TWO ELEMENTS IN FRONT OF IT SAY SO.
+ *
+ * `#site-menu-scrim` is the dimmed page behind the sheet and the click target
+ * that closes it. It ships `hidden` alongside the panel and is painted by the
+ * WAVE 6 block at the foot of nav-unify.css; the geometry (fixed, anchored at
+ * the header's bottom edge) lives entirely there.
+ *
+ * THE <noscript> LINK IS THE NO-JS ANSWER, and it is a real one. Every path
+ * into this drawer — and into the three desktop mega-panels — is a script:
+ * both ship `hidden`, and `hidden` is not something CSS can undo on a click.
+ * With scripting off the burger is therefore useless, so /nav-nojs.css hides
+ * the burger outright and renders the drawer as a plain expanded list in the
+ * flow of the header, which is the navigation a phone visitor without JS can
+ * actually use (the groups are <details>, so they still open and close on
+ * their own). The same sheet gives the desktop mega-panels a :hover /
+ * :focus-within reveal. It is a <link rel="stylesheet"> rather than an inline
+ * <style> because `rel=stylesheet` is body-ok in the HTML spec and a <style>
+ * element inside a <body> <noscript> is not, and it costs a request ONLY for
+ * the visitors who need it.
+ *
+ * The panel takes `role="navigation"` + an accessible name rather than
+ * `role="dialog" aria-modal="true"`: its close control is the burger, which
+ * lives OUTSIDE the panel, and `aria-modal` would hide exactly that control
+ * from assistive tech. Focus is still trapped, by script, over the burger plus
+ * the panel — see HEADER_SCRIPTS.
+ *
+ * Each menu is a <details> so it collapses cleanly at 375px, and each panel
+ * column becomes a `.mm-sub` sub-heading — the drawer used to be a flat 11-link
+ * dump under Carriers with no grouping at all, which made it unscannable on a
+ * phone.
+ */
+export const SITE_MOBILE_MENU_HTML = `<noscript><link rel="stylesheet" href="/nav-nojs.css"></noscript>`
+  + `<div class="site-menu-scrim" id="site-menu-scrim" hidden></div>`
+  + `<div class="site-mobile-menu" id="site-mobile-menu" role="navigation" aria-label="Site menu" tabindex="-1" hidden>`
   + `<details class="mm-group" open><summary class="mm-head">For Carriers &amp; Brokers</summary>`
   // `/claim` is the drawer's ONLY path to the free profile claim: the header's
   // "Claim your listing — free" button is hidden at the burger breakpoint, so
@@ -243,7 +273,21 @@ export class SiteChromeError extends Error {
 
 export const THEME_TOGGLE_BTN = `<button type="button" class="qf-theme-btn" aria-label="Toggle light/dark theme" aria-pressed="false" title="Toggle theme"><svg class="qf-ico-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg><svg class="qf-ico-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg></button>`;
 
-export const SITE_BURGER_BTN = `<button type="button" class="site-burger" id="site-burger" aria-label="Open menu" aria-expanded="false" aria-controls="site-mobile-menu"><svg class="ico-open" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><line x1="4" y1="7" x2="20" y2="7"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="17" x2="20" y2="17"/></svg><svg class="ico-close" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><line x1="6" y1="6" x2="18" y2="18"/><line x1="18" y1="6" x2="6" y2="18"/></svg></button>`;
+/**
+ * THE BURGER MORPHS; IT DOES NOT SWAP GLYPHS. It used to ship TWO icons — a
+ * three-line `.ico-open` and an X `.ico-close` — with CSS toggling `display`
+ * between them on `aria-expanded`. `display` cannot be animated, so the change
+ * was a hard cut: the bars vanished and an X appeared in the same frame, which
+ * is the cheapest-looking part of a control the visitor taps every time.
+ *
+ * Three spans instead. They are the SAME three bars in both states, so opening
+ * rotates the outer two onto each other and fades the middle one out — one
+ * continuous movement the eye can follow, on the same emphasised curve as the
+ * sheet it opens. Geometry and transforms live in the WAVE 6 block at the foot
+ * of nav-unify.css; `pointer-events: none` on the box keeps every tap on the
+ * <button> itself.
+ */
+export const SITE_BURGER_BTN = `<button type="button" class="site-burger" id="site-burger" aria-label="Open menu" aria-expanded="false" aria-controls="site-mobile-menu"><span class="qf-burger-box" aria-hidden="true"><span class="qf-burger-bar"></span><span class="qf-burger-bar"></span><span class="qf-burger-bar"></span></span></button>`;
 
 // ── Canonical full site header + mobile menu ────────────────────────────────
 export const FULL_SITE_HEADER = `<header class="site-header">
@@ -991,21 +1035,159 @@ export const PREMIUM_FOOTER = `<footer class="premium-footer"><div class="premiu
 // never appears anywhere in the page, which an explanatory number in a shipped
 // comment can trip by coincidence. It did: "42-link stack" against
 // claimed_tenant_id 42 (carrierProfileCard.test.ts).
+//
+// ── THE DRAWER CONTROLLER, AND THE FOUR THINGS IT HAS TO GET RIGHT ─────────
+//
+// 1. THE SCROLL LOCK PINS THE BODY, AND THE HEADER WITH IT. Neither cheap
+//    lock survives this document — `html,body{height:100%}` is site-wide and
+//    the homepage additionally puts `overflow-y:auto` on body, so `overflow:
+//    hidden` on either one clamps scrollY to 0 on / (measured: 900 -> 0 on
+//    open) and does not lock /directory at all (measured: 328 -> 728 on a
+//    wheel). The body is therefore taken out of the scrollport at its current
+//    offset, which is the only version that keeps an identical picture; see
+//    the WAVE 6 note in nav-unify.css for the numbers. A pinned body renders
+//    the sticky header at `-lockY`, i.e. off screen with the burger on it, so
+//    the header is pinned too — by INLINE `!important` properties rather than
+//    a rule, because nav-ia.css restates the homepage header at (0,4,2) with
+//    `position: sticky !important` and is injected last; an inline important
+//    is the one thing that outranks it without an id this element cannot
+//    carry. --qf-lock-pad (the body's own top padding plus the header's
+//    height) puts back the flow the pinned header takes away, and --qf-sbw
+//    (measured before the lock, while documentElement.clientWidth still
+//    excludes it) puts back the scrollbar's width. `scrollTo(0, lockY)` on
+//    release is the half iOS needs.
+//
+// 2. THE ENTRANCE NEEDS A FRAME. `hidden` is removed first, so the panel is
+//    laid out in its "from" state, and `data-state="open"` is set two frames
+//    later: set in the same tick, the browser coalesces both into one style
+//    resolution and the transition never runs. The exit is the mirror — the
+//    attribute comes off immediately and `hidden` goes back on only after the
+//    exit duration, which is also when the lock is released, so nothing can
+//    scroll underneath a panel that is still on screen.
+//
+// 3. REDUCED MOTION SHORTENS THE TIMER, NOT JUST THE CSS. The CSS kills the
+//    transition; if the script still waited 200ms for it, the panel would sit
+//    invisible-but-present for a fifth of a second after every close. Same
+//    media query, read here.
+//
+// 4. THE TRAP INCLUDES THE BUTTON. Focus moves to the first item on open and
+//    cycles burger -> first ... last -> burger, because the burger IS the
+//    close control and it lives outside the panel; a trap that excluded it
+//    would strand a keyboard visitor with no way to close what they opened.
+//    Escape and a scrim click both close and hand focus back; following a link
+//    closes WITHOUT taking focus, since the page is navigating away.
 export const HEADER_SCRIPTS = `<script>
   (function () {
     var y = document.getElementById('year'); if (y) y.textContent = new Date().getFullYear();
     var b = document.getElementById('site-burger');
     var m = document.getElementById('site-mobile-menu');
+    var sc = document.getElementById('site-menu-scrim');
     if (b && m) {
-      var set = function (open) {
-        b.setAttribute('aria-expanded', open ? 'true' : 'false');
-        b.setAttribute('aria-label', open ? 'Close menu' : 'Open menu');
-        if (open) m.removeAttribute('hidden'); else m.setAttribute('hidden', '');
+      var root = document.documentElement;
+      var bar = document.querySelector('.site-header');
+      var reduce = window.matchMedia('(prefers-reduced-motion: reduce)');
+      var wide = window.matchMedia('(min-width: 1024px)');
+      var lockY = 0, basePad = 0, closeTimer = null, isOpen = false;
+      var EXIT_MS = 200;
+      var can = function (el) { return el.getClientRects().length > 0; };
+      var stops = function () {
+        return Array.prototype.filter.call(
+          m.querySelectorAll('a[href], summary, button:not([disabled])'), can);
       };
-      b.addEventListener('click', function (e) { e.stopPropagation(); set(b.getAttribute('aria-expanded') !== 'true'); });
-      m.addEventListener('click', function (e) { if (e.target.closest('a')) set(false); });
-      document.addEventListener('click', function (e) { if (!m.hasAttribute('hidden') && !m.contains(e.target) && !b.contains(e.target)) set(false); });
-      document.addEventListener('keydown', function (e) { if (e.key === 'Escape') set(false); });
+      var PIN = [['position', 'fixed'], ['top', '0px'], ['left', '0px'], ['z-index', '2147483004']];
+      var pinBar = function (on) {
+        if (!bar) return;
+        if (on) {
+          for (var i = 0; i < PIN.length; i++) bar.style.setProperty(PIN[i][0], PIN[i][1], 'important');
+          bar.style.setProperty('right', root.style.getPropertyValue('--qf-sbw') || '0px', 'important');
+        } else {
+          for (var j = 0; j < PIN.length; j++) bar.style.removeProperty(PIN[j][0]);
+          bar.style.removeProperty('right');
+        }
+      };
+      var measure = function () {
+        var h = bar ? bar.offsetHeight : 0;
+        root.style.setProperty('--qf-menu-top', Math.max(0, Math.round(h)) + 'px');
+        root.style.setProperty('--qf-lock-pad', Math.round(basePad + h) + 'px');
+      };
+      var open = function () {
+        if (isOpen) return;
+        if (closeTimer) { clearTimeout(closeTimer); closeTimer = null; }
+        lockY = window.scrollY || window.pageYOffset || 0;
+        basePad = parseFloat(getComputedStyle(document.body).paddingTop) || 0;
+        root.style.setProperty('--qf-sbw', (window.innerWidth - root.clientWidth) + 'px');
+        root.style.setProperty('--qf-lock-y', Math.round(lockY) + 'px');
+        measure();
+        isOpen = true;
+        if (sc) sc.removeAttribute('hidden');
+        m.removeAttribute('hidden');
+        pinBar(true);
+        root.setAttribute('data-qf-menu', 'open');
+        b.setAttribute('aria-expanded', 'true');
+        b.setAttribute('aria-label', 'Close menu');
+        var paint = function () {
+          if (!isOpen) return;
+          m.setAttribute('data-state', 'open');
+          if (sc) sc.setAttribute('data-state', 'open');
+        };
+        if (window.requestAnimationFrame) requestAnimationFrame(function () { requestAnimationFrame(paint); });
+        else paint();
+        var f = stops();
+        if (f.length) f[0].focus(); else m.focus();
+      };
+      var close = function (giveBackFocus) {
+        if (!isOpen) return;
+        isOpen = false;
+        m.removeAttribute('data-state');
+        if (sc) sc.removeAttribute('data-state');
+        b.setAttribute('aria-expanded', 'false');
+        b.setAttribute('aria-label', 'Open menu');
+        if (giveBackFocus !== false) b.focus();
+        var settle = function () {
+          closeTimer = null;
+          if (isOpen) return;
+          m.setAttribute('hidden', '');
+          if (sc) sc.setAttribute('hidden', '');
+          pinBar(false);
+          root.removeAttribute('data-qf-menu');
+          root.style.removeProperty('--qf-sbw');
+          root.style.removeProperty('--qf-menu-top');
+          root.style.removeProperty('--qf-lock-y');
+          root.style.removeProperty('--qf-lock-pad');
+          /* Same synchronous block as the unpin, so the frame the browser
+             paints already has the page back at its old offset. */
+          if ((window.scrollY || window.pageYOffset || 0) !== lockY) window.scrollTo(0, lockY);
+        };
+        if (closeTimer) clearTimeout(closeTimer);
+        closeTimer = setTimeout(settle, reduce.matches ? 0 : EXIT_MS);
+      };
+      b.addEventListener('click', function (e) { e.stopPropagation(); if (isOpen) close(); else open(); });
+      m.addEventListener('click', function (e) { if (e.target.closest('a')) close(false); });
+      if (sc) sc.addEventListener('click', function () { close(); });
+      document.addEventListener('click', function (e) {
+        if (isOpen && !m.contains(e.target) && !b.contains(e.target)) close(false);
+      });
+      document.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape' && isOpen) { e.preventDefault(); close(); }
+      });
+      m.addEventListener('keydown', function (e) {
+        if (e.key !== 'Tab') return;
+        var f = stops();
+        if (!f.length) return;
+        var at = document.activeElement;
+        if (e.shiftKey ? at === f[0] : at === f[f.length - 1]) { e.preventDefault(); b.focus(); }
+      });
+      b.addEventListener('keydown', function (e) {
+        if (e.key !== 'Tab' || !isOpen) return;
+        var f = stops();
+        if (!f.length) return;
+        e.preventDefault();
+        (e.shiftKey ? f[f.length - 1] : f[0]).focus();
+      });
+      window.addEventListener('resize', function () {
+        if (!isOpen) return;
+        if (wide.matches) close(false); else measure();
+      });
     }
     var dds = Array.prototype.slice.call(document.querySelectorAll('[data-nav-dd]'));
     if (dds.length) {

@@ -1368,3 +1368,412 @@ body:has(#site-burger[aria-expanded="true"]) .qf-mc-fab { display: none; }
   border-radius: 6px;
   opacity: 1;
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   WAVE 6 — THE MOBILE DRAWER STOPS PUSHING THE PAGE AND BECOMES AN OVERLAY.
+
+   THE BUG, EXACTLY. `#site-mobile-menu` is the last child of `.site-header`
+   and it was laid out IN NORMAL FLOW. Opening it therefore grew the header's
+   flow box and shoved the whole document down by the drawer's height; and
+   because `.site-header` is `position: sticky`, the page underneath was still
+   free to scroll, so the hero slid up BEHIND the drawer while it was open.
+   Both halves of the report ("it pushes the website down", "I can see the hero
+   under the menu") are that one fact.
+
+   WHAT REPLACES IT. A `position: fixed` sheet anchored under the header, a
+   fixed scrim under it, and a scroll lock on the root element. Nothing about
+   the drawer is in flow any more, so open and close cannot move a single pixel
+   of the page.
+
+   WHY IT IS ADDRESSED BY ID. Seven sheets style `.site-mobile-menu`
+   (nav-unify, nav-ia, landing-home-fixes, landing-glass, landing-nav-
+   consistency, landing-wefixtrades-cleanup, landing-footer-polish), most of
+   them at `html body.qf-wft ...:not([hidden])` with `!important`, and some are
+   injected by script AFTER every static <link>. A class-level rule here loses
+   to at least one of them on at least one surface — which is how the drawer
+   ended up with a different fill on / than on /directory in the first place.
+   `#site-mobile-menu` is (1,0,1): it outranks every one of them on specificity
+   alone, so this block is the single description of the drawer on all four
+   shells (static marketing pages, landing.html, the directory subsite and the
+   OS/OW + pilot-car tool shells) regardless of load order, and no later sheet
+   can quietly put it back in flow without also using the id.
+
+   THE STACKING ORDER IS DELIBERATE. `.site-header` is the drawer's ancestor
+   and carries `z-index: 70`, so it opens a stacking context the drawer cannot
+   escape: raising the drawer alone would have done nothing. The header itself
+   is promoted for as long as the drawer is open — above the marketing chat
+   launcher's 2147483000 — and dropped back the moment it closes, so the chat
+   PANEL is never covered when chat is the thing that is open. The launcher
+   also still stands down via the `:has()` rule above; this is the belt for
+   browsers without `:has()`.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+:root {
+  /* Scrim: the page ink at 44%, i.e. inside Material's 0.32-0.48 scrim band,
+     keyed to --ink (#020618) rather than pure black so it tints with the
+     palette. */
+  --qf-menu-scrim: rgba(2, 6, 24, 0.44);
+  /* THE FROST. Tint alpha is set by MEASUREMENT, not by taste. The hero wash's
+     top band is a saturated azure (#0179AD to #026692, see
+     landing-home-grid.css) and the drawer's body text is near-black in the
+     light theme, so this is the one place on the site where the glass really
+     is between body copy and a dark ground.
+
+     Every menu item was pixel-sampled against the RENDERED blur — the panel
+     photographed twice at 375px, once painted and once with the type made
+     transparent, and each row's worst background pixel taken from the second —
+     on /, /directory and a tool page, in all three theme states:
+
+       0.86  worst row 5.77:1   (the frost barely reads)
+       0.80  worst row 5.05:1   ← shipped: 12% of headroom over the 4.5 floor
+                                  and the azure is genuinely visible through it
+
+     The worst row is always a 10px `--muted` sub-heading, never a link. Going
+     further was not attempted: the hero raster is generated (scripts/make-hero
+     -wash.mjs) and can be re-cut, so the tint keeps margin for a darker wash
+     rather than sitting on the limit. Legibility beats the effect, and when
+     the two disagreed the numbers above decided it. */
+  --qf-menu-tint: rgba(255, 255, 255, 0.80);
+  --qf-menu-hair: rgba(255, 255, 255, 0.62);
+  --qf-menu-hover: rgba(2, 6, 24, 0.06);
+  --qf-menu-blur: 24px;
+  --qf-menu-sat: 180%;
+  /* The two durations the design law allows, used the conventional way round:
+     the longer one enters, the shorter one exits. */
+  --qf-menu-dur-in: .3s;
+  --qf-menu-dur-out: .2s;
+  /* THE ONE NEW CURVE, AND WHY IT IS NOT `ease`. The system ships a single
+     easing (`ease` = cubic-bezier(.25,.1,.25,1)), which is symmetric: it
+     starts slowly, and a panel that starts slowly reads as one being dragged
+     rather than one arriving. Material's "emphasised decelerate" is the
+     opposite shape — most of the distance is covered in the first third, then
+     it settles — and that snap IS what the report calls a premium Android
+     effect. Scoped to the drawer, the scrim and the burger and used nowhere
+     else; every exit keeps the system `ease`. */
+  --qf-menu-ease-emphasized: cubic-bezier(0.2, 0, 0, 1);
+}
+html[data-theme="dark"] {
+  --qf-menu-scrim: rgba(2, 6, 24, 0.58);
+  --qf-menu-tint: rgba(19, 26, 40, 0.78);
+  --qf-menu-hair: rgba(226, 232, 240, 0.16);
+  --qf-menu-hover: rgba(226, 232, 240, 0.10);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --qf-menu-scrim: rgba(2, 6, 24, 0.58);
+    --qf-menu-tint: rgba(19, 26, 40, 0.78);
+    --qf-menu-hair: rgba(226, 232, 240, 0.16);
+    --qf-menu-hover: rgba(226, 232, 240, 0.10);
+  }
+}
+
+/* ── The scroll lock, and why it is the three-part one ───────────────────
+   MEASURED, because the cheap version was tried first and both cheap versions
+   fail on THIS document. `html, body { height: 100% }` is in force site-wide,
+   and on the homepage `body` additionally carries `overflow-y: auto`, so the
+   viewport's scroller is propagated from BODY there and from the ROOT
+   elsewhere — two different scroll containers on two pages of the same site:
+
+     • `body { overflow: hidden }` — propagates to the viewport, the viewport
+       stops being scrollable, and Chrome CLAMPS the offset to 0. Measured on
+       /: scrollY 900 -> 0 the instant the menu opened. That is precisely the
+       "loses its place" failure this lock exists to avoid.
+     • `html { overflow: hidden }` — same clamp on / (900 -> 0), and on
+       /directory it did not even lock: measured scrollY 328 -> 728 on a wheel
+       with the drawer open, because the root's `height: 100%` leaves the real
+       overflow on body.
+
+   So the body is taken out of the scrollport and PINNED at its current offset
+   — the only lock that keeps a pixel-identical picture on both — and the two
+   things that technique normally breaks are fixed here rather than left:
+
+     1. THE STICKY HEADER GOES WITH IT. A fixed body renders the header at
+        `-lockY`, i.e. off screen at any scroll depth, taking the burger with
+        it. The header is therefore pinned too, for exactly as long as the
+        drawer is open.
+     2. PINNING THE HEADER PULLS IT OUT OF FLOW, so everything under it jumps
+        up by its height. --qf-lock-pad is the body's own top padding PLUS the
+        header's height, measured an instant before the lock, which puts the
+        content back where it was — measured as 0px of movement and 0 CLS on
+        open AND on close.
+
+   --qf-sbw is the classic scrollbar's width, measured before the lock (when
+   documentElement.clientWidth still excludes it) and re-added as body padding
+   so losing the bar cannot shift the page sideways. It is 0px on a phone. And
+   the script still calls `scrollTo(0, lockY)` on release: the pin is what
+   keeps the picture, the explicit restore is what iOS needs. */
+html[data-qf-menu="open"] {
+  overflow: hidden !important;
+}
+html[data-qf-menu="open"] body {
+  position: fixed !important;
+  top: calc(var(--qf-lock-y, 0px) * -1) !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: auto !important;
+  width: auto !important;
+  height: auto !important;
+  min-height: 0 !important;
+  /* Not `hidden`: a fixed body with `overflow-y: auto` becomes its own scroll
+     container, complete with its own scrollbar and its own scrollable content
+     — the lock would leak straight back in through it. */
+  overflow: visible !important;
+  padding-top: var(--qf-lock-pad, 0px) !important;
+  padding-right: var(--qf-sbw, 0px) !important;
+}
+
+/* THE HEADER'S PIN IS THE ONE THING NOT DECLARED HERE, and deliberately.
+   nav-ia.css states the homepage header four times, the widest of them at
+   `html:not([data-theme="light"]) body.qf-wft.landing-v2 .site-header` — (0,4,2)
+   with `position: sticky !important` — and it is injected after this sheet, so
+   matching it would mean either an id this header cannot carry (three tests pin
+   the literal `<header class="site-header">`) or a selector padded with repeated
+   classes until it outranks a rule it has no quarrel with. Measured with the
+   CSS version in place: the header stayed sticky on / and rode the
+   compensation padding 64px DOWN the page.
+
+   So the pin is four inline `!important` properties set by the script for
+   exactly as long as the drawer is open, and removed with it — an inline
+   `!important` is the one thing that outranks every sheet on the page whatever
+   its specificity or load order. See HEADER_SCRIPTS in siteChrome.ts. */
+
+/* ── The scrim ────────────────────────────────────────────────────────────
+   Starts at the header's bottom edge, so the bar stays crisp and its burger
+   stays the close control. Fades on the SAME durations as the panel: one
+   gesture, not two. */
+#site-menu-scrim {
+  position: fixed;
+  top: var(--qf-menu-top, var(--chrome-h-compact));
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 1;
+  background-color: var(--qf-menu-scrim);
+  opacity: 0;
+  /* Inert while it is fading OUT, so a second tap lands on the page rather
+     than on a scrim the visitor can no longer see. */
+  pointer-events: none;
+  transition: opacity var(--qf-menu-dur-out) ease;
+}
+#site-menu-scrim[data-state="open"] {
+  opacity: 1;
+  pointer-events: auto;
+  transition: opacity var(--qf-menu-dur-in) var(--qf-menu-ease-emphasized);
+}
+
+@media (max-width: 1023px) {
+  /* ── The panel ─────────────────────────────────────────────────────────
+     `position: fixed` is what fixes the reported bug. Everything else here is
+     the surface. The panel is NOT full-bleed to the bottom: it is as tall as
+     its content up to the viewport, so a short menu does not paint an empty
+     glass slab over two thirds of the hero. */
+  #site-mobile-menu:not([hidden]) {
+    position: fixed !important;
+    top: calc(var(--qf-menu-top, var(--chrome-h-compact)) + var(--space-1)) !important;
+    left: var(--space-2) !important;
+    right: var(--space-2) !important;
+    bottom: auto !important;
+    z-index: 2 !important;
+    margin: 0 !important;
+    padding: var(--space-1) !important;
+    max-height: calc(100vh - var(--qf-menu-top, var(--chrome-h-compact)) - var(--space-3));
+    max-height: calc(100dvh - var(--qf-menu-top, var(--chrome-h-compact)) - var(--space-3));
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+    border-radius: var(--radius) !important;
+    border: 1px solid var(--qf-menu-hair) !important;
+    box-shadow: var(--qf-shadow-lift) !important;
+    /* THE FALLBACK IS THE BASE DECLARATION. A browser with backdrop-filter
+       disabled or unimplemented never enters the @supports block below and
+       gets a fully opaque --chrome-panel-bg sheet — never body text floating
+       on the hero. Progressive enhancement, so the fallback cannot rot. */
+    background-color: var(--chrome-panel-bg) !important;
+    background-image: none !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    /* Closed-but-rendered: the frame the entrance animates FROM. */
+    opacity: 0;
+    transform: translateY(calc(var(--space-1-5) * -1)) scale(0.98);
+    transform-origin: top center;
+    transition:
+      opacity var(--qf-menu-dur-out) ease,
+      transform var(--qf-menu-dur-out) ease;
+    will-change: transform, opacity;
+  }
+  #site-mobile-menu[data-state="open"] {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    transition:
+      opacity var(--qf-menu-dur-in) var(--qf-menu-ease-emphasized),
+      transform var(--qf-menu-dur-in) var(--qf-menu-ease-emphasized);
+  }
+  @supports ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+    #site-mobile-menu:not([hidden]) {
+      background-color: var(--qf-menu-tint) !important;
+      backdrop-filter: blur(var(--qf-menu-blur)) saturate(var(--qf-menu-sat)) !important;
+      -webkit-backdrop-filter: blur(var(--qf-menu-blur)) saturate(var(--qf-menu-sat)) !important;
+    }
+  }
+
+  /* ── Inside the sheet: one surface, gaps for dividers ──────────────────
+     nav-ia.css paints every `.mm-group` with an OPAQUE --chrome-card-bg card,
+     which on glass is a solid rectangle covering the frost it sits on. The
+     groups go transparent; the 8px gap between them is the divider, which is
+     the house rule anyway. */
+  #site-mobile-menu .mm-group {
+    background: transparent !important;
+    border: 0 !important;
+    border-top: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+  /* .mm-flat (Pricing) and .mm-account (Sign in) are the <a> elements
+     THEMSELVES, not wrappers. Folding them into the rule above zeroed their
+     padding — `#site-mobile-menu .mm-flat` (1,1,0) outranks the link rule's
+     (1,0,1) — and both rows rendered flush against the panel's inner edge,
+     12px to the left of every heading. They keep the row padding and lose only
+     the card fill and the divider rule. */
+  #site-mobile-menu .mm-flat,
+  #site-mobile-menu .mm-account {
+    background: transparent !important;
+    border: 0 !important;
+    border-top: 0 !important;
+    margin: 0 !important;
+    padding: var(--space-1) var(--space-1-5) !important;
+  }
+  #site-mobile-menu {
+    gap: var(--space-1) !important;
+  }
+  #site-mobile-menu .mm-head {
+    color: var(--muted) !important;
+    min-height: var(--tap-target);
+    padding: var(--space-1) var(--space-1-5) !important;
+    border-radius: var(--radius-md);
+  }
+  #site-mobile-menu .mm-sub {
+    color: var(--muted) !important;
+    margin: 0 !important;
+    padding: var(--space-1) var(--space-1-5) var(--space-0-5) !important;
+  }
+  #site-mobile-menu a {
+    display: flex !important;
+    align-items: center;
+    min-height: var(--tap-target);
+    margin: 0 !important;
+    padding: var(--space-1) var(--space-1-5) !important;
+    border-radius: var(--radius-md) !important;
+    color: var(--ink) !important;
+    text-decoration: none;
+    transition: background-color var(--qf-menu-dur-out) ease, color var(--qf-menu-dur-out) ease;
+  }
+  #site-mobile-menu .mm-group > a {
+    padding-left: var(--space-3) !important;
+  }
+  #site-mobile-menu a:hover {
+    color: var(--accent) !important;
+    background-color: var(--qf-menu-hover) !important;
+  }
+  /* The focus ring is an OUTLINE, the hover cue is a FILL — the two states are
+     never mistaken for one another, which is the point of :focus-visible. */
+  #site-mobile-menu a:focus-visible,
+  #site-mobile-menu summary:focus-visible {
+    outline: 2px solid var(--accent) !important;
+    outline-offset: -2px;
+    background-color: transparent !important;
+  }
+  /* [hidden] stays authoritative over the display rules above (nav-auth.js
+     gates /importers/saved on a session). */
+  #site-mobile-menu a[hidden],
+  #site-mobile-menu .mm-group > a[hidden] { display: none !important; }
+}
+
+/* ── Tablet: a sheet, not a wall ─────────────────────────────────────────
+   The collapse point is 1023px, so at 600-1023 a full-bleed drawer is a 1000px
+   pane holding a 200px-wide column of links with the rest left empty, and it
+   covers the page completely for no reason. It becomes a 360px sheet on the
+   burger's own side instead — the end-drawer shape, and the panel now points
+   at the control that opened it. `left: auto` because a fixed box with left,
+   right AND a width is over-constrained, and in LTR the browser drops `right`,
+   which would anchor it to the wrong edge. */
+@media (min-width: 600px) and (max-width: 1023px) {
+  #site-mobile-menu:not([hidden]) {
+    left: auto !important;
+    right: var(--space-2) !important;
+    width: 360px;
+    transform-origin: top right;
+  }
+}
+
+/* Above the collapse point there is no burger, so there is no drawer. Stated
+   because the id out-specifies the `display: none` the other sheets carry. */
+@media (min-width: 1024px) {
+  #site-mobile-menu { display: none !important; }
+  #site-menu-scrim { display: none !important; }
+}
+
+/* ── The burger becomes an X ──────────────────────────────────────────────
+   Three spans, not two swapped glyphs: the bars are the SAME three bars
+   before and after, so the change is a rotation the eye can follow rather
+   than a substitution it can only notice. Laid out with space-between so the
+   only numbers involved are the transforms.
+
+   AND THE CONTROL ITSELF WAS UNDER THE FLOOR. Every sheet that shows the
+   burger sizes it 40x40 — nav-unify at the collapse point, nav-ia at (0,3,2)
+   with !important, landing-home-fixes at 640 — and the house rule, Apple's
+   44pt and Material's 48dp all put the minimum at 44. It is the one control
+   this whole round is about, so it goes to 44 rather than staying 4px short.
+   min-* rather than width/height, so no other sheet has to be edited and the
+   box cannot shrink back; measured at 320px the header still fits with 0
+   horizontal overflow. */
+#site-burger {
+  min-width: var(--tap-target);
+  min-height: var(--tap-target);
+}
+#site-burger .qf-burger-box {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  width: 20px;
+  height: 16px;
+  pointer-events: none;
+}
+#site-burger .qf-burger-bar {
+  display: block;
+  width: 100%;
+  height: 2px;
+  border-radius: var(--radius-pill);
+  background-color: currentColor;
+  transition:
+    transform var(--qf-menu-dur-out) ease,
+    opacity var(--qf-menu-dur-out) ease;
+}
+#site-burger[aria-expanded="true"] .qf-burger-bar {
+  transition:
+    transform var(--qf-menu-dur-in) var(--qf-menu-ease-emphasized),
+    opacity var(--qf-menu-dur-in) var(--qf-menu-ease-emphasized);
+}
+#site-burger[aria-expanded="true"] .qf-burger-bar:nth-child(1) { transform: translateY(7px) rotate(45deg); }
+#site-burger[aria-expanded="true"] .qf-burger-bar:nth-child(2) { opacity: 0; transform: scaleX(0.2); }
+#site-burger[aria-expanded="true"] .qf-burger-bar:nth-child(3) { transform: translateY(-7px) rotate(-45deg); }
+#site-burger:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* ── prefers-reduced-motion: the frost stays, the movement goes ──────────
+   Not "shorter" and not "fade only" — instant, both ways. The script reads the
+   same query so the close is not held open waiting for a transitionend that
+   will never arrive. */
+@media (prefers-reduced-motion: reduce) {
+  #site-mobile-menu:not([hidden]),
+  #site-mobile-menu[data-state="open"],
+  #site-menu-scrim,
+  #site-menu-scrim[data-state="open"],
+  #site-burger .qf-burger-bar,
+  #site-burger[aria-expanded="true"] .qf-burger-bar {
+    transition: none !important;
+    animation: none !important;
+  }
+  #site-mobile-menu:not([hidden]) { transform: none !important; }
+}
