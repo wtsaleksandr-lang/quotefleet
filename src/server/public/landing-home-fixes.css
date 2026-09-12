@@ -117,7 +117,12 @@ body.qf-wft .site-actions .btn-secondary {
   background: transparent !important;
   border: 1px solid rgba(255, 255, 255, 0.32) !important;
   color: #F9F9F9 !important;
-  border-radius: 10px !important;
+  /* This is the declaration that actually wins for the header CTA sitewide:
+     maersk-radius-system.css sets .btn-secondary to --qf-maersk-radius-button
+     with !important, and only an !important rule of higher specificity can
+     beat it. It was 10px — off the 6 / 8 / 12 scale, and the odd one out in a
+     cluster whose other two controls compute to 8px. */
+  border-radius: var(--radius-btn) !important;
   padding: 9px 18px !important;
   font-family: "Inter", system-ui, sans-serif !important;
   font-size: 13px !important;

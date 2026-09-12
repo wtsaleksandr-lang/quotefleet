@@ -474,23 +474,23 @@ src/server/public/landing-footer-polish.css:169	radius	border-radius: 999px
 src/server/public/landing-footer-polish.css:194	radius	border-radius: 14px
 src/server/public/landing-hero-fixes-v2.css:142	radius	border-radius: 2px
 src/server/public/landing-home-fixes.css:106	spacing	gap: 14px
-src/server/public/landing-home-fixes.css:120	spacing	padding: 9px 18px
-src/server/public/landing-home-fixes.css:144	spacing	gap: 10px
-src/server/public/landing-home-fixes.css:148	spacing	margin-bottom: 22px
-src/server/public/landing-home-fixes.css:165	radius	border-radius: 2px
-src/server/public/landing-home-fixes.css:172	spacing	gap: clamp(50px, 5.8vw, 92px)
-src/server/public/landing-home-fixes.css:196	spacing	gap: 20px
-src/server/public/landing-home-fixes.css:206	spacing	column-gap: 18px
-src/server/public/landing-home-fixes.css:252	spacing	gap: 26px
+src/server/public/landing-home-fixes.css:125	spacing	padding: 9px 18px
+src/server/public/landing-home-fixes.css:149	spacing	gap: 10px
+src/server/public/landing-home-fixes.css:153	spacing	margin-bottom: 22px
+src/server/public/landing-home-fixes.css:170	radius	border-radius: 2px
+src/server/public/landing-home-fixes.css:177	spacing	gap: clamp(50px, 5.8vw, 92px)
+src/server/public/landing-home-fixes.css:201	spacing	gap: 20px
+src/server/public/landing-home-fixes.css:211	spacing	column-gap: 18px
+src/server/public/landing-home-fixes.css:257	spacing	gap: 26px
 src/server/public/landing-home-fixes.css:26	spacing	padding: 12px 20px 0
-src/server/public/landing-home-fixes.css:266	spacing	padding: 22px
+src/server/public/landing-home-fixes.css:271	spacing	padding: 22px
 src/server/public/landing-home-fixes.css:32	spacing	padding: 10px 22px
 src/server/public/landing-home-fixes.css:34	radius	border-radius: 14px
-src/server/public/landing-home-fixes.css:394	spacing	gap: 2px
-src/server/public/landing-home-fixes.css:397	radius	border-radius: 14px
-src/server/public/landing-home-fixes.css:410	spacing	padding: 12px 14px
+src/server/public/landing-home-fixes.css:399	spacing	gap: 2px
+src/server/public/landing-home-fixes.css:402	radius	border-radius: 14px
+src/server/public/landing-home-fixes.css:415	spacing	padding: 12px 14px
 src/server/public/landing-home-fixes.css:42	spacing	gap: 9px
-src/server/public/landing-home-fixes.css:610	radius	border-radius: 999px
+src/server/public/landing-home-fixes.css:615	radius	border-radius: 999px
 src/server/public/landing-s-polish.css:105	radius	border-radius: 999px
 src/server/public/landing-s-polish.css:106	spacing	padding: 5px 8px
 src/server/public/landing-s-polish.css:119	spacing	padding: 10px
@@ -664,21 +664,21 @@ src/server/public/leads-list-focus.css:85	spacing	padding: 7px 10px
 src/server/public/nav-unify.css:134	radius	border-radius: 14px
 src/server/public/nav-unify.css:18	spacing	padding: 12px 20px 0
 src/server/public/nav-unify.css:190	spacing	gap: 14px
-src/server/public/nav-unify.css:202	spacing	padding: 9px 18px
+src/server/public/nav-unify.css:205	spacing	padding: 9px 18px
 src/server/public/nav-unify.css:25	spacing	padding: 10px 22px
-src/server/public/nav-unify.css:267	spacing	gap: 2px
-src/server/public/nav-unify.css:270	radius	border-radius: 14px
+src/server/public/nav-unify.css:270	spacing	gap: 2px
+src/server/public/nav-unify.css:273	radius	border-radius: 14px
 src/server/public/nav-unify.css:28	spacing	gap: 20px
-src/server/public/nav-unify.css:284	spacing	padding: 12px 14px
+src/server/public/nav-unify.css:287	spacing	padding: 12px 14px
 src/server/public/nav-unify.css:29	radius	border-radius: 14px
-src/server/public/nav-unify.css:345	spacing	padding: 54px 24px 34px
-src/server/public/nav-unify.css:403	spacing	padding: 5px 0
+src/server/public/nav-unify.css:348	spacing	padding: 54px 24px 34px
+src/server/public/nav-unify.css:406	spacing	padding: 5px 0
 src/server/public/nav-unify.css:42	spacing	gap: 9px
-src/server/public/nav-unify.css:436	spacing	margin: 34px auto 0
-src/server/public/nav-unify.css:438	spacing	padding-top: 18px
-src/server/public/nav-unify.css:441	spacing	gap: 18px
-src/server/public/nav-unify.css:458	spacing	padding: 42px 18px 28px
-src/server/public/nav-unify.css:509	radius	border-radius: 14px
+src/server/public/nav-unify.css:439	spacing	margin: 34px auto 0
+src/server/public/nav-unify.css:441	spacing	padding-top: 18px
+src/server/public/nav-unify.css:444	spacing	gap: 18px
+src/server/public/nav-unify.css:461	spacing	padding: 42px 18px 28px
+src/server/public/nav-unify.css:512	radius	border-radius: 14px
 src/server/public/onboarding-wizard.css:810	radius	border-radius: 14px
 src/server/public/premium-saas-polish.css:10	spacing	padding: 18px
 src/server/public/premium-saas-polish.css:115	spacing	margin-top: 14px
