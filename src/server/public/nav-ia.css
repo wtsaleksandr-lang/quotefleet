@@ -608,3 +608,32 @@ html body.qf-wft .site-mobile-menu:not([hidden]) {
 /* The chat launcher stands down while the drawer is open — same stacking fix,
    same reasoning as the block of that name at the foot of nav-unify.css. */
 html body:has(#site-burger[aria-expanded="true"]) .qf-mc-fab { display: none !important; }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   FOOTER COLUMN HEADINGS — NO ORPHANED WORD
+   ---------------------------------------------------------------------------
+   Appended at EOF: both CI guards key their baselines by `file:line`
+   (docs/design-refactor/baseline-protocol.md r1), so a new rule goes at the
+   foot of the sheet rather than mid-file where it would renumber every entry
+   below it.
+
+   The house rule is that a wrap must never strand a single item alone on its
+   own line (DESIGN-SYSTEM.md §8 — the same arithmetic that sets the footer's
+   own 5 → 3 → 2 track ladder, and the same rule `.dirfoot-legal` and
+   `.qf-partner-title` already answer with `text-wrap: balance`).
+
+   The five `.footer-col h4` labels were breaking it. Measured on the rendered
+   homepage, at BOTH 320 and 375: "For Carriers & Brokers" split
+   ["For Carriers &" 112.5px | "Brokers" 56.3px] — one word by itself. The four
+   others ("For Shippers", "Free Tools", "Company", "Legal") each fit their
+   track on one line and are untouched by this, which is exactly why the
+   declaration goes on the SELECTOR rather than on the single heading that
+   wraps today: add a longer label to FOOTER_COLUMNS and it inherits the fix.
+
+   `text-wrap: balance` and nothing else — no width cap, no `<br>`, no
+   non-breaking space. The heading keeps its own track, so the balanced split
+   ("For Carriers" / "& Brokers") fits at both widths with no reflow anywhere
+   else. Type, colour and spacing are untouched: contrast is `--footer-ink` on
+   the footer ground, exactly as the block above sets it.
+   ═══════════════════════════════════════════════════════════════════════════ */
+.premium-footer .footer-col h4 { text-wrap: balance; }

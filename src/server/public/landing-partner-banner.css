@@ -93,15 +93,30 @@ html body.landing-v2.qf-wft main > section.qf-marquee-section::after {
    idiom, not a lookalike: same `auto minmax(0, 1fr)` track pair, same 16px
    column gap, same `align-self: center` on both header items.
 
-     col 1 (auto)     col 2 (minmax(0, 1fr))
-     ┌────────────┬──────────────────────────┐
-     │ icon tile  │  h2.qf-partner-title     │  row 1  auto
-     ├────────────┴──────────────────────────┤
-     │ a.qf-partner-cta                      │  row 2  auto
-     └───────────────────────────────────────┘
+     col 1 (auto)     col 2 (minmax(0, 1fr))     col 3 (auto)
+     ┌────────────┬──────────────────────┬──────────────────┐
+     │ icon tile  │  h2.qf-partner-title │ a.qf-partner-cta │  row 1  auto
+     └────────────┴──────────────────────┴──────────────────┘
+
+   THE THIRD TRACK IS WHAT FILLS THE CARD. With the CTA on its own row 2 the
+   card measured, at 1440: title box ending 411px (32% of the 1280 card) short
+   of the right edge and 81px of nothing under the CTA — 298.72px tall to carry
+   138.72px of content. Neither number is a spacing bug that padding could fix;
+   the layout simply had a whole column of width it never used, which is what
+   makes the widest breakpoint read unfinished. Moving the CTA into the empty
+   column spends that width on the one thing a banner is for and drops the
+   second row with it.
+
+   THE TWO-ROW SHAPE IS STILL THERE, below 1100 — see the breakpoint block.
+   Under a 28px headline the title track gets too narrow to share a line with a
+   287px button, so at that width the CTA goes back under the header.
 
    NOT A LINE OF MARKUP MOVES — the source order (tile, title, CTA) is already
    the order the grid wants, and each child is placed by rule.
+
+   `align-self: center` on all three keeps the icon-to-title centre delta at
+   the 0.00px #556 measured; the CTA joins the same centred row rather than
+   introducing a second vertical alignment.
 
    AND IT IS LEFT-ALIGNED, which is the same house rule the hero above it now
    obeys: page and card headers are never centred. This one was centred at ALL
@@ -110,14 +125,21 @@ html body.landing-v2.qf-wft main > section.qf-marquee-section::after {
    instead of stretching it across the card. */
 .qf-partner-card {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: start;
   justify-items: start;
   row-gap: 24px;
   column-gap: 16px;
   width: 100%;
   min-width: 0;
-  padding: 80px 24px;
+  /* 60, not 80. The other half of the dead space was vertical: 80px top and
+     bottom wrapped 138.72px of content in a 298.72px card, and with the CTA
+     now sharing row 1 the content is a single ~63px band — 160px of padding
+     around it would be 72% of the card. 60px is the next step down the ramp
+     and lands the band at 182.72px, which is the proportion the bento cards
+     above it keep. The ≤860 and ≤560 blocks re-declare their own padding, so
+     this moves nothing on phones. */
+  padding: 60px 24px;
   background-color: var(--surface-hero);
   background-image: var(--surface-hero-grain), var(--surface-hero-grain-ink);
   background-repeat: repeat, repeat;
@@ -191,8 +213,9 @@ html body.qf-wft .qf-partner-title .qf-partner-title__soft { color: var(--muted)
    `--cta-*` tokens the bento grid's primary tool buttons use, so the page has
    exactly one primary-button look. */
 .qf-partner-cta {
-  grid-column: 1 / -1;
-  grid-row: 2;
+  grid-column: 3;
+  grid-row: 1;
+  align-self: center;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -260,6 +283,14 @@ html[data-theme="light"] body.qf-wft a.qf-partner-cta:not(.btn):not(.nav-link):n
      component rather than two that merely look alike at 1440. */
   .qf-partner-card { column-gap: 12px; }
   html body.qf-wft .qf-partner-title { font-size: 28px; letter-spacing: -1.12px; }
+  /* BACK TO TWO ROWS. The three-track row above is a 1440-and-down-to-1101
+     shape: it costs the title 48px of tile + 287px of button + two gaps, and
+     below 1100 what is left is too narrow for a 28px headline to read as one
+     line of copy. So the card returns to the `auto minmax(0, 1fr)` header with
+     the CTA spanning underneath — the exact shape it shipped with, unchanged
+     from 1100 all the way down, including the full-bleed button at ≤560. */
+  .qf-partner-card { grid-template-columns: auto minmax(0, 1fr); }
+  .qf-partner-cta { grid-column: 1 / -1; grid-row: 2; align-self: start; }
 }
 
 @media (max-width: 860px) {
