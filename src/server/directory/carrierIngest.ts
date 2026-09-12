@@ -1,8 +1,11 @@
 /**
  * FMCSA carrier-directory ingest CORE.
  *
- * Ingest ACTIVE US motor CARRIERS with operating authority from FMCSA's free
- * public data → the `carrier_directory` table (public, browsable directory).
+ * Ingest ACTIVE NORTH-AMERICAN motor CARRIERS with US operating authority from
+ * FMCSA's free public data → the `carrier_directory` table (public, browsable
+ * directory). US, Canadian AND Mexican domiciles: all three hold the same FMCSA
+ * property authority, and the country control on /directory is driven off the
+ * live per-country counts this produces.
  *
  * This module holds the reusable ingest engine (fetch → filter → normalize →
  * upsert) so BOTH callers can share it:
@@ -45,6 +48,7 @@ import { carrierDirectory, type CarrierDirectoryRow } from '../../db/schema.js';
 import { nearestPortForZip, nearestCaPortForProvince } from './containerPorts.js';
 import { US_STATE_CODES } from './usStates.js';
 import { CA_PROVINCE_CODES } from './caProvinces.js';
+import { MX_STATE_CODES } from './mxStates.js';
 import { exchangeTimeoutSignal } from '../../http/responseBody.js';
 import {
   CRASH_ID,
@@ -170,6 +174,17 @@ export interface CensusRow {
   phy_city?: string;
   phy_state?: string;
   phy_zip?: string;
+  /**
+   * FMCSA's OWN domicile country for the physical address — 'US' | 'CA' | 'MX'
+   * (plus a long tail of ~30 others with 1–245 rows each). Confirmed live on
+   * az4n-8mr2 2026-09-11: US 4,406,035 · CA 67,366 · MX 27,212.
+   *
+   * This is the ONLY field in either source that states the country outright,
+   * and it is what makes cross-border classification honest instead of inferred.
+   * It matters most for `NL`, the one code the Canadian and Mexican sets share
+   * (Nuevo León vs Newfoundland and Labrador) — see carrierCountry().
+   */
+  phy_country?: string;
 }
 
 /** Normalized carrier record persisted to `carrier_directory`. */
@@ -180,8 +195,8 @@ export interface CarrierRecord {
   dbaName: string | null;
   city: string | null;
   state: string | null;
-  /** Domicile country derived from state: 'US' or 'CA'. */
-  country: string;
+  /** Domicile country — 'US', 'CA' or 'MX'. See carrierCountry(). */
+  country: CarrierCountryCode;
   zip: string | null;
   phone: string | null;
   /** Census email_address (normalized lower-case), or null when absent/implausible. */
@@ -440,14 +455,50 @@ export function cargoClassFlags(census: CensusRow | undefined): {
   };
 }
 
+/** The domicile countries the directory can place a carrier in. */
+export type CarrierCountryCode = 'US' | 'CA' | 'MX';
+
+const CARRIER_COUNTRY_CODES: ReadonlySet<string> = new Set<CarrierCountryCode>(['US', 'CA', 'MX']);
+
 /**
- * Domicile country for a (already upper-cased) physical state/province code:
- * 'US' when it's a US state/territory, 'CA' when it's a Canadian province, else
- * null (Mexico / other / no state) — unplaceable in the North-America browse.
+ * Domicile country for a carrier — 'US', 'CA', 'MX', or null for "FMCSA did not
+ * give us enough to place this carrier in North America".
+ *
+ * TWO SIGNALS, IN PRIORITY ORDER, AND THE ORDER IS THE WHOLE POINT:
+ *
+ * 1. `fmcsaCountry` — the census file's own `phy_country`. When FMCSA says the
+ *    physical address is in a country, that is not an inference, it is the
+ *    record. It covers ~99.9% of carriers (the census match rate) and is the
+ *    ONLY thing that can settle `NL`, which the Canadian and Mexican code sets
+ *    genuinely share: Newfoundland and Labrador vs Nuevo León. A country outside
+ *    US/CA/MX (Guatemala 245, El Salvador 38, Honduras 37, …) is a real answer
+ *    too — "not North-America-browsable" — and returns null rather than falling
+ *    through to a code guess that would misplace it.
+ *
+ * 2. The state/province code, for the ~0.1% of rows with no census match. Here
+ *    `NL` HAS to be decided without help, so it is decided on evidence rather
+ *    than on which `Set.has` happens to run first: every one of 40 sampled L&I
+ *    rows carrying `bus_state_code='NL'` resolves to `phy_country='MX'`,
+ *    `phy_state='NL'` (Monterrey, Guadalupe, Apodaca — Nuevo León), and the
+ *    filtered L&I file contains NO Newfoundland rows under any spelling. So MX
+ *    is checked before CA, and `NL` reads as Nuevo León. That single overlap is
+ *    the only one: the US, CA and MX code sets are otherwise disjoint.
+ *
+ * `state` is expected already upper-cased; `fmcsaCountry` is upper-cased here.
  */
-export function carrierCountry(state: string | null): 'US' | 'CA' | null {
+export function carrierCountry(
+  state: string | null,
+  fmcsaCountry?: string | null,
+): CarrierCountryCode | null {
+  const declared = cleanStr(fmcsaCountry)?.toUpperCase() ?? null;
+  if (declared) {
+    // FMCSA named a country. Trust it — including when the answer is "somewhere
+    // we don't browse", which is a placement decision, not a missing one.
+    return CARRIER_COUNTRY_CODES.has(declared) ? (declared as CarrierCountryCode) : null;
+  }
   if (!state) return null;
   if (US_STATE_CODES.has(state)) return 'US';
+  if (MX_STATE_CODES.has(state)) return 'MX'; // before CA: resolves the NL overlap
   if (CA_PROVINCE_CODES.has(state)) return 'CA';
   return null;
 }
@@ -457,6 +508,33 @@ export function carrierCountry(state: string | null): 'US' | 'CA' | null {
  * truth for the ZIP/province → port mapping. US carriers resolve via the ZIP
  * centroid (nearestPortForZip); CA postal codes aren't in the US ZCTA table, so
  * CA carriers map by province → nearest Canadian gateway (nearestCaPortForProvince).
+ *
+ * MEXICO GETS NULL, DELIBERATELY, AND THE BRANCH IS LOAD-BEARING.
+ *
+ * There is no honest hub to assign. The US path resolves a hub from a ZCTA
+ * CENTROID and then THROWS IT AWAY past MAX_HUB_RADIUS_MI (250 mi) — the module
+ * already states that a carrier hundreds of miles from every hub is not a
+ * drayage provider for any of them, and that no hub beats a misleading one. A
+ * Mexican carrier has neither input: ALL_HUBS contains zero Mexican terminals,
+ * and Mexican postal codes are absent from ZIP5_CENTROIDS. Mapping Mexican
+ * states to US border crossings instead would fabricate at STATE granularity
+ * what the US side resolves at ZIP granularity — Tamaulipas alone spans Nuevo
+ * Laredo, Reynosa/Pharr, Matamoros/Brownsville and Tampico, ~350 mi apart, and
+ * Yucatán is ~1,500 mi from the nearest crossing.
+ *
+ * Falling through to `nearestPortForZip` would be worse than wrong, it would be
+ * SILENTLY wrong: Mexican postal codes are five digits, so Monterrey's 64000
+ * and Tijuana's 22000 are perfectly valid US ZIP lookups and would file those
+ * carriers under Kansas City and Charleston WV. That is exactly the failure the
+ * Phoenix/Los Angeles fix removed, and this explicit branch is what stops it
+ * coming back through the border.
+ *
+ * Null is a well-trodden, already-handled state, not a new one: a US carrier
+ * whose ZIP has no centroid, or who is >250 mi from every hub, already stores
+ * null (89 of 5,001 rows in the local fixture). Such a carrier simply appears
+ * under no port facet — it is still listed, searchable, and has a full profile.
+ * Adding real Mexican gateways later is a DATA problem (a Mexican postal-code
+ * centroid table + Mexican terminals in terminals.ts), not a mapping problem.
  *
  * Both the ingest (normalizeCarrier, below) AND the boot-time re-derivation
  * backfill (src/server/directory/backfillNearestPort.ts) call THIS function, so
@@ -468,7 +546,9 @@ export function deriveNearestPortCode(
   state: string | null | undefined,
   zip: string | null | undefined,
 ): string | null {
-  return country === 'CA' ? nearestCaPortForProvince(state) : nearestPortForZip(zip);
+  if (country === 'CA') return nearestCaPortForProvince(state);
+  if (country === 'MX') return null; // see above — no fabricated geography
+  return nearestPortForZip(zip);
 }
 
 /** URL-safe slug from the display name, suffixed with USDOT for uniqueness. */
@@ -493,6 +573,11 @@ export function normalizeCarrier(
   census: CensusRow | undefined,
   includeCanada = false,
   safety: CarrierSafety = EMPTY_SAFETY,
+  /** Called with the raw state code (or null) each time a row is dropped ONLY
+   *  because its domicile could not be placed in US/CA/MX. Optional so every
+   *  existing call site stays valid; runIngest passes one so the drops are
+   *  counted rather than silently discarded. */
+  onUnplaceable?: (stateCode: string | null) => void,
 ): CarrierRecord | null {
   if (!isActivePropertyCarrier(li)) return null;
   if (!censusAllowsOperate(census)) return null;
@@ -510,11 +595,20 @@ export function normalizeCarrier(
   // port, so a carrier must be placeable in a North-America country:
   //   - US state / DC / PR-VI-GU  → country 'US' (kept, unchanged behavior).
   //   - Canadian province          → country 'CA' (kept ONLY when includeCanada;
-  //     otherwise dropped — this preserves the EXACT current US-only output when
-  //     the flag is off, since the ~9k Canada carriers hold US cross-border authority).
-  //   - Mexico / other / no state  → country null (dropped — unchanged behavior).
-  const country = carrierCountry(state);
-  if (country === null) return null;
+  //     runIngest defaults that ON, so the live ingest keeps them).
+  //   - Mexican state              → country 'MX' (kept — ~14.7k active property
+  //     carriers licensed by FMCSA under US cross-border authority; they were
+  //     dropped outright until this change, which is why the directory read as
+  //     100% US and #548's country control could never render).
+  //   - anything else / no state   → country null: UNPLACEABLE, still dropped —
+  //     but the caller is TOLD (onUnplaceable), so the number stops being
+  //     invisible. Central-American domiciles (GT 245, SV 38, HN 37, …) and
+  //     rows with no usable state code are the real population here.
+  const country = carrierCountry(state, census?.phy_country);
+  if (country === null) {
+    onUnplaceable?.(state);
+    return null;
+  }
   if (country === 'CA' && !includeCanada) return null;
 
   return {
@@ -565,6 +659,8 @@ export function filterAndNormalizeCarriers(
   censusByDot: Map<string, CensusRow>,
   includeCanada = false,
   safetyLookup?: SafetyLookup,
+  /** Forwarded to normalizeCarrier — see its `onUnplaceable`. */
+  onUnplaceable?: (stateCode: string | null) => void,
 ): CarrierRecord[] {
   const out: CarrierRecord[] = [];
   const seen = new Set<string>();
@@ -579,7 +675,7 @@ export function filterAndNormalizeCarriers(
           safetyLookup.crashQueried,
         )
       : EMPTY_SAFETY;
-    const rec = normalizeCarrier(li, census, includeCanada, safety);
+    const rec = normalizeCarrier(li, census, includeCanada, safety, onUnplaceable);
     if (rec && !seen.has(rec.usdot)) {
       seen.add(rec.usdot);
       out.push(rec);
@@ -1157,7 +1253,7 @@ export async function fetchCensusByDots(dots: string[]): Promise<Map<string, Cen
     const inList = chunk.map((d) => `'${d}'`).join(',');
     const rows = await socrataJson<CensusRow>(CENSUS_ID, {
       $select:
-        'dot_number,legal_name,dba_name,email_address,power_units,total_drivers,safety_rating,safety_rating_date,add_date,status_code,crgo_intermodal,hm_ind,crgo_genfreight,crgo_coldfood,crgo_liqgas,crgo_chem,crgo_metalsheet,crgo_machlrg,crgo_logpole,crgo_drybulk,crgo_household,crgo_beverages,crgo_produce,crgo_motoveh,crgo_livestock,crgo_grainfeed,crgo_oilfield,crgo_meat,crgo_paperprod,crgo_construct,crgo_farmsupp,crgo_coalcoke,crgo_bldgmat,phone,phy_street,phy_city,phy_state,phy_zip',
+        'dot_number,legal_name,dba_name,email_address,power_units,total_drivers,safety_rating,safety_rating_date,add_date,status_code,crgo_intermodal,hm_ind,crgo_genfreight,crgo_coldfood,crgo_liqgas,crgo_chem,crgo_metalsheet,crgo_machlrg,crgo_logpole,crgo_drybulk,crgo_household,crgo_beverages,crgo_produce,crgo_motoveh,crgo_livestock,crgo_grainfeed,crgo_oilfield,crgo_meat,crgo_paperprod,crgo_construct,crgo_farmsupp,crgo_coalcoke,crgo_bldgmat,phone,phy_street,phy_city,phy_state,phy_zip,phy_country',
       $where: `dot_number in (${inList})`,
       $limit: String(chunk.length),
     });
@@ -1322,6 +1418,24 @@ export interface IngestSummary {
   intermodal: number;
   stateCounts: Array<[string, number]>;
   portCounts: Array<[string, number]>;
+  /** Per-domicile-country counts for the rows WRITTEN this run ('US'|'CA'|'MX').
+   *  The number that tells you whether a cross-border ingest actually did
+   *  anything, without a second query against the table. */
+  countryCounts: Array<[string, number]>;
+  /**
+   * Rows dropped ONLY because their domicile could not be placed in US/CA/MX.
+   *
+   * Before this existed the drop was the largest silent event in the ingest:
+   * ~25.8k Mexican carriers left the pipeline every run and nothing anywhere
+   * said so. It is still a drop (the browse is organized by North-American
+   * state + port, and a Guatemalan domicile has no place in it) — but it is now
+   * a COUNTED one, with the raw state codes that produced it, so the next gap
+   * is visible the day it appears instead of years later.
+   */
+  unplaceable: number;
+  /** The raw state codes behind `unplaceable`, descending. '(none)' buckets the
+   *  rows that carried no state code at all. */
+  unplaceableCodes: Array<[string, number]>;
 }
 
 export async function runIngest(
@@ -1357,6 +1471,15 @@ export async function runIngest(
   let intermodal = 0;
   const stateCounts = new Map<string, number>();
   const portCounts = new Map<string, number>();
+  const countryCounts = new Map<string, number>();
+  const unplaceableCodes = new Map<string, number>();
+  let unplaceable = 0;
+  /** Count a row the domicile gate could not place. See IngestSummary.unplaceable. */
+  const noteUnplaceable = (stateCode: string | null): void => {
+    unplaceable += 1;
+    const key = stateCode || '(none)';
+    unplaceableCodes.set(key, (unplaceableCodes.get(key) ?? 0) + 1);
+  };
   // Observability counters. `changed` stays null until a store reports a real
   // measurement, so "we could not measure it" never masquerades as "zero".
   let changed: number | null = null;
@@ -1430,7 +1553,13 @@ export async function runIngest(
       crashQueried: crashOk,
     };
 
-    let records = filterAndNormalizeCarriers(liRows, censusByDot, includeCanada, safetyLookup);
+    let records = filterAndNormalizeCarriers(
+      liRows,
+      censusByDot,
+      includeCanada,
+      safetyLookup,
+      noteUnplaceable,
+    );
 
     // Honor --limit at the page boundary: trim this page's records so the total
     // never exceeds the cap, then bulk-upsert the (trimmed) page in one go.
@@ -1441,6 +1570,7 @@ export async function runIngest(
     for (const rec of records) {
       if (rec.intermodal) intermodal += 1;
       if (rec.state) stateCounts.set(rec.state, (stateCounts.get(rec.state) ?? 0) + 1);
+      countryCounts.set(rec.country, (countryCounts.get(rec.country) ?? 0) + 1);
       if (rec.nearestPortCode) portCounts.set(rec.nearestPortCode, (portCounts.get(rec.nearestPortCode) ?? 0) + 1);
     }
     if (!opts.dryRun) {
@@ -1485,6 +1615,18 @@ export async function runIngest(
     );
   }
 
+  // Say the drop count out loud. It is not an error — a Guatemalan domicile has
+  // no place in a North-American state/port browse — but an uncounted drop is
+  // how ~25.8k Mexican carriers stayed invisible for the life of the ingest.
+  if (unplaceable > 0) {
+    const top = [...unplaceableCodes.entries()]
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 10)
+      .map(([c, n]) => `${c}=${n}`)
+      .join(' ');
+    log(`  …unplaceable domicile (not US/CA/MX): ${unplaceable} rows dropped — ${top}`);
+  }
+
   const finishedAt = now();
   const sortDesc = (m: Map<string, number>) => [...m.entries()].sort((a, b) => b[1] - a[1]);
   return {
@@ -1498,6 +1640,9 @@ export async function runIngest(
     intermodal,
     stateCounts: sortDesc(stateCounts),
     portCounts: sortDesc(portCounts),
+    countryCounts: sortDesc(countryCounts),
+    unplaceable,
+    unplaceableCodes: sortDesc(unplaceableCodes),
   };
 }
 

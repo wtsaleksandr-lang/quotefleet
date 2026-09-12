@@ -355,12 +355,14 @@ describe('filterAndNormalizeCarriers', () => {
 
 // ── country-aware Canada gate (GATED OFF by default) ─────────────────────
 describe('carrierCountry', () => {
-  it('maps US states/territories → US, CA provinces → CA, else null', () => {
+  it('maps US states/territories → US, CA provinces → CA, MX states → MX, else null', () => {
     expect(carrierCountry('GA')).toBe('US');
     expect(carrierCountry('PR')).toBe('US'); // territory
     expect(carrierCountry('ON')).toBe('CA');
     expect(carrierCountry('BC')).toBe('CA');
-    expect(carrierCountry('AG')).toBeNull(); // Aguascalientes (Mexico)
+    // Mexico used to return null here, which is what dropped ~14.7k active
+    // property carriers out of the directory. See crossBorderIngest.test.ts.
+    expect(carrierCountry('AG')).toBe('MX'); // Aguascalientes
     expect(carrierCountry('ZZ')).toBeNull();
     expect(carrierCountry(null)).toBeNull();
   });
@@ -440,9 +442,28 @@ describe('Canada gate in filterAndNormalizeCarriers', () => {
     expect(rec.nearestPortCode).toBe('INLTOR'); // ON → Toronto inland ramp (province fallback)
   });
 
-  it('DROPS a Mexico/other-domicile carrier regardless of includeCanada', () => {
-    expect(filterAndNormalizeCarriers([activeCarrier], mxCensus, false)).toHaveLength(0);
-    expect(filterAndNormalizeCarriers([activeCarrier], mxCensus, true)).toHaveLength(0);
+  it('KEEPS + tags a Mexico-domicile carrier regardless of includeCanada', () => {
+    // MX is ungated on purpose: the flag exists to preserve the legacy US-only
+    // output for Canada, and Mexico was never in that output to preserve.
+    for (const flag of [false, true]) {
+      const [rec] = filterAndNormalizeCarriers([activeCarrier], mxCensus, flag);
+      expect(rec.country).toBe('MX');
+      expect(rec.state).toBe('AG');
+      // No Mexican hub exists and no Mexican postcode is in the US ZCTA table —
+      // null beats a fabricated one. See deriveNearestPortCode.
+      expect(rec.nearestPortCode).toBeNull();
+    }
+  });
+
+  it('DROPS + REPORTS a domicile outside US/CA/MX instead of discarding it silently', () => {
+    const gtCensus = new Map<string, CensusRow>([
+      ['107080', { dot_number: '107080', status_code: 'A', phy_state: 'GU', phy_country: 'GT' }],
+    ]);
+    const dropped: Array<string | null> = [];
+    expect(
+      filterAndNormalizeCarriers([activeCarrier], gtCensus, true, undefined, (c) => dropped.push(c)),
+    ).toHaveLength(0);
+    expect(dropped).toEqual(['GU']);
   });
 
   it('produces the EXACT same US set from a mixed US+CA batch with the flag off', () => {
