@@ -196,22 +196,25 @@ test.describe('375px, in BOTH themes', () => {
 test.describe('the honesty rules are visible, not just in the source', () => {
   test('the index leads with "self-reported unless it says otherwise"', async ({ page }) => {
     await open(page, DIR);
-    // #518 SPLIT this claim in two rather than removing it. The one-line version
-    // stays UNCOLLAPSED in the hero — that is what "leads with" means, and it is
-    // asserted first and on its own, so burying the whole thing behind a
-    // disclosure fails here. The long form moved into `details.qt-fold`, the
-    // site-wide "About this…" disclosure every tool page now carries.
+    // #518 SPLIT this claim in two rather than removing it, and the tool-page
+    // template migration keeps both halves and makes both UNCOLLAPSED:
     //
-    // Both halves are asserted, which is strictly more than the single
-    // `.pc-truth` check this replaces: dropping either the visible line or the
-    // full explanation now fails, where before only the container had to exist.
-    const hero = page.locator('.pc-hero');
-    await expect(hero).toContainText('Listings are self-reported and unverified unless the card says otherwise');
+    //   - the one-line version leads, in the header band's own lead paragraph.
+    //     That is what "leads with" means, and it is asserted first and on its
+    //     own, so burying it fails here;
+    //   - the long form is the answer/limits strip, block 3 of the template,
+    //     which is open by default. It used to need a click.
+    //
+    // Both halves are asserted and BOTH must be visible without interaction,
+    // which is strictly more than either earlier version of this test required.
+    const band = page.locator('.qtt-band');
+    await expect(band).toContainText(
+      'Listings are self-reported and unverified unless the card says otherwise',
+    );
 
-    const about = hero.locator('details.qt-fold');
+    const about = page.locator('.qtt-strip');
     await expect(about).toBeVisible();
-    await expect(about.locator('summary')).toContainText("About this directory's data");
-    await about.locator('summary').click();
+    await expect(about.locator('details')).toHaveCount(0);
     await expect(about).toContainText('Operators list themselves; we do not import anyone');
     // And the second half of the honesty rule: the state disagreement is
     // published rather than averaged away.

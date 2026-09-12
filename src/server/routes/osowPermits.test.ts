@@ -365,25 +365,49 @@ describe('coverage lists', () => {
 
 describe('the page', () => {
   const html = renderOsowToolPage();
+  /**
+   * The page is now built on the shared tool-page template, whose stylesheet
+   * DOCUMENTS the two hex values the header band must not borrow and the
+   * `overflow: hidden` that kills a sticky descendant. Those are prose in a
+   * comment, not declarations, so every "this string must not appear in the
+   * CSS" assertion below reads the stylesheet with comments stripped — the same
+   * discipline `toolPage.test.ts` states for the template itself. Asserting
+   * against the raw string would fail on the reasoning rather than on the code.
+   */
+  const styleBlock = /<style>([\s\S]*?)<\/style>/.exec(html)?.[1] ?? '';
+  const cssDecls = styleBlock.replace(/\/\*[\s\S]*?\*\//g, '');
 
   it('says what the number is before the user reads it as a freight quote', () => {
-    // The disclaimer lives inside a collapsible <details> but is still in the HTML.
-    expect(html).toMatch(/About this calculator/);
+    // MIGRATED, NOT DROPPED. The claim used to sit in the hero behind a
+    // collapsed "About this calculator" disclosure; it is now the answer/limits
+    // strip, which is block 3 of the template and is OPEN by default — so the
+    // sentence is visible without a click, which is strictly more than before.
+    expect(html).toMatch(/class="qtt-strip"/);
     expect(html).toMatch(/STATE PERMIT FEES ONLY/);
+    // ...and it is NOT behind a <details> any more.
+    const strip = html.slice(html.indexOf('class="qtt-strip"'), html.indexOf('</section>', html.indexOf('class="qtt-strip"')));
+    expect(strip).toMatch(/STATE PERMIT FEES ONLY/);
+    expect(strip).not.toMatch(/<details/);
     // The escort omission is stated on the page itself, not only in the API.
     expect(html).toMatch(/one escort can cost more than every permit below combined/);
   });
 
-  it('left-aligns the hero and puts the eyebrow above it, top-left', () => {
-    expect(html).toMatch(/\.ow-hero \{[^}]*text-align: left/);
-    expect(html).toMatch(/\.ow-hero h1 \{[^}]*text-align: left/);
-    expect(html).toMatch(/\.ow-eyebrow \{[^}]*text-align: left/);
+  it('left-aligns the header band and puts the eyebrow above the H1, top-left', () => {
+    // The hero is the template's header band now. Its H1, lead and eyebrow are
+    // all left-aligned in the template's own stylesheet, which ships with the
+    // page, so the property is still asserted on the rendered document.
+    expect(html).toMatch(/\.qtt-band h1 \{[^}]*text-align: left/);
+    expect(html).toMatch(/\.qtt-band p\.qtt-lead \{[^}]*text-align: left/);
+    expect(html).toMatch(/\.qtt-eyebrow \{[^}]*text-align: left/);
     // Eyebrow renders BEFORE the h1 in source order.
-    expect(html.indexOf('ow-eyebrow')).toBeLessThan(html.indexOf('<h1>'));
+    expect(html.indexOf('qtt-eyebrow')).toBeLessThan(html.indexOf('<h1>'));
+    // The breadcrumb is above the band, on the page ground — the only place a
+    // muted 13px link clears 4.5:1 on this surface.
+    expect(html.indexOf('qtt-crumbs')).toBeLessThan(html.indexOf('class="qtt-band"'));
   });
 
   it('never uses overflow:hidden, which breaks sticky in embedded contexts', () => {
-    expect(html).not.toMatch(/overflow:\s*hidden/);
+    expect(cssDecls).not.toMatch(/overflow:\s*hidden/);
   });
 
   it('puts the field label INSIDE the field and one help cue top-left per section', () => {
@@ -438,10 +462,88 @@ describe('the page', () => {
   });
 
   it('uses theme tokens only — no raw hex that would break one theme', () => {
-    const css = html.match(/<style>([\s\S]*?)<\/style>/)?.[1] ?? '';
-    expect(css.length).toBeGreaterThan(1000);
-    expect(css).not.toMatch(/#[0-9a-fA-F]{3,8}\b/);
-    expect(css).not.toMatch(/\b(?:color|background)\s*:\s*(?:white|black)\b/);
+    expect(cssDecls.length).toBeGreaterThan(1000);
+    expect(cssDecls).not.toMatch(/#[0-9a-fA-F]{3,8}\b/);
+    expect(cssDecls).not.toMatch(/\b(?:color|background)\s*:\s*(?:white|black)\b/);
+  });
+
+  it('renders the answer with tabular figures, so a recalculation cannot jitter', () => {
+    // Every number the result paints and re-paints: the headline total, the
+    // four tiles, the per-state amounts and both money tables.
+    for (const rule of [
+      /\.ow-total \.ow-tv \{[^}]*font-variant-numeric: tabular-nums/,
+      /\.ow-flag \.v \{[^}]*font-variant-numeric: tabular-nums/,
+      /\.ow-sh \.amt \{[^}]*font-variant-numeric: tabular-nums/,
+      /\.ow-lines td\.num[^{]*\{[^}]*font-variant-numeric: tabular-nums/,
+      /\.ow-sum td\.num[^{]*\{[^}]*font-variant-numeric: tabular-nums/,
+      /\.ow-yourv \{[^}]*font-variant-numeric: tabular-nums/,
+    ]) {
+      expect(cssDecls, String(rule)).toMatch(rule);
+    }
+    // ...and the headline figure is flat ink, never the accent: a computed
+    // answer is not a link.
+    const tv = /\.ow-total \.ow-tv \{([^}]*)\}/.exec(cssDecls)?.[1] ?? '';
+    expect(tv).toContain('color: var(--ink)');
+    expect(tv).not.toContain('var(--accent)');
+  });
+
+  it('guards every animation behind prefers-reduced-motion', () => {
+    // No transition may be declared outside a no-preference query.
+    const withoutMotionQueries = cssDecls
+      .replace(/@media \(prefers-reduced-motion: no-preference\) \{[\s\S]*?\n  \}/g, '')
+      .replace(/@media \(prefers-reduced-motion: reduce\) \{[\s\S]*?\n  \}/g, '');
+    expect(withoutMotionQueries).not.toMatch(/^\s*transition:/m);
+    expect(cssDecls).toContain('@media (prefers-reduced-motion: reduce)');
+  });
+
+  it('answers a FAQ, and emits FAQPage schema for exactly those questions', () => {
+    const ld = [...html.matchAll(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/g)]
+      .map((m) => JSON.parse(m[1] as string) as Record<string, unknown>);
+    const faq = ld.find((o) => o['@type'] === 'FAQPage') as
+      | { mainEntity: Array<{ name: string; acceptedAnswer: { text: string } }> }
+      | undefined;
+    expect(faq, 'the page must emit FAQPage schema').toBeDefined();
+    const entities = faq!.mainEntity;
+    expect(entities.length).toBeGreaterThanOrEqual(4);
+    // EVERY schema'd question is a real question rendered on the page, and
+    // every answer is real prose. Schema for content that is not on the page is
+    // the thing this assertion exists to stop.
+    for (const q of entities) {
+      expect(q.name.length).toBeGreaterThan(10);
+      expect(q.acceptedAnswer.text.length).toBeGreaterThan(40);
+      const rendered = q.name
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+      expect(html, `FAQ question not rendered: ${q.name}`).toContain(rendered);
+    }
+    // The count in the schema is the count on the page — no padding either way.
+    const folds = html.slice(html.indexOf('id="faq"')).match(/<details class="qh-fold"/g) ?? [];
+    expect(folds).toHaveLength(entities.length);
+  });
+
+  it('states no jurisdictional rule of its own in the FAQ', () => {
+    // THE HONESTY GUARD ON THE FAQ. This is compliance-adjacent copy, and the
+    // failure mode is a confident sentence about one state's law that our
+    // corpus cannot source. The permit engine prices fees; it does not opine on
+    // when a permit, an escort or a survey is REQUIRED, so no answer here may
+    // claim one — and Canada is a known schema gap, so it may not appear at all.
+    const ld = [...html.matchAll(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/g)]
+      .map((m) => JSON.parse(m[1] as string) as Record<string, unknown>);
+    const faq = ld.find((o) => o['@type'] === 'FAQPage') as
+      | { mainEntity: Array<{ name: string; acceptedAnswer: { text: string } }> }
+      | undefined;
+    const text = (faq?.mainEntity ?? []).map((q) => `${q.name} ${q.acceptedAnswer.text}`).join(' ');
+    for (const banned of [
+      /\bCanad(a|ian)\b/i,
+      /\bprovinc/i,
+      /\byou (?:will |must )?need a permit\b/i,
+      /\brequires? (?:an? )?escort (?:if|when|above|over)\b/i,
+    ]) {
+      expect(text, `FAQ asserts an unsourced rule: ${String(banned)}`).not.toMatch(banned);
+    }
   });
 
   it('lets a wide table scroll inside itself rather than the page', () => {

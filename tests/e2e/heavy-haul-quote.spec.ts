@@ -334,12 +334,34 @@ test.describe('the reference lane, through the form', () => {
     // the seven permit rows into one, clamping the line notes to two lines now
     // that the full text is one hover away, and merging the lane and mileage
     // cards bought back more than the pills and cards cost.
-    const { results, doc } = await page.evaluate(() => ({
-      results: Math.round((document.querySelector('.hh-results') as HTMLElement).getBoundingClientRect().height),
-      doc: document.documentElement.scrollHeight,
-    }));
+    //
+    // THE DOCUMENT BUDGET IS NOW SPLIT ALONG THE OWNERSHIP LINE THIS COMMENT
+    // ALREADY DREW, because the page has moved onto the shared tool-page
+    // template and the template's five explanatory blocks (limits, how it
+    // works, the two rows, related tools, FAQ) sit below the tool on every tool
+    // page in the suite by design. A single `doc` number could no longer tell a
+    // regression in THIS tool's output from the scaffold every page carries, so
+    // it is measured as two figures instead of loosened to one big one:
+    //
+    //   owned    — the band plus the tool card (the form and the results)
+    //   scaffold — everything from the limits strip down, incl. the footer
+    //
+    // Measured on the reference migration (/tools/bridge-formula) the scaffold
+    // is 2,695px desktop; here it is 2,810px with two more FAQ answers. The
+    // RESULTS budget below is unchanged and is still the one that matters.
+    const { results, owned, scaffold } = await page.evaluate(() => {
+      const doc = document.documentElement.scrollHeight;
+      const limits = document.getElementById('limits') as HTMLElement;
+      const blocksTop = Math.round(limits.getBoundingClientRect().top + window.scrollY);
+      return {
+        results: Math.round((document.querySelector('.hh-results') as HTMLElement).getBoundingClientRect().height),
+        owned: blocksTop,
+        scaffold: doc - blocksTop,
+      };
+    });
     expect(results, `desktop results column ${results}px`).toBeLessThan(2600);
-    expect(doc, `desktop document ${doc}px`).toBeLessThan(4200);
+    expect(owned, `desktop band + tool ${owned}px`).toBeLessThan(3200);
+    expect(scaffold, `desktop template scaffold ${scaffold}px`).toBeLessThan(3200);
   });
 
   test('does not scroll the document sideways', async ({ page }) => {
@@ -663,26 +685,33 @@ for (const theme of ['dark', 'light'] as const) {
     // The permits page's mobile result was cut from 12,199px to 4,347px. Same
     // discipline: the RESULTS column is the part this page owns, and every line
     // note is clamped with the full text one hover away.
-    const { results, doc, note } = await page.evaluate(() => {
+    const { results, owned, scaffold, note } = await page.evaluate(() => {
       const notes = [...document.querySelectorAll('.hh-ln')].map((el) =>
         Math.round(el.getBoundingClientRect().height),
       );
+      const doc = document.documentElement.scrollHeight;
+      const limits = document.getElementById('limits') as HTMLElement;
+      const blocksTop = Math.round(limits.getBoundingClientRect().top + window.scrollY);
       return {
         results: Math.round(
           (document.querySelector('.hh-results') as HTMLElement).getBoundingClientRect().height,
         ),
-        doc: document.documentElement.scrollHeight,
+        owned: blocksTop,
+        scaffold: doc - blocksTop,
         note: Math.max(0, ...notes),
       };
     });
     expect(results, `375px ${theme} results column ${results}px`).toBeLessThan(3200);
     // The RESULTS budget above is the one this page owns and it has not moved.
-    // The DOCUMENT budget includes the shared footer, which grew by three links
-    // when the OS/OW reference hub and its two calculators were added to the
-    // "Free Tools" column — ~150px of footer on every page on the site, and
-    // nothing to do with this tool's own output. Raised once, deliberately, so
-    // the number still catches a regression in the part this page controls.
-    expect(doc, `375px ${theme} document ${doc}px`).toBeLessThan(7600);
+    // The document budget used to be a single number that also carried the
+    // shared footer; now that the page sits on the shared tool-page template it
+    // also carries the template's five explanatory blocks, which every tool
+    // page in the suite has by design. So it is split, the same way the desktop
+    // case is: `owned` is the band plus the tool card, `scaffold` is everything
+    // from the limits strip down. A regression in what this tool renders moves
+    // the first two numbers; adding a FAQ answer moves only the third.
+    expect(owned, `375px ${theme} band + tool ${owned}px`).toBeLessThan(6000);
+    expect(scaffold, `375px ${theme} template scaffold ${scaffold}px`).toBeLessThan(6200);
     // Two lines at 12px/1.5 is 36px. A taller note means the clamp stopped
     // working, which is how a compact result silently becomes a report again.
     expect(note, `375px ${theme} tallest line note ${note}px`).toBeLessThanOrEqual(40);
@@ -718,7 +747,8 @@ for (const theme of ['dark', 'light'] as const) {
     await openTool(page, theme);
     const painted = await page.evaluate(() => {
       const body = getComputedStyle(document.body);
-      const hero = document.querySelector('.hh-hero h1');
+      // The hero is the shared tool-page template's header band now.
+      const hero = document.querySelector('.qtt-band h1');
       return {
         bg: body.backgroundColor,
         heroInk: hero ? getComputedStyle(hero).color : '',
@@ -804,11 +834,11 @@ for (const theme of ['dark', 'light'] as const) {
 // The standing UI rules
 // ──────────────────────────────────────────────────────────────────────────
 
-test('the hero is left-aligned with its eyebrow top-left', async ({ page }) => {
+test('the header band is left-aligned with its eyebrow top-left', async ({ page }) => {
   await openTool(page);
   const boxes = await page.evaluate(() => {
-    const eyebrow = document.querySelector('.hh-eyebrow') as HTMLElement;
-    const h1 = document.querySelector('.hh-hero h1') as HTMLElement;
+    const eyebrow = document.querySelector('.qtt-band .qtt-eyebrow') as HTMLElement;
+    const h1 = document.querySelector('.qtt-band h1') as HTMLElement;
     return {
       eyebrowLeft: Math.round(eyebrow.getBoundingClientRect().left),
       h1Left: Math.round(h1.getBoundingClientRect().left),

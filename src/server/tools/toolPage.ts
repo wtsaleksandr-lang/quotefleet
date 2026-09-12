@@ -171,7 +171,18 @@ export const TOOL_TEMPLATE_CSS = `
   @media (prefers-reduced-motion: no-preference) {
     .qtt-embed { transition: background-color var(--qtt-dur-1) var(--qtt-ease), border-color var(--qtt-dur-1) var(--qtt-ease); }
   }
-  .qtt-embed:hover { border-color: var(--accent-ink); }
+  /* THE HOVER COLOUR IS PINNED, AND THAT IS A CONTRAST FIX, NOT A PREFERENCE.
+     style.css carries a global 'a:hover { color: var(--accent-strong); }' at
+     specificity (0,1,1), which beats this component's own '.qtt-embed { color:
+     var(--accent-ink) }' at (0,1,0). So hovering the chip turned its label from
+     white to the accent — ON THE SATURATED ACCENT BAND. Measured per pixel
+     against the brightest pixel under the label: 1.48:1 in light theme and
+     3.12:1 in dark, against a 4.5:1 floor for 13px text. The label was
+     effectively invisible for as long as the pointer was on it.
+     Restating the colour here restores --accent-ink on hover, where it measures
+     5.44:1. The hover AFFORDANCE is unchanged and is what it always was: the
+     border going to full-strength ink. */
+  .qtt-embed:hover { border-color: var(--accent-ink); color: var(--accent-ink); }
 
   /* ── THE SECTION-HEADER PRIMITIVE ────────────────────────────────────────
      ONE definition: eyebrow -> heading -> sub -> 24px gap -> body, eyebrow
@@ -572,6 +583,21 @@ export interface ToolPageOpts {
   extraScripts?: string;
   /** Anything that must sit between the tool card and block 3 — a JSON seed. */
   afterToolHtml?: string;
+  /**
+   * EXTRA CLASSES ON `<body>`, appended after `qtt` — never instead of it.
+   *
+   * Additive and optional: omitted, the body is exactly `class="qtt"`, which is
+   * what every page built on this template got before this option existed and
+   * what the bridge-formula page still gets.
+   *
+   * It exists because two of the migrated tools carry a behavioural body class
+   * of their own that has nothing to do with the template: `qf-mc-hide-sm`,
+   * which `marketing-chat.js` reads to keep the chat launcher off a page whose
+   * primary action is a submit button at phone width. Dropping it in the
+   * migration would have put the floating launcher back over the calculate
+   * button on a 375px screen — a real regression, invisible in a diff.
+   */
+  bodyClassExtra?: string;
 }
 
 /**
@@ -681,8 +707,9 @@ export function toolPage(opts: ToolPageOpts): string {
     lead: opts.lead,
     heroHtml: band,
     // `.qtt` scopes the template's focus-ring and reduced-motion rules to this
-    // page, so they cannot leak onto the ~35 hub pages sharing the shell.
-    bodyClass: 'qtt',
+    // page, so they cannot leak onto the ~35 hub pages sharing the shell. It is
+    // always FIRST and always present; `bodyClassExtra` only ever appends.
+    bodyClass: opts.bodyClassExtra ? `qtt ${opts.bodyClassExtra}` : 'qtt',
     bodyHtml: `${tool}${limits}${steps}${rows}${related}${faq}`,
     jsonLd: opts.jsonLd,
     extraCss: `${TOOL_TEMPLATE_CSS}${BAND_TOKENS}${opts.extraCss ?? ''}`,
