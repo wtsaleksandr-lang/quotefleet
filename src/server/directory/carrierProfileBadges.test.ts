@@ -231,7 +231,10 @@ describe('renderCarrierProfile — DrayLocator-structured header', () => {
     const html = renderCarrierProfile({ carrier: carrier() });
     expect(html).toContain('class="cp-headrow"');
     expect(html).toContain('class="cp-badge-active"');
-    expect(html).toContain('Own this company?');
+    // The claim link is the header's "Claim & edit" pill. It replaced the
+    // "Own this company? …" sentence that used to sit one element below it and
+    // said the same thing; see carrierProfileCard.test.ts for the full contract.
+    expect(html).toContain('class="cp-editbtn" href="/claim/acme-drayage-inc-107080"');
   });
 
   it('puts the ADDRESS in the header subtitle and the identifiers in the badge row', () => {

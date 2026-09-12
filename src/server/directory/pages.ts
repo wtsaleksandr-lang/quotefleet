@@ -667,6 +667,36 @@ function carrierLogoTile(c: VisibleCarrier, cls: string): string {
   return `<span class="${cls}" style="--dir-logo-h: ${carrierLogoHue(key)}" aria-hidden="true">${esc(monogramInitials(name))}</span>`;
 }
 
+/**
+ * A 48px rounded ICON TILE, built exactly the way the homepage cards build
+ * theirs (#545): the `<svg>` IS the tile. `box-sizing: border-box` turns its
+ * padding into the inset and the viewBox scales the glyph into what is left,
+ * so a 48px tile with 8px of padding draws a 32px glyph — no wrapper element,
+ * and one CSS rule (`.cp-cbox-ic`) re-skins every tile on the page.
+ *
+ * Stroke attributes live on the `<svg>` so each path inherits them; the glyph
+ * colour is `--accent-legible` (the accent picked by GROUND rather than by
+ * theme variable), which is what keeps it legible on the dark card too.
+ */
+const tileIcon = (paths: string, extraClass = ''): string =>
+  `<svg class="cp-cbox-ic${extraClass ? ` ${extraClass}` : ''}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">${paths}</svg>`;
+
+/** The four contact-row glyphs + the "add something" plus, as tile icons. */
+const TILE_PIN = tileIcon('<path d="M12 21s6.4-5.6 6.4-10.4a6.4 6.4 0 1 0-12.8 0C5.6 15.4 12 21 12 21Z"/><circle cx="12" cy="10.4" r="2.4"/>');
+const TILE_GLOBE = tileIcon(
+  '<circle cx="12" cy="12" r="8.4"/><path d="M3.6 12h16.8"/><path d="M12 3.6c2.2 2.3 3.4 5.3 3.4 8.4S14.2 18 12 20.4C9.8 18 8.6 15.1 8.6 12S9.8 5.9 12 3.6Z"/>',
+);
+const TILE_MAIL = tileIcon('<rect x="3.2" y="5.6" width="17.6" height="12.8" rx="2"/><path d="m4.2 7.2 7.8 5.8 7.8-5.8"/>');
+const TILE_PHONE = tileIcon(
+  '<path d="M7.2 3.8h3l1.4 3.5-2 1.4a11.6 11.6 0 0 0 5.7 5.7l1.4-2 3.5 1.4v3a1.7 1.7 0 0 1-1.9 1.7C10.7 18.1 5.9 13.3 5.5 5.7a1.7 1.7 0 0 1 1.7-1.9Z"/>',
+);
+const TILE_PLUS = tileIcon('<path d="M12 5.6v12.8"/><path d="M5.6 12h12.8"/>', 'cp-cbox-ic--plus');
+
+/** The pencil on the header's claim-and-edit pill. Small enough to sit inline
+ *  with 12px text, so it is NOT a tile — it is a 14px inline glyph. */
+const PENCIL_ICON =
+  '<svg class="cp-editbtn-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M4.5 19.5h3.2L18.6 8.6a1.7 1.7 0 0 0 0-2.4l-.8-.8a1.7 1.7 0 0 0-2.4 0L4.5 16.3Z"/><path d="M14.2 6.6 17.4 9.8"/></svg>';
+
 /** Inline location pin. `currentColor`, no external asset, no icon font. */
 const PIN_ICON =
   '<svg class="dir-ico" viewBox="0 0 16 16" width="12" height="12" aria-hidden="true" focusable="false"><path fill="currentColor" d="M8 1.5a4.5 4.5 0 0 0-4.5 4.5c0 3.2 3.9 8 4.1 8.2a.5.5 0 0 0 .8 0c.2-.2 4.1-5 4.1-8.2A4.5 4.5 0 0 0 8 1.5Zm0 6.2A1.7 1.7 0 1 1 8 4.3a1.7 1.7 0 0 1 0 3.4Z"/></svg>';
@@ -1353,10 +1383,20 @@ export const DIRECTORY_CSS = `
   }
   /* ── DrayLocator-structured header: [monogram] name · Active · FMCSA / claim
      on the right, subtitle, then the squared badge row — all left-aligned. ──── */
-  .cp-headrow { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px 24px; flex-wrap: wrap; text-align: left; margin: 14px 0 0; }
-  .cp-idblock { display: flex; align-items: flex-start; gap: 16px; min-width: 0; }
-  .cp-monogram { flex: 0 0 auto; width: 54px; height: 54px; border-radius: 8px; margin-top: 2px; background: var(--surface-2); border: 1px solid var(--border); color: var(--ink); display: inline-flex; align-items: center; justify-content: center; font-family: var(--font-mono); font-size: 21px; font-weight: 700; letter-spacing: 0.04em; }
-  .cp-idtext { min-width: 0; }
+  /* FOUR ITEMS, TWO LAYOUTS, ONE MARKUP ORDER. grid-template-areas places the
+     logo, the identity block, the edit pill and the action group; the mobile
+     override below re-places the SAME four into the reference's stack. The
+     logo/identity tracks span both rows so the pill and the actions stack on
+     the right without a wrapper element to align them. */
+  /* auto 1fr, NOT auto auto: the identity block spans both rows, and with
+     two auto rows grid splits its height evenly between them — which parked the
+     action group halfway down the card, a dead diagonal of blue between the
+     name and the buttons. A 1fr second row absorbs the span instead, so row 1
+     is exactly the pill's height (or zero on a claimed profile) and the actions
+     start immediately under it. */
+  .cp-headrow { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; grid-template-rows: auto 1fr; grid-template-areas: "logo id edit" "logo id actions"; align-items: start; gap: 12px 24px; text-align: left; margin: 14px 0 0; }
+  .cp-monogram { grid-area: logo; flex: 0 0 auto; width: 54px; height: 54px; border-radius: 8px; margin-top: 2px; background: var(--surface-2); border: 1px solid var(--border); color: var(--ink); display: inline-flex; align-items: center; justify-content: center; font-family: var(--font-mono); font-size: 21px; font-weight: 700; letter-spacing: 0.04em; }
+  .cp-idtext { grid-area: id; min-width: 0; }
   .cp-nameline { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
   .cp-nameline h1 { font-size: 30px; line-height: 1.15; margin: 0; }
   .cp-fmcsa { position: relative; font-size: 10px; font-family: var(--font-mono); letter-spacing: 0.08em; text-transform: uppercase; padding: 3px 7px; border-radius: 6px; background: var(--surface-2); color: var(--muted); border: 1px solid var(--border); white-space: nowrap; cursor: help; }
@@ -1598,7 +1638,7 @@ export const DIRECTORY_CSS = `
   /* ── Saved lists (Directory Pro, PR D) ──────────────────────────────────
      The "Save" affordance on cards + profile, its popover, and the saved-lists
      page rows. Theme-aware, tokens only. */
-  .cp-headactions { display: flex; flex-direction: column; align-items: flex-end; gap: 8px; }
+  .cp-headactions { grid-area: actions; display: flex; flex-direction: column; align-items: flex-end; gap: 8px; }
   /* Primary shipper action group (Request a rate + Save). flex-wrap keeps >=2 per
      line where they fit and stacks each control full-width otherwise — never a
      stranded orphan, no horizontal overflow at 375px. */
@@ -2209,8 +2249,24 @@ export const DIRECTORY_CSS = `
 
   /* ── 3 · Carrier profile: deep-blue header card + contact strip ─────────── */
   .dir-hero--cp { padding-bottom: 32px; }
-  .cp-herocard { background: var(--accent-fill); border-radius: var(--radius-lg); padding: 24px; margin-top: 12px; }
+  /* THE MOBILE BACK LINK. Present in the markup at every width and revealed
+     only below 640px, where it REPLACES the breadcrumb (which wrapped onto two
+     lines at 375px and read as furniture rather than as a way back). Sized as a
+     real tap target, not as a 12px caption. */
+  .cp-back { display: none; align-items: center; gap: 8px; font-size: 14px; color: var(--ink-soft); text-decoration: none; padding: 8px 0; transition: color .2s ease; }
+  .cp-back:hover { color: var(--accent); }
+  /* Same raster-over-flat-token blue as the /directory search card: a flat
+     saturated slab this size reads as a heavy block, and the depth that fixes
+     it is an IMAGE, never a CSS gradient (see the block header above). A 404 or
+     a WebP-less client lands on the flat --accent-fill this card shipped with. */
+  .cp-herocard { background-color: var(--accent-fill); background-image: url("/brand/dir-hero-wash.webp"); background-repeat: no-repeat; background-position: 50% 50%; background-size: cover; border-radius: var(--radius-lg); padding: 24px; margin-top: 12px; }
   .cp-herocard .cp-headrow { margin-top: 0; }
+  /* "Claim & edit" — the reference's top-right pill, carrying the action we
+     actually have. A ghost pill on the blue card: outline + card ink, never a
+     bright fill, so it never competes with the primary "Request a rate". */
+  .cp-editbtn { grid-area: edit; justify-self: end; display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-family: var(--font-mono); letter-spacing: 0.04em; padding: 8px 12px; border-radius: var(--radius-pill); border: 1px solid var(--cta-sec-border); background: transparent; color: var(--accent-ink); text-decoration: none; white-space: nowrap; transition: border-color .2s ease, background .2s ease; }
+  .cp-editbtn:hover { border-color: var(--accent-ink); background: var(--cta-sec-bg-hover); }
+  .cp-editbtn-ic { width: 14px; height: 14px; flex: 0 0 auto; }
   /* '.hero p.lead' and '.muted-small' win on specificity, and both resolve to a
      grey that measures 1.4:1 (light) / 2.2:1 (dark) on this blue card. The
      address line is the second most-read fact on the page, so it takes the
@@ -2218,9 +2274,12 @@ export const DIRECTORY_CSS = `
   .cp-herocard .cp-nameline h1 { color: var(--accent-ink); }
   .dir-hero--cp .cp-herocard p.cp-subtitle,
   .dir-hero--cp .cp-herocard p.cp-legalline { color: var(--accent-ink); }
-  /* .lead ships a marketing line-height; at the address's size that opened a
-     ~60px hole between it and the legal-name line. */
-  .dir-hero--cp .cp-herocard p.cp-subtitle { line-height: 1.3; }
+  /* .lead ships a marketing line-height AND a marketing margin-bottom; at the
+     address's size the first opened a ~60px hole between it and the legal-name
+     line, and the second (which .cp-subtitle's own margin cannot reach — the
+     ".hero p.lead" selector outranks it) left 38px of dead blue under the
+     address on desktop. Both are reset here, at a specificity that wins. */
+  .dir-hero--cp .cp-herocard p.cp-subtitle { line-height: 1.3; margin: 8px 0 0; }
   /* Inline flow, not flex — see the .carrier-card--row .meta note above. */
   .cp-herocard .cp-subtitle { margin-top: 8px; }
   .cp-herocard .cp-legalline { margin: 4px 0 0; }
@@ -2229,8 +2288,27 @@ export const DIRECTORY_CSS = `
   /* THE TILE SITS ON WHITE INSIDE THE BLUE CARD. A tinted tile on a blue field
      reads as a muddy dark square, and a supplied logo needs a neutral ground
      anyway — so the tile inverts here: white plate, tint-coloured initials. */
-  .cp-herocard .cp-monogram { border-color: transparent; background: var(--surface); color: var(--dir-logo-tint); }
-  .cp-herocard .cp-monogram--img { background: var(--surface); padding: 4px; }
+  /* PROMINENT, AND THE SAME PLATE FOR BOTH ARTWORK SHAPES. The reference's tile
+     is the first thing the eye lands on, so this one is 72px (64px at 375px)
+     with the 12px card radius rather than the 54px/8px chip it was.
+
+     It is a SQUARE plate holding an object-fit: contain image, which is why
+     both curated crops sit correctly in it: carrierLogoUrl() returns the 112x112
+     SQUARE crop (#547), inside which a wide wordmark is already trimmed and
+     scaled to the same optical weight as a round seal — so a wordmark
+     letterboxes cleanly and a square mark fills the plate, and neither is ever
+     cropped or stretched. 8px of padding keeps dark artwork off the plate edge.
+     A carrier with no artwork keeps the monogram, which uses the same plate. */
+  .cp-herocard .cp-monogram { border-color: transparent; background: var(--accent-ink); color: var(--dir-logo-tint); width: 72px; min-width: 72px; height: 72px; border-radius: var(--radius-lg); margin-top: 0; font-size: 26px; }
+  /* --accent-ink, NOT --surface: --surface is white in light but near-black in
+     dark, and a logo plate that flips to near-black is wrong twice over. A
+     carrier's mark is drawn for a LIGHT ground — Old Dominion's dark-green seal
+     and every black wordmark in the registry disappear on a dark plate — and
+     the monogram's own tint (hsl 226 58% 42%) measures 2.0:1 on it against
+     7.4:1 on white. --accent-ink is #FFFFFF in BOTH themes by design (the same
+     reason this whole card needs only one wash image), so the plate is white
+     wherever it renders. */
+  .cp-herocard .cp-monogram--img { background: var(--accent-ink); padding: 8px; }
   .cp-herocard .cp-monogram--img img { width: 100%; height: 100%; object-fit: contain; display: block; }
   /* The status badges carry --ink on a translucent tint, which on the blue card
      would be dark-on-blue. They take the card's ink and keep their outline. */
@@ -2245,29 +2323,66 @@ export const DIRECTORY_CSS = `
   .cp-hbadge { font-size: 12px; padding: 4px 12px; border-radius: var(--radius-chip); border: 1px solid var(--cta-sec-border); background: var(--cta-sec-bg-hover); color: var(--accent-ink); white-space: nowrap; }
   .cp-hbadge--on { border-color: var(--accent-ink); }
   .cp-hbadge--code { font-family: var(--font-mono); letter-spacing: 0.04em; font-variant-numeric: tabular-nums; }
-  /* Contact strip — 4 boxes. 4 and 2 both divide cleanly, so no track ever
-     strands one box alone (DESIGN-SYSTEM.md §8). */
-  .cp-cstrip { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin-top: 12px; }
-  .cp-cbox { display: flex; align-items: flex-start; gap: 12px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-btn); padding: 12px 16px; min-width: 0; }
-  .cp-cbox--empty { background: var(--surface-2); border-style: dashed; }
-  .cp-cbox-ic { flex: 0 0 auto; color: var(--muted); line-height: 1; margin-top: 4px; }
-  .cp-cbox-glyph { font-size: 12px; }
+  /* CONTACT CARD — ONE white card holding four rows, per the reference.
+     TWO tracks, not four: an email is the widest value on the page and a
+     quarter-width track cut "…@summitllc.com" mid-word at 1440. Two tracks give
+     each row ~490px, which fits every FMCSA email we carry, and 4 rows divide
+     into 2 cleanly so no track ever strands one row alone (DESIGN-SYSTEM.md §8).
+     At 375px it collapses to the reference's single stack. */
+  .cp-cstrip { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-top: 12px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 8px; }
+  /* A POPULATED row is plain: transparent ground, TRANSPARENT border (so it
+     keeps the same box as a dashed one and the row heights cannot disagree),
+     and nothing drawn around the value. */
+  .cp-cbox { display: flex; align-items: center; gap: 12px; background: transparent; border: 1px solid transparent; border-radius: var(--radius-btn); padding: 12px; min-width: 0; }
+  /* An EMPTY row is an INVITATION: dashed outline on the neutral second surface
+     — the same treatment the "Help complete this profile" card uses — never a
+     warning colour, because a missing website is not an error. */
+  .cp-cbox--empty { background: var(--surface-2); border-color: var(--border-strong); border-style: dashed; }
+  /* THE ICON TILE (#545 construction — the svg IS the tile: border-box padding
+     makes the inset, the viewBox scales the glyph). 48px, 12px radius, tinted
+     ground, accent glyph picked by GROUND (--accent-legible) so it stays
+     legible on the dark theme's card too. */
+  .cp-cbox-ic { flex: 0 0 auto; box-sizing: border-box; display: block; width: 48px; height: 48px; padding: 12px; background: var(--icon-tile-bg); border-radius: var(--radius-lg); color: var(--accent-legible); }
+  /* On an empty row the tile drops to the neutral surface + muted glyph: the
+     invitation should read quieter than a real value, not louder. */
+  .cp-cbox--empty .cp-cbox-ic { background: var(--surface); color: var(--muted); }
   .cp-cbox-body { display: flex; flex-direction: column; min-width: 0; }
   .cp-cbox-k { font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
   .cp-cbox-v { font-size: 14px; color: var(--ink); margin-top: 4px; overflow-wrap: anywhere; }
   .cp-cbox-v a { color: var(--accent); text-decoration: none; }
   .cp-cbox-v a:hover { text-decoration: underline; }
+  /* Italic marks the difference between a fact and an invitation at a glance. */
+  .cp-cbox--empty .cp-cbox-v { font-style: italic; color: var(--muted); }
   .cp-cbox--empty .cp-cbox-v a { color: var(--accent); }
   /* "Help complete this profile" — dashed, so it reads as an invitation to fill
-     something in rather than as another content card. */
-  .cp-claimcard { border-style: dashed; border-color: var(--border-strong); background: var(--surface-2); }
-  @media (max-width: 900px) {
-    .cp-cstrip { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  }
+     something in rather than as another content card. The reference leads it
+     with a "+" tile; same tile construction as the contact rows. */
+  .cp-claimcard { border-style: dashed; border-color: var(--border-strong); background: var(--surface-2); display: flex; align-items: flex-start; gap: 16px; }
+  .cp-claimcard-body { min-width: 0; }
+  .cp-cbox-ic--plus { stroke-width: 2; }
   @media (max-width: 640px) {
+    /* THE REFERENCE'S MOBILE HEADER, from the same four grid items: logo
+       top-left, "Claim & edit" pill top-right, the company name beneath the
+       tile, the action group under that. Three content rows now, so the
+       desktop auto-1fr track sizing is replaced by plain auto rows. */
+    .cp-headrow { grid-template-columns: auto minmax(0, 1fr); grid-template-rows: auto auto auto; grid-template-areas: "logo edit" "id id" "actions actions"; gap: 12px; }
     .cp-herocard { padding: 16px; }
-    .cp-cstrip { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
-    .cp-cbox { padding: 12px; }
+    .cp-herocard .cp-monogram { width: 64px; min-width: 64px; height: 64px; font-size: 24px; }
+    /* Exactly one route back is visible at a time. */
+    .cp-back { display: inline-flex; }
+    .dir-hero--cp .dir-crumbs { display: none; }
+    /* One stacked column of contact rows — the reference's layout. */
+    .cp-cstrip { grid-template-columns: minmax(0, 1fr); gap: 4px; }
+    /* The tile takes its own line: beside the body it left ~250px for a CTA
+       whose label does not break, which pushed the page 10px wider than 375. */
+    .cp-claimcard { flex-direction: column; gap: 12px; }
+    /* NO ORPHANED PILL. Seven header badges flow-wrapped to 3 + 3 + 1 at 375px,
+       stranding "MC ..." alone on the last line. A 2-track grid cannot strand
+       one: when the COUNT is odd the first pill spans both tracks, so every
+       remaining line carries exactly 2. Same construction as .cp-crosslinks. */
+    .cp-hbadges { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .cp-hbadge { white-space: normal; text-align: center; }
+    .cp-hbadges .cp-hbadge:first-child:nth-last-child(odd) { grid-column: 1 / -1; }
   }
 `;
 
@@ -4967,6 +5082,22 @@ export function renderCarrierProfile(opts: {
   crumbs.push({ name: carrierName(c) });
 
   const isCa = domicile === 'CA';
+  // THE MOBILE "← BACK" LINK. The reference's mobile profile opens with one
+  // text link back to the list, not with a 4-level breadcrumb — at 375px ours
+  // wrapped onto two lines and read as page furniture. Both are now in the
+  // markup and exactly ONE is visible at any width (CSS, .cp-back/.dir-crumbs):
+  // the crumb trail above 640px, this link below it.
+  //
+  // The target is the DEEPEST crumb that still carries a path, so it follows
+  // whatever the trail resolved to rather than assuming a state page exists.
+  // That is load-bearing after #550: a non-US domicile gets its region as a
+  // PLAIN, UNLINKED crumb (stateByCode would otherwise synthesise `/directory/
+  // ta` for Tamaulipas and link confidently to a 404), so the reverse-find
+  // skips it and this lands on /directory — never on a page we do not serve.
+  const backCrumb = [...crumbs].reverse().find((x) => x.path);
+  const backLink = backCrumb
+    ? `<a class="cp-back" href="${esc(backCrumb.path ?? '/directory')}"><span aria-hidden="true">←</span> Back to ${esc(backCrumb.name)}</a>`
+    : '';
   const isActive = !!c.authorityType;
   // Free-forever profile claim (routes/claim.ts). A CLAIMED profile shows the
   // "Verified owner" badge and drops every claim CTA — the id itself is never
@@ -5323,64 +5454,90 @@ export function renderCarrierProfile(opts: {
   ]
     .filter(Boolean)
     .join('');
-  // ── Contact strip — Location / Website / Phone / Email.
+  // ── Contact card — Location / Website / Phone / Email, one row each.
   //
-  // WE HAVE NO WEBSITE COLUMN, so that box is an invitation to the claim flow
-  // rather than a fabricated URL — the reference's own empty-state idea, used
-  // here for the ONE field we genuinely lack instead of for most of them.
-  // Phone/email mirror `publicContact` exactly, including the contactHidden
-  // opt-out, so a hidden carrier emits no tel: or mailto: anywhere on the page.
+  // POPULATED IS THE DEFAULT, AND THE TWO STATES LOOK DIFFERENT ON PURPOSE.
+  // The reference's card is four dashed "Add …" rows, because its profile has
+  // no location, no phone and no email. FMCSA gives us the physical address and
+  // the phone for essentially every carrier and an email for most, so ours
+  // renders REAL values in a plain row — no border, no tint, nothing competing
+  // with the value — and keeps the dashed treatment strictly for a field this
+  // carrier genuinely lacks. A dashed row is an INVITATION, not an error: it
+  // takes the neutral `--surface-2` ground and a muted (not red, not warning)
+  // icon tile, and its value is an italic link into the free claim flow.
+  //
+  // WE HAVE NO WEBSITE COLUMN, so that row is always the invitation — the
+  // reference's own empty-state idea, used for the ONE field we genuinely lack
+  // instead of for most of them. Phone/email mirror `publicContact` exactly,
+  // including the contactHidden opt-out, so a hidden carrier emits no tel: or
+  // mailto: anywhere on the page.
   const contactBox = (
     label: string,
     icon: string,
     value: string,
     empty = false,
   ): string =>
-    `<div class="cp-cbox${empty ? ' cp-cbox--empty' : ''}"><span class="cp-cbox-ic" aria-hidden="true">${icon}</span><span class="cp-cbox-body"><span class="cp-cbox-k">${label}</span><span class="cp-cbox-v">${value}</span></span></div>`;
+    `<div class="cp-cbox${empty ? ' cp-cbox--empty' : ''}">${icon}<span class="cp-cbox-body"><span class="cp-cbox-k">${label}</span><span class="cp-cbox-v">${value}</span></span></div>`;
   // A CLAIMED profile never shows a claim CTA (claimFreeAndDisclaimer.test.ts),
   // so its empty boxes state the absence plainly instead of inviting a claim.
   const addCta = (what: string) =>
     isClaimed ? `Not listed` : `<a href="${claimHref}">Add ${what}</a>`;
   const hiddenNote = 'Hidden at the carrier’s request';
   const contactStrip = `<div class="cp-cstrip">
-        ${contactBox('Location', PIN_ICON, cityStateZip ? esc(cityStateZip) : domicileCountryName(domicile))}
-        ${contactBox('Website', '<span class="cp-cbox-glyph">↗</span>', addCta('website'), true)}
+        ${contactBox('Location', TILE_PIN, cityStateZip ? esc(cityStateZip) : domicileCountryName(domicile))}
+        ${contactBox('Website', TILE_GLOBE, addCta('website'), true)}
         ${
           c.contactHidden || !c.phone
-            ? contactBox('Phone', '<span class="cp-cbox-glyph">☎</span>', c.contactHidden ? hiddenNote : addCta('phone'), true)
-            : contactBox('Phone', '<span class="cp-cbox-glyph">☎</span>', `<a href="tel:${encodeURIComponent(c.phone)}">${esc(c.phone)}</a>`)
+            ? contactBox('Phone', TILE_PHONE, c.contactHidden ? hiddenNote : addCta('phone'), true)
+            : contactBox('Phone', TILE_PHONE, `<a href="tel:${encodeURIComponent(c.phone)}">${esc(c.phone)}</a>`)
         }
         ${
           c.contactHidden || !c.email
-            ? contactBox('Email', '<span class="cp-cbox-glyph">✉</span>', c.contactHidden ? hiddenNote : addCta('email'), true)
-            : contactBox('Email', '<span class="cp-cbox-glyph">✉</span>', `<a href="mailto:${encodeURIComponent(c.email)}">${esc(c.email)}</a>`)
+            ? contactBox('Email', TILE_MAIL, c.contactHidden ? hiddenNote : addCta('email'), true)
+            : contactBox('Email', TILE_MAIL, `<a href="mailto:${encodeURIComponent(c.email)}">${esc(c.email)}</a>`)
         }
       </div>`;
+  // ── THE HEADER'S EDIT AFFORDANCE — labelled for what it actually does.
+  //
+  // The reference puts a "Suggest Edit" pill at the top-right of the header
+  // card. WE HAVE NO SUGGESTION MECHANISM: the only two write paths into
+  // `carrier_overrides` are the super-admin endpoint
+  // (POST /api/admin/carrier/:usdot/override) and the verified-owner claim flow
+  // (claims.ts → upsertCarrierOverride). There is no public queue a stranger's
+  // correction could land in, and inventing one is a backend, not a button.
+  //
+  // So the pill keeps the reference's POSITION and AFFORDANCE and states the
+  // real action: claiming is how you get edit rights, it is free, and it is one
+  // click from here. A CLAIMED profile renders no pill at all — every claim CTA
+  // is suppressed once ownership is proven (claimFreeAndDisclaimer.test.ts), and
+  // the "Verified owner" badge in the name line is the state it replaces.
+  const editPill = isClaimed
+    ? ''
+    : `<a class="cp-editbtn" href="${claimHref}" title="Claim this profile to edit it — free, forever">${PENCIL_ICON}<span>Claim &amp; edit</span></a>`;
   const body = `
   <section class="hero dir-hero dir-hero--cp">
     <div class="container-narrow">
+      ${backLink}
       ${crumbsHtml(crumbs)}
       <div class="cp-herocard">
         <div class="cp-headrow">
-          <div class="cp-idblock">
-            ${carrierLogoTile(c, 'cp-monogram')}
-            <div class="cp-idtext">
-              <div class="cp-nameline">
-                <h1>${esc(carrierName(c))}</h1>
-                <span class="cp-badge-active" data-auth-badge${isActive ? '' : ' hidden'}>Active</span>
-                ${isClaimed ? VERIFIED_OWNER_BADGE : ''}
-                <span class="cp-fmcsa cp-tip" tabindex="0" role="note" aria-label="FMCSA — Profile built from FMCSA public records." data-tip="Profile built from FMCSA public records.">FMCSA</span>
-              </div>
-              <p class="lead cp-subtitle">${cityStateZip ? `${PIN_ICON}${esc(cityStateZip)}` : headerSubtitle}</p>
-              ${carrierName(c) !== c.legalName ? `<p class="muted-small cp-legalline">Legal name: ${esc(c.legalName)}</p>` : ''}
+          ${carrierLogoTile(c, 'cp-monogram')}
+          <div class="cp-idtext">
+            <div class="cp-nameline">
+              <h1>${esc(carrierName(c))}</h1>
+              <span class="cp-badge-active" data-auth-badge${isActive ? '' : ' hidden'}>Active</span>
+              ${isClaimed ? VERIFIED_OWNER_BADGE : ''}
+              <span class="cp-fmcsa cp-tip" tabindex="0" role="note" aria-label="FMCSA — Profile built from FMCSA public records." data-tip="Profile built from FMCSA public records.">FMCSA</span>
             </div>
+            <p class="lead cp-subtitle">${cityStateZip ? `${PIN_ICON}${esc(cityStateZip)}` : headerSubtitle}</p>
+            ${carrierName(c) !== c.legalName ? `<p class="muted-small cp-legalline">Legal name: ${esc(c.legalName)}</p>` : ''}
           </div>
+          ${editPill}
           <div class="cp-headactions">
             <div class="cp-headcta">
               ${rfqButton}
               ${saveControl(c)}
             </div>
-            ${isClaimed ? '' : `<p class="cp-claimline">Own this company? <a href="${claimHref}">Claim this profile — free, forever →</a></p>`}
           </div>
         </div>
         <div class="cp-hbadges">${headBadges}</div>
@@ -5493,10 +5650,13 @@ export function renderCarrierProfile(opts: {
     ${relatedModule}
 
     ${isClaimed ? '' : `<div class="dir-card cp-claimcard">
-      <h2 style="font-size: 18px; margin: 0 0 8px;">Help complete this profile</h2>
-      <p class="muted" style="margin: 0 0 16px; max-width: 460px;">Is this your company? This page is built from public FMCSA records — claim it to add your website, lanes and contact details, control how it reads, and receive rate requests directly. Claiming is free, forever — no trial, no card, no plan.</p>
-      <a class="btn btn-primary" href="${claimHref}">Claim this profile — free, forever <span class="arr">→</span></a>
-      <p class="muted-small" style="margin: 16px 0 0; max-width: 460px;">Carrier data is sourced from public FMCSA records. To correct or hide your contact details, email support@quotefleet.net with your USDOT number.</p>
+      ${TILE_PLUS}
+      <div class="cp-claimcard-body">
+        <h2 style="font-size: 18px; margin: 0 0 8px;">Help complete this profile</h2>
+        <p class="muted" style="margin: 0 0 16px; max-width: 460px;">Is this your company? This page is built from public FMCSA records — claim it to add your website, lanes and contact details, control how it reads, and receive rate requests directly. Claiming is free, forever — no trial, no card, no plan.</p>
+        <a class="btn btn-primary" href="${claimHref}">Claim this profile — free, forever <span class="arr">→</span></a>
+        <p class="muted-small" style="margin: 16px 0 0; max-width: 460px;">Carrier data is sourced from public FMCSA records. To correct or hide your contact details, email support@quotefleet.net with your USDOT number.</p>
+      </div>
     </div>`}
   </main>
   <script>

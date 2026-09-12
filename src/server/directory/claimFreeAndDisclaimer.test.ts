@@ -65,9 +65,20 @@ describe('free calculator disclaimer', () => {
 describe('carrier-profile claim CTAs are explicitly free, forever', () => {
   const html = renderCarrierProfile({ carrier: carrier() });
 
-  it("the 'Own this company?' line states claiming is free, forever", () => {
-    expect(html).toContain('Own this company?');
-    expect(html).toContain('Claim this profile — free, forever →');
+  /**
+   * The header's claim affordance is now the ONE "Claim & edit" pill (it
+   * replaced a "Own this company? Claim this profile — free, forever →" line
+   * that sat one element below it and said the same thing). The free-forever
+   * promise did not move off the header with it: the pill's own title states
+   * it, and the "Help complete this profile" card below states it in full —
+   * both asserted here, so the guarantee cannot be dropped silently.
+   */
+  it('the header claim pill states claiming is free, forever', () => {
+    expect(html).toContain('class="cp-editbtn" href="/claim/acme-drayage-inc-107080"');
+    expect(html).toContain('title="Claim this profile to edit it — free, forever"');
+    expect(html).toContain('Claim &amp; edit');
+    // …and it is the only claim CTA in the header (the old line is gone).
+    expect(html).not.toContain('Own this company?');
   });
 
   it('every claim CTA points at the free claim page, never the trial signup', () => {
