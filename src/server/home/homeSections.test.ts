@@ -203,9 +203,12 @@ describe('homepage: the partner / embed banner', () => {
     // #545 gave all fifteen cards a 48px tinted icon tile and moved every
     // primary button's hover to the brand fill with a 4px chevron slide. A
     // banner sitting directly under those cards must not invent a third look.
+    // The tile pair is the AZURE one now — the cards moved onto the hero
+    // wash's hue and this banner follows them, or it becomes the third look.
     const css = strip(read('src/server/public/landing-partner-banner.css'));
-    expect(css).toContain('background: var(--icon-tile-bg)');
-    expect(css).toContain('color: var(--accent-legible)');
+    expect(css).toContain('background: var(--icon-tile-azure-bg)');
+    expect(css).toContain('color: var(--icon-azure)');
+    expect(css).not.toContain('var(--icon-tile-bg)');
     expect(css).toContain('background: var(--accent-fill)');
     expect(css).toMatch(/\.qf-partner-cta:hover \.qf-partner-cta__chev \{\s*transform: translateX\(4px\)/);
     // The dead `--cta-bg-hover` repaint #545 retired must not come back.

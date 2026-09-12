@@ -275,12 +275,15 @@ html body.qf-wft .qf-hhero .hero-cta {
    the track obeys the container, and the ≤374px rule further down makes sure
    there is nothing left to clip at the widths where it would have mattered. */
 .qf-hcard {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 24px;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-rows: auto 1fr auto;
+  align-items: start;
+  justify-items: start;
+  row-gap: 16px;
+  column-gap: 16px;
   min-width: 0;
-  min-height: 224px;
+  min-height: 192px;
   padding: 24px;
   background: var(--surface);
   border: 1px solid var(--border);
@@ -362,12 +365,15 @@ html body.qf-wft .qf-toolgrid-head__all:hover { color: var(--accent) !important;
 /* Recessed variant — border matches the ground so the 1px is reserved and
    nothing shifts, and NO shadow (the raised hero card carries the elevation). */
 .qf-toolcard {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 24px;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-rows: auto 1fr auto;
+  align-items: start;
+  justify-items: start;
+  row-gap: 16px;
+  column-gap: 16px;
   min-width: 0;
-  min-height: 224px;
+  min-height: 192px;
   padding: 24px;
   background: var(--surface-2);
   border: 1px solid var(--surface-2);
@@ -379,42 +385,95 @@ html body.qf-wft .qf-toolgrid-head__all:hover { color: var(--accent) !important;
 
 /* ── 6 · Card internals — shared by both grids ───────────────────────────── */
 
+/* THE CARD IS A GRID, AND THE ICON SITS ON THE TITLE'S LINE.
+
+   The owner's ask, from a 375px screenshot: the tile and the title read as one
+   header, not as two stacked rows with the tile floating alone above a short
+   title. So the card's three flex rows become a two-column grid:
+
+     col 1 (auto)          col 2 (minmax(0, 1fr))
+     ┌──────────────┬────────────────────────────┐
+     │  icon tile   │  h3  (both centred on the  │  row 1  auto
+     │              │       taller of the two)   │
+     ├──────────────┴────────────────────────────┤
+     │  .qf-toolcard__sub                        │  row 2  1fr
+     ├───────────────────────────────────────────┤
+     │  .qf-toolcard__actions                    │  row 3  auto
+     └───────────────────────────────────────────┘
+
+   ROW 2 IS `1fr`, WHICH IS WHAT REPLACES `margin-top: auto`. In the old flex
+   column the action bar was floor-pinned by an auto margin. Here the middle
+   row takes every spare pixel, so the bar is still the last thing before the
+   bottom padding at any card height — and because both grids stretch their
+   items to the tallest card in the row, every card in a row still lands its
+   bar on ONE y. That is the invariant #545 bought and this wave must not
+   spend: measured after the change at 1440/1024, all three hero cards and both
+   cards of each bento row share an action-row top to the pixel.
+
+   `display: contents` ON THE BODY, NOT A MARKUP CHANGE. The h3 and the sub are
+   wrapped in `.qf-toolcard__body`, and they need to land in different grid
+   areas — the title beside the tile, the description under both. Dissolving
+   the wrapper into the grid does that without touching fifteen blocks of HTML,
+   which is the same choice the tile itself made ("not a single line of markup
+   moves"). The div carries no role and no semantics, so nothing is lost with
+   it. If a browser ever ignores `display: contents`, the body falls back to a
+   single grid item in column 2 — tile left, title and copy right — which is a
+   different layout but not a broken one.
+
+   `min-height` DROPS 224 -> 192. Folding a 48px row into the title's 19px one
+   takes ~64px out of the card, and 224 would have paid that straight back as
+   dead air between the description and the buttons. 192 is just under the new
+   natural height at 1440 (194px), so desktop cards size to their content and
+   the floor still catches the short ones lower down.
+
+   ROW GAP IS 16 EVERYWHERE, where the old card ran 24 / 16 / 24. The title and
+   its description are a pair and 16 is the gap they already had; the slack
+   that used to sit between them now lands above the action bar, which is where
+   a card wants its breathing room. The column gap tightens to 12 at ≤1100 for
+   the same reason the padding does there — see the breakpoint. */
+
 /* THE ICON TILE. The reference does not float a bare glyph on the card — it
    sits each one in its own soft rounded square with a blue-tinted fill and
-   draws the glyph in the brand accent. Both grids get the same treatment, at
-   the same size, so the 15 cards read as one set.
+   draws the glyph in the accent. Both grids get the same treatment, at the
+   same size, so the 15 cards read as one set.
 
    NO WRAPPER ELEMENT. The <svg> IS the tile: `box-sizing: border-box` turns
    its padding into the inset and the viewBox scales the glyph into what is
    left, so a 48px tile with 8px of padding draws a 32px glyph. One rule
    re-skins every card and not a single line of markup moves.
 
-   The glyph colour is `--accent`, which is #3356EE in light and the lightened
-   #8DA2F9 in dark — the same token the rest of the site uses for the brand
-   blue, so it stays legible on the dark card instead of sinking into it.
-   Measured against the composited tile: 5.9:1 light, 4.9:1 dark (AA for
-   non-text is 3:1). The old `drop-shadow` goes with the bare glyph — a tinted
-   tile is the elevation now, and a filter shadow is not one of our three. */
+   THE ACCENT HERE IS THE HERO'S AZURE, NOT THE BRAND INDIGO. Wave 8 moved the
+   hero wash to hue 198 and left these tiles at `--accent`'s hue 229, which the
+   owner spotted as a mismatch on one surface. `--icon-azure` and
+   `--icon-tile-azure-bg` are derived from the wash generator's own band
+   anchors — style.css's Wave 9 block has the derivation and the numbers.
+   Measured on the composited tile, worst case per theme: glyph 5.16:1 light
+   (on the bento card's `--surface-2`), 5.24:1 dark. AA in both. Nothing else
+   on the page moves off indigo. The old `drop-shadow` goes with the bare glyph
+   — a tinted tile is the elevation now, and a filter shadow is not one of our
+   three. */
 .qf-toolcard__ico {
+  grid-column: 1;
+  grid-row: 1;
+  align-self: center;
   flex: 0 0 auto;
   box-sizing: border-box;
   display: block;
   width: 48px;
   height: 48px;
   padding: var(--space-1);
-  background: var(--icon-tile-bg);
+  background: var(--icon-tile-azure-bg);
   border-radius: var(--radius);
-  color: var(--accent-legible);
+  color: var(--icon-azure);
 }
 
 .qf-toolcard__body {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 16px;
-  width: 100%;
+  display: contents;
 }
 html body.qf-wft .qf-toolcard__body h3 {
+  grid-column: 2;
+  grid-row: 1;
+  align-self: center;
   margin: 0;
   padding: 0;
   font-family: var(--font-sans);
@@ -425,6 +484,8 @@ html body.qf-wft .qf-toolcard__body h3 {
   text-align: left;
 }
 html body.qf-wft .qf-toolcard__sub {
+  grid-column: 1 / -1;
+  grid-row: 2;
   margin: 0;
   padding: 0;
   font-family: var(--font-sans);
@@ -435,8 +496,12 @@ html body.qf-wft .qf-toolcard__sub {
   text-align: left;
 }
 
-/* Action bar — 1-2 buttons, each a distinct destination. `margin-top:auto`
-   pins it to the card floor so every card's buttons sit on one line.
+/* Action bar — 1-2 buttons, each a distinct destination. It is the card
+   grid's last row and the row above it is `1fr`, which is what pins it to the
+   card floor now that the card is a grid rather than a flex column (the
+   `margin-top: auto` below is kept because it is still correct and still does
+   the job if the row template is ever relaxed). Every card's buttons sit on
+   one line, and every card in a grid row sits on the same one.
 
    `flex-wrap: nowrap` IS THE FIX FOR THE ROW THAT DID NOT MATCH ITS SIBLINGS.
    The bar used to wrap, so whether a card's two buttons sat side by side or
@@ -449,6 +514,8 @@ html body.qf-wft .qf-toolcard__sub {
    width. Any future label that does not fit has to be shortened — which is the
    point: the layout can no longer paper over it. */
 .qf-toolcard__actions {
+  grid-column: 1 / -1;
+  grid-row: 3;
   display: flex;
   align-items: center;
   flex-wrap: nowrap;
@@ -621,9 +688,15 @@ html[data-theme="light"] body.qf-wft a.qf-toolgrid-head__all:not(.btn):not(.nav-
      per card and 24 -> 16 on the grid gap is another +5px per 3-up column —
      together that is the difference between an action row that fits with
      4px of slack and one that fits with 25px of it. Both values are on the
-     house ramp; this is buying headroom, not inventing a new scale. */
+     house ramp; this is buying headroom, not inventing a new scale.
+
+     The card's COLUMN gap — tile to title — buys the same way, 16 -> 12. The
+     inline header costs the title 48px of tile plus the gap, and the tightest
+     column on the page is the 3-up at 1024 (254px of content). 12px leaves the
+     longest hero title 25px of slack there instead of 21. The card's ROW gap
+     stays 16; it is the title/description pair's own rhythm, not headroom. */
   .qf-hcard,
-  .qf-toolcard { padding: 16px; gap: 16px; }
+  .qf-toolcard { padding: 16px; row-gap: 16px; column-gap: 12px; }
   .qf-hhero__cards,
   .qf-toolgrid { gap: 16px; }
 }
