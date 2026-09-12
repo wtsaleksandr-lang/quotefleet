@@ -53,7 +53,24 @@
     box-shadow: var(--qf-shadow-lift) !important;
   }
   #site-mobile-menu[hidden] a[hidden],
-  #site-mobile-menu[hidden] .mm-group > a[hidden] { display: none !important; }
+  #site-mobile-menu[hidden] .mm-group > a[hidden],
+  #site-mobile-menu[hidden] .mm-fold__in > a[hidden] { display: none !important; }
+
+  /* WAVE 7. Two of the panel's parts exist only because it is an overlay, and
+     in flow they are wrong rather than merely unnecessary:
+       • `.mm-barpad` reserves the height of a bar the drawer is no longer
+         underneath, so in flow it is a blank band the height of the header.
+       • `.mm-scroll` is the panel's scrollport. In flow the panel has no
+         height to scroll INSIDE — the page scrolls — so it is a plain block
+         with the same 16px gutter.
+     The fold needs nothing: its collapsed state is gated on `[data-fold-js]`,
+     which only the controller sets, so here every <details> is the browser's
+     own disclosure and opens to its full height with no script. */
+  #site-mobile-menu[hidden] .mm-barpad { display: none !important; }
+  #site-mobile-menu[hidden] .mm-scroll {
+    overflow: visible !important;
+    padding: 0 var(--space-2) var(--space-1) !important;
+  }
 }
 
 /* ── Desktop: the mega-panels open on hover and on keyboard focus ───────── */

@@ -206,26 +206,147 @@ export const SITE_NAV_HTML = `<nav class="site-nav" aria-label="Main navigation"
  * column becomes a `.mm-sub` sub-heading — the drawer used to be a flat 11-link
  * dump under Carriers with no grouping at all, which made it unscannable on a
  * phone.
+ *
+ * ── WAVE 7: THE INTERIOR IS A ROW, NOT A LINE OF TEXT ──────────────────────
+ *
+ * Reported as "it's very basic ... I don't see any clear separation between
+ * categories ... Icons for the tools. Tools have titles and subtitles.
+ * Subtitles fit in a single line." Three structural changes answer it, and one
+ * of them is content rather than markup.
+ *
+ * 1. THE SPACER. `.mm-barpad` is an opaque, `aria-hidden` block the height of
+ *    the top bar, INSIDE the panel. It is what lets the panel start at y=0 and
+ *    run to all four viewport edges while the bar's controls still float over
+ *    it: the surface is full-bleed, the content is not under the burger. The
+ *    panel used to be inset 16px left and right with an 8px gap under the bar,
+ *    which is the "large gaps on the left and right sides and between menu
+ *    container and the top bar" half of the report. Measured after: 0px on all
+ *    four sides and 0px to the bar.
+ *
+ * 2. THE FOLD. Each group's body is wrapped in `.mm-fold > .mm-fold__in` so it
+ *    can be animated with `grid-template-rows: 0fr -> 1fr`, which resolves to
+ *    the content's INTRINSIC height — no `max-height` guess that clips a long
+ *    group or coasts through empty space on a short one. The <details> stays
+ *    the element, so a visitor with scripting off still gets a working
+ *    disclosure; the script only holds `open` on for the length of the exit so
+ *    the close can be seen (see FOLD CONTROLLER in HEADER_SCRIPTS).
+ *
+ * 3. THE ROW. Every destination is now an icon tile + title + subtitle. The
+ *    glyphs are the SAME set the homepage tool bento draws (24px box, 1.3px
+ *    stroke, no fill) so the menu and the page agree on what a tool looks
+ *    like; the rows the bento has no card for are drawn in that same grammar.
+ *
+ * THE ONE-LINE SUBTITLE IS EDITORIAL, NOT CSS. Nothing here is clipped in the
+ * normal case: every subtitle below is written to a <=28 character budget,
+ * which is what keeps it on one line down to 320px. `nowrap` + `ellipsis` in
+ * the sheet is a BACKSTOP for a future long string, not the mechanism — if it
+ * ever fires, the copy is wrong, not the CSS.
  */
+
+/** The row glyphs. Same grammar as `.qf-toolcard__ico` on the homepage — a
+ *  24px box, `fill: none`, `stroke: currentColor`, 1.3px, round caps — so the
+ *  eleven that have a bento card are the bento's own paths, verbatim, and the
+ *  rest are drawn to match rather than borrowed from a second icon set. */
+const MM_GLYPHS: Record<string, string> = {
+  // ── Verbatim from the homepage tool bento (landing.html) ────────────────
+  permits: `<path d="M3 7v10M21 7v10"/><rect x="7" y="9" width="10" height="6" rx="1"/><path d="M5.6 10.6 4.2 12l1.4 1.4M18.4 10.6 19.8 12l-1.4 1.4"/>`,
+  scales: `<path d="M12 4.2v15.4M7.5 19.6h9"/><path d="M4 8.6h16"/><path d="M4 8.6 1.9 13.6a2.5 2.5 0 0 0 4.2 0z"/><path d="M20 8.6l2.1 5a2.5 2.5 0 0 1-4.2 0z"/>`,
+  lowboy: `<path d="M2.5 15.5V9.5h9v6"/><path d="M11.5 11.5h4.2l3.8 3.4v.6h-8"/><path d="M5 9.5V5.5h5v4"/><circle cx="6.5" cy="17.6" r="1.8"/><circle cx="16.5" cy="17.6" r="1.8"/>`,
+  frost: `<path d="M12 3v18M4.2 7.5l15.6 9M19.8 7.5l-15.6 9"/><path d="M9.5 5 12 7.5 14.5 5M9.5 19 12 16.5l2.5 2.5"/>`,
+  cone: `<path d="M12 3.6 6.8 18.4h10.4z"/><path d="M9.9 11.2h4.2M8.8 14.8h6.4"/><path d="M4 20.6h16"/>`,
+  shield: `<path d="M12 3 4.8 5.8v5.6c0 4.3 3 7.2 7.2 8.8 4.2-1.6 7.2-4.5 7.2-8.8V5.8z"/><path d="m9 12 2.2 2.2L15.4 10"/>`,
+  clipboard: `<rect x="5" y="4.5" width="14" height="16" rx="2"/><path d="M9 4.5V3.2h6v1.3"/><path d="m9.2 12.4 2 2 3.6-3.8"/>`,
+  cube: `<path d="M12 3.2 3.9 7.3v9.4L12 20.8l8.1-4.1V7.3z"/><path d="M3.9 7.3 12 11.4l8.1-4.1M12 11.4v9.4"/>`,
+  container: `<rect x="3" y="8.5" width="12" height="7" rx="1"/><path d="M6 8.5v7M9 8.5v7M12 8.5v7"/><path d="M19 6.2v11M16.6 15.1 19 17.5l2.4-2.4"/>`,
+  lock: `<rect x="4.5" y="10.4" width="15" height="9.6" rx="2"/><path d="M8 10.4V7.8a4 4 0 0 1 8 0v2.6"/><path d="M12 14.4v2"/>`,
+  book: `<path d="M4 4.5h6a3 3 0 0 1 3 3v12a2.4 2.4 0 0 0-2.4-2.4H4z"/><path d="M20 4.5h-6a3 3 0 0 0-3 3v12a2.4 2.4 0 0 1 2.4-2.4H20z"/>`,
+  // ── Drawn in the same grammar for the rows the bento has no card for ────
+  demo: `<rect x="3" y="4.5" width="18" height="13" rx="2"/><path d="M8.5 20.5h7"/><path d="m10.5 8.6 4.4 2.4-4.4 2.4z"/>`,
+  compare: `<path d="M2.5 20.5h19"/><path d="M5.5 20.5V13M12 20.5V5M18.5 20.5v-4.5"/>`,
+  tag: `<path d="M3.5 11.2V4.5a1 1 0 0 1 1-1h6.7a1 1 0 0 1 .7.3l8.3 8.3a1 1 0 0 1 0 1.4l-6.7 6.7a1 1 0 0 1-1.4 0L3.8 11.9a1 1 0 0 1-.3-.7z"/><circle cx="7.8" cy="7.8" r="1.4"/>`,
+  userplus: `<path d="M14.5 20.5v-1.7a4 4 0 0 0-4-4H6.4a4 4 0 0 0-4 4v1.7"/><circle cx="8.45" cy="7.4" r="3.4"/><path d="M18.5 6.5v6M21.5 9.5h-6"/>`,
+  bookmark: `<path d="M6 4h12v16.5l-6-4.2-6 4.2z"/>`,
+  briefcase: `<rect x="3" y="7.5" width="18" height="12.5" rx="2"/><path d="M8.5 7.5V6a1.5 1.5 0 0 1 1.5-1.5h4A1.5 1.5 0 0 1 15.5 6v1.5"/><path d="M3 12.5h18"/>`,
+  globe: `<circle cx="12" cy="12" r="8.6"/><path d="M3.4 12h17.2"/><path d="M12 3.4c2.2 2.4 3.4 5.4 3.4 8.6S14.2 18.2 12 20.6c-2.2-2.4-3.4-5.4-3.4-8.6S9.8 5.8 12 3.4z"/>`,
+  pallet: `<rect x="3" y="12.5" width="7.5" height="6.5" rx="1"/><rect x="13.5" y="12.5" width="7.5" height="6.5" rx="1"/><rect x="8.25" y="5" width="7.5" height="6.5" rx="1"/>`,
+  sliders: `<path d="M4 6.5h16M4 12h16M4 17.5h16"/><circle cx="9" cy="6.5" r="1.9"/><circle cx="15" cy="12" r="1.9"/><circle cx="8" cy="17.5" r="1.9"/>`,
+  star: `<path d="m12 3.6 2.7 5.5 6 .9-4.35 4.2 1.03 6L12 17.4l-5.38 2.8 1.03-6L3.3 10l6-.9z"/>`,
+  send: `<path d="M21 3.5 3.3 10.1l6.7 2.9 2.9 6.7z"/><path d="m10 13 4.6-4.6"/>`,
+  calculator: `<rect x="5" y="3.5" width="14" height="17" rx="2"/><path d="M8.5 7.5h7"/><path d="M9 11.5h.01M12 11.5h.01M15 11.5h.01M9 15h.01M12 15h.01M15 15h.01M9 18h6"/>`,
+  gauge: `<circle cx="12" cy="13.2" r="7.6"/><path d="m12 13.2 3.1-3.7"/><path d="M4.6 8.6 6.1 6.3M19.4 8.6 17.9 6.3"/>`,
+  map: `<path d="m9 4.5-6 2.4v12.6l6-2.4 6 2.4 6-2.4V4.5l-6 2.4z"/><path d="M9 4.5v12.6M15 6.9v12.6"/>`,
+  doc: `<rect x="4.5" y="3.5" width="15" height="17" rx="2"/><path d="M8 8.5h8M8 12h8M8 15.5h5"/>`,
+  receipt: `<path d="M6 3.5h12v17l-2.4-1.6-2.4 1.6-2.4-1.6-2.4 1.6L6 20.5z"/><path d="M9.5 8.5h5M9.5 12.5h5"/>`,
+  signin: `<path d="M14.5 3.5h4a2 2 0 0 1 2 2v13a2 2 0 0 1-2 2h-4"/><path d="m9.8 16 4-4-4-4"/><path d="M13.8 12h-10"/>`,
+};
+
+/** One drawer row: 36px icon tile, 14px title, 12px subtitle. */
+function mmRow(href: string, glyph: string, title: string, sub: string, attrs = ''): string {
+  return `<a href="${href}"${attrs}>`
+    + `<span class="mm-tile" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round">${MM_GLYPHS[glyph]}</svg></span>`
+    + `<span class="mm-txt"><span class="mm-t">${title}</span><span class="mm-s">${sub}</span></span>`
+    + `</a>`;
+}
+
+/** The group heading: 16px sentence-case label + a 16px chevron that rotates. */
+function mmHead(label: string): string {
+  return `<summary class="mm-head"><span class="mm-head__t">${label}</span>`
+    + `<svg class="mm-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></summary>`;
+}
+
+const mmFold = (rows: string): string => `<div class="mm-fold"><div class="mm-fold__in">${rows}</div></div>`;
+
 export const SITE_MOBILE_MENU_HTML = `<noscript><link rel="stylesheet" href="/nav-nojs.css"></noscript>`
   + `<div class="site-menu-scrim" id="site-menu-scrim" hidden></div>`
   + `<div class="site-mobile-menu" id="site-mobile-menu" role="navigation" aria-label="Site menu" tabindex="-1" hidden>`
-  + `<details class="mm-group" open><summary class="mm-head">For Carriers &amp; Brokers</summary>`
+  + `<div class="mm-barpad" aria-hidden="true"></div>`
+  + `<div class="mm-scroll">`
+  + `<details class="mm-group">${mmHead('For Carriers &amp; Brokers')}`
   // `/claim` is the drawer's ONLY path to the free profile claim: the header's
   // "Claim your listing — free" button is hidden at the burger breakpoint, so
   // without this row a phone visitor has no route to it at all. Distinct href
   // from /signup (claiming is free forever; the trial is a separate product).
-  + `<p class="mm-sub">Your quote tool</p><a href="/w/demo">See a Live Demo</a><a href="/compare">Why QuoteFleet</a><a href="/claim">Claim your listing — free</a><a href="/signup">Start Free</a>`
-  + `<p class="mm-sub">Find new customers</p><a href="/importers">Importers Directory</a><a href="/importers/saved" data-nav-auth="user" hidden>Saved Importers</a>`
-  + `<p class="mm-sub">By business type</p><a href="/for/brokers">Freight Brokers</a><a href="/for/forwarders">Freight Forwarders</a><a href="/for/ltl">LTL Carriers</a></details>`
-  + `<details class="mm-group"><summary class="mm-head">For Shippers</summary>`
-  + `<p class="mm-sub">Find &amp; vet carriers</p><a href="/directory">Carrier Directory</a><a href="/guides">Carrier Market Guides</a><a href="/compliance">Compliance Tools</a><a href="/services">Carriers by Capability</a><a href="/directory/join">Directory Pro</a>`
-  + `<p class="mm-sub">Get rates &amp; quotes</p><a href="${RFQ_HREF}">Request Freight Quotes</a><a href="/drayage-rates">Port Drayage Rates</a>`
-  + `<p class="mm-sub">Protect your shipment data</p><a href="/manifest-privacy">Manifest Privacy</a></details>`
-  + `<details class="mm-group"><summary class="mm-head">Free Tools</summary>`
-  + `<p class="mm-sub">No account needed</p><a href="/tools">Freight Rate Calculator</a><a href="/tools/oversize-permits">Oversize Permit Calculator</a><a href="/tools/bridge-formula">Bridge Formula Calculator</a><a href="/tools/axle-weights">Axle Weight Checker</a><a href="/tools/heavy-haul-quote">Heavy-Haul Quote Tool</a><a href="/tools/seasonal-weight-restrictions">Frost Law Restrictions</a><a href="/oversize">Oversize Permit Guide</a><a href="/pilot-cars">Pilot Car &amp; Escort Directory</a><a href="/glossary">Freight Glossary</a></details>`
-  + `<a class="mm-flat" href="/pricing">Pricing</a>`
-  + `<a class="mm-account" href="/login">Sign in</a>`
+  + mmFold(`<p class="mm-sub">Your quote tool</p>`
+    + mmRow('/w/demo', 'demo', 'See a Live Demo', 'See the quote widget')
+    + mmRow('/compare', 'compare', 'Why QuoteFleet', 'How we compare to a TMS')
+    + mmRow('/claim', 'tag', 'Claim your listing — free', 'Free carrier profile')
+    + mmRow('/signup', 'userplus', 'Start Free', 'Open a trial account')
+    + `<p class="mm-sub">Find new customers</p>`
+    + mmRow('/importers', 'cube', 'Importers Directory', 'US customs import records')
+    + mmRow('/importers/saved', 'bookmark', 'Saved Importers', 'Your saved companies', ' data-nav-auth="user" hidden')
+    + `<p class="mm-sub">By business type</p>`
+    + mmRow('/for/brokers', 'briefcase', 'Freight Brokers', 'QuoteFleet for brokers')
+    + mmRow('/for/forwarders', 'globe', 'Freight Forwarders', 'QuoteFleet for forwarders')
+    + mmRow('/for/ltl', 'pallet', 'LTL Carriers', 'QuoteFleet for LTL'))
+  + `</details>`
+  + `<details class="mm-group">${mmHead('For Shippers')}`
+  + mmFold(`<p class="mm-sub">Find &amp; vet carriers</p>`
+    + mmRow('/directory', 'shield', 'Carrier Directory', 'Search FMCSA carriers')
+    + mmRow('/guides', 'map', 'Carrier Market Guides', 'Freight market guides')
+    + mmRow('/compliance', 'clipboard', 'Compliance Tools', 'Look up a USDOT or MC')
+    + mmRow('/services', 'sliders', 'Carriers by Capability', 'Browse by equipment')
+    + mmRow('/directory/join', 'star', 'Directory Pro', 'Contact reveals and CSV')
+    + `<p class="mm-sub">Get rates &amp; quotes</p>`
+    + mmRow(RFQ_HREF, 'send', 'Request Freight Quotes', 'One RFQ to many carriers')
+    + mmRow('/drayage-rates', 'container', 'Port Drayage Rates', 'Rate ranges by gateway')
+    + `<p class="mm-sub">Protect your shipment data</p>`
+    + mmRow('/manifest-privacy', 'lock', 'Manifest Privacy', 'File a CBP privacy request'))
+  + `</details>`
+  + `<details class="mm-group">${mmHead('Free Tools')}`
+  + mmFold(`<p class="mm-sub">No account needed</p>`
+    + mmRow('/tools', 'calculator', 'Freight Rate Calculator', 'Estimate a freight rate')
+    + mmRow('/tools/oversize-permits', 'permits', 'Oversize Permit Calculator', 'OS/OW fees by state')
+    + mmRow('/tools/bridge-formula', 'scales', 'Bridge Formula Calculator', 'Federal bridge formula')
+    + mmRow('/tools/axle-weights', 'gauge', 'Axle Weight Checker', 'Check each axle group')
+    + mmRow('/tools/heavy-haul-quote', 'lowboy', 'Heavy-Haul Quote Tool', 'Price an oversize move')
+    + mmRow('/tools/seasonal-weight-restrictions', 'frost', 'Frost Law Restrictions', 'Spring thaw postings')
+    + mmRow('/oversize', 'doc', 'Oversize Permit Guide', 'How OS/OW permits work')
+    + mmRow('/pilot-cars', 'cone', 'Pilot Car &amp; Escort Directory', 'Escorts by state')
+    + mmRow('/glossary', 'book', 'Freight Glossary', 'Plain-English definitions'))
+  + `</details>`
+  + `<a class="mm-flat" href="/pricing"><span class="mm-tile" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round">${MM_GLYPHS.receipt}</svg></span><span class="mm-txt"><span class="mm-t">Pricing</span><span class="mm-s">Plans and what they cost</span></span></a>`
+  + `<a class="mm-account" href="/login"><span class="mm-tile" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round">${MM_GLYPHS.signin}</svg></span><span class="mm-txt"><span class="mm-t">Sign in</span><span class="mm-s">Access your account</span></span></a>`
+  + `</div>`
   + `</div>`;
 
 /**
@@ -1089,7 +1210,7 @@ export const HEADER_SCRIPTS = `<script>
       var wide = window.matchMedia('(min-width: 1024px)');
       var lockY = 0, basePad = 0, closeTimer = null, isOpen = false;
       var EXIT_MS = 200;
-      var can = function (el) { return el.getClientRects().length > 0; };
+      var can = function (el) { return el.getClientRects().length > 0 && !el.closest('[inert]'); };
       var stops = function () {
         return Array.prototype.filter.call(
           m.querySelectorAll('a[href], summary, button:not([disabled])'), can);
@@ -1187,6 +1308,52 @@ export const HEADER_SCRIPTS = `<script>
       window.addEventListener('resize', function () {
         if (!isOpen) return;
         if (wide.matches) close(false); else measure();
+      });
+
+      /* ── THE FOLD CONTROLLER ────────────────────────────────────────────
+         A <details> cannot be animated on its own: with the attribute off the
+         browser does not render the content at all, so there is nothing to
+         transition FROM. The element stays a <details> — that is the whole
+         no-JS story, and nav-nojs.css depends on it — and the script simply
+         holds the open attribute on for the length of the exit so the
+         collapse can be seen. The movement itself is CSS: .mm-fold animates
+         grid-template-rows 0fr -> 1fr, which resolves to the content's
+         intrinsic height, so a group of two rows and a group of nine both
+         land exactly on their own height with no max-height guess.
+
+         inert goes on while it collapses. For those 200ms the rows are
+         zero-height but still laid out (they are clipped, not removed), so
+         without it Tab would stop on a link nobody can see — and can()
+         above skips anything inside an inert subtree for the same reason. */
+      var folds = Array.prototype.slice.call(m.querySelectorAll('.mm-group'));
+      /* The flag the collapsed state is gated on. Set HERE, by the controller
+         that owns data-fold, so a group can never be collapsed by CSS that
+         nothing is able to expand again. */
+      if (folds.length) m.setAttribute('data-fold-js', '');
+      folds.forEach(function (g) {
+        var sum = g.querySelector('summary');
+        var fold = g.querySelector('.mm-fold');
+        if (!sum || !fold) return;
+        var timer = null;
+        sum.addEventListener('click', function (e) {
+          e.preventDefault();
+          if (timer) { clearTimeout(timer); timer = null; }
+          if (g.open && fold.getAttribute('data-fold') === 'open') {
+            fold.removeAttribute('data-fold');
+            fold.setAttribute('inert', '');
+            timer = setTimeout(function () {
+              timer = null;
+              g.open = false;
+              fold.removeAttribute('inert');
+            }, reduce.matches ? 0 : EXIT_MS);
+          } else {
+            g.open = true;
+            fold.removeAttribute('inert');
+            var show = function () { fold.setAttribute('data-fold', 'open'); };
+            if (reduce.matches || !window.requestAnimationFrame) show();
+            else requestAnimationFrame(function () { requestAnimationFrame(show); });
+          }
+        });
       });
     }
     var dds = Array.prototype.slice.call(document.querySelectorAll('[data-nav-dd]'));
