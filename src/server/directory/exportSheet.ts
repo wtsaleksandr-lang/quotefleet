@@ -48,6 +48,7 @@ import {
   type VisibleCarrier,
 } from './queries.js';
 import { portByCode } from './containerPorts.js';
+import { formatDocketNumber } from './docketNumber.js';
 import { stateByCode, stateBySlug } from './usStates.js';
 import { esc, carrierName, layout } from './pages.js';
 
@@ -149,7 +150,9 @@ export function carrierToExportRow(c: VisibleCarrier): ExportRow {
   return {
     company: carrierName(c),
     usdot: c.usdot || DASH,
-    mc: (c.mcNumber && c.mcNumber.trim()) || DASH,
+    // Formatted, not verbatim: the stored value already carries its registry
+    // prefix, and an FF docket in a column headed "MC" must still read "FF …".
+    mc: formatDocketNumber(c.mcNumber) || DASH,
     location: locationText(c),
     phone,
     email,

@@ -45,6 +45,7 @@ import {
   titleCaseCity,
 } from './queries.js';
 import { createHash } from 'node:crypto';
+import { docketParts, formatDocketNumber } from './docketNumber.js';
 import { formatFmcsaAsOf } from './fmcsaFreshness.js';
 import { US_STATES, stateByCode, type UsState } from './usStates.js';
 import {
@@ -2891,7 +2892,8 @@ export function carrierAbout(c: VisibleCarrier): string {
 export function carrierCard(c: VisibleCarrier): string {
   const sr = safetyLabel(c.safetyRating);
   const cityState = [c.city, c.state].filter(Boolean).join(', ');
-  const idMeta = [c.usdot ? `USDOT ${esc(c.usdot)}` : '', c.mcNumber ? `MC ${esc(c.mcNumber)}` : '']
+  const mcLabel = formatDocketNumber(c.mcNumber);
+  const idMeta = [c.usdot ? `USDOT ${esc(c.usdot)}` : '', mcLabel ? esc(mcLabel) : '']
     .filter(Boolean)
     .join(' · ');
   // Compliance + capability pills. Safety leads, then hazmat, then the FMCSA
@@ -3075,6 +3077,7 @@ function jsonLdFaq(faqs: Array<{ q: string; a: string }>): string {
  * human-readable profile already shows in its "Operating authority" row.
  */
 function jsonLdCarrier(c: VisibleCarrier): string {
+  const docket = docketParts(c.mcNumber);
   const addr = {
     '@type': 'PostalAddress',
     // The STORED domicile country, not an assumption. This was hardcoded 'US',
@@ -3095,7 +3098,9 @@ function jsonLdCarrier(c: VisibleCarrier): string {
     url: `${SITE}/directory/carrier/${encodeURIComponent(c.slug)}`,
     identifier: [
       { '@type': 'PropertyValue', propertyID: 'USDOT', value: c.usdot },
-      ...(c.mcNumber ? [{ '@type': 'PropertyValue', propertyID: 'MC', value: c.mcNumber }] : []),
+      // propertyID carries the registry the docket actually belongs to (MC / FF /
+      // MX) and value carries the bare digits — never the prefix twice over.
+      ...(docket ? [{ '@type': 'PropertyValue', propertyID: docket.prefix, value: docket.digits }] : []),
     ],
     // Suppress contact fields entirely when the carrier has opted out.
     ...(!c.contactHidden && c.phone ? { telephone: c.phone } : {}),
@@ -5052,6 +5057,9 @@ export function renderCarrierProfile(opts: {
   const related = opts.related ?? [];
   const sr = safetyLabel(c.safetyRating);
   const cityState = [c.city, c.state].filter(Boolean).join(', ');
+  // Display form of the stored docket ("MC 012892"), built ONCE for every place
+  // this profile prints it — the subtitle, the header badge and the FMCSA grid.
+  const mcLabel = formatDocketNumber(c.mcNumber);
   const domicile = carrierDomicile(c);
   // ONLY a US state has a browsable /directory/:stateSlug page — stateBySlug
   // resolves the 50 states + DC + PR/VI/GU and nothing else. stateByCode, by
@@ -5108,7 +5116,7 @@ export function renderCarrierProfile(opts: {
   // ── §3 FMCSA DATA — clean labeled grid (numbers tabular via CSS). ──────────
   const dataItems: Array<[string, string]> = [
     ['USDOT', c.usdot ? esc(c.usdot) : '—'],
-    ['MC / Docket', c.mcNumber ? esc(c.mcNumber) : '—'],
+    ['MC / Docket', mcLabel ? esc(mcLabel) : '—'],
     ['Power units', fmtNum(c.powerUnits)],
     ['Drivers', fmtNum(c.drivers)],
     ['Authority', esc(authorityLabel(c.authorityType))],
@@ -5429,7 +5437,7 @@ export function renderCarrierProfile(opts: {
   // Subtitle line — DrayLocator order: USDOT · MC · City, State (each dropped when absent).
   const headerSubtitle = [
     c.usdot ? `USDOT ${esc(c.usdot)}` : '',
-    c.mcNumber ? `MC ${esc(c.mcNumber)}` : '',
+    mcLabel ? esc(mcLabel) : '',
     cityState ? esc(cityState) : '',
   ]
     .filter(Boolean)
@@ -5450,7 +5458,7 @@ export function renderCarrierProfile(opts: {
     c.powerUnits != null ? `<span class="cp-hbadge">${fmtNum(c.powerUnits)} trucks</span>` : '',
     c.drivers != null ? `<span class="cp-hbadge">${fmtNum(c.drivers)} drivers</span>` : '',
     c.usdot ? `<span class="cp-hbadge cp-hbadge--code">USDOT ${esc(c.usdot)}</span>` : '',
-    c.mcNumber ? `<span class="cp-hbadge cp-hbadge--code">MC ${esc(c.mcNumber)}</span>` : '',
+    mcLabel ? `<span class="cp-hbadge cp-hbadge--code">${esc(mcLabel)}</span>` : '',
   ]
     .filter(Boolean)
     .join('');
@@ -5989,6 +5997,10 @@ export function renderCompliancePage(summary: DirectorySummary): string {
       go.addEventListener('click', run);
       input.addEventListener('keydown', function (e) { if (e.key === 'Enter') run(); });
       function auth(v){return v==='A'?'Active':v==='I'?'Inactive':v==='N'?'None':(v||'—');}
+      // Browser-side mirror of formatDocketNumber() (docketNumber.ts): QCMobile's
+      // docketNumber already carries its registry prefix ("MC012892"/"FF003456"),
+      // so print it once, keeping the registry it actually belongs to.
+      function fmtMc(v){var s=String(v==null?'':v).trim();if(!s)return '';var m=/^([A-Za-z]{1,3})?[\\s._:-]*(\\d+)$/.exec(s);if(!m)return (/\\d/).test(s)?esc(s):'';return esc((m[1]||'MC').toUpperCase()+' '+m[2]);}
       function fmtBipd(v){var n=Number(String(v==null?'':v).replace(/[^0-9.]/g,''));if(!isFinite(n)||n<=0)return '—';var d=n*1000;return d%1000000===0?('$'+(d/1000000)+'M'):('$'+d.toLocaleString('en-US'));}
       function render(j) {
         if (!j || !j.found) { return '<p class="muted-small" style="margin-top:14px;">' + esc((j && j.note) || 'No FMCSA record found.') + '</p>'; }
@@ -5997,7 +6009,7 @@ export function renderCompliancePage(summary: DirectorySummary): string {
           ['DBA', j.dbaName ? esc(j.dbaName) : '—'],
           ['Location', esc([j.city, j.state].filter(Boolean).join(', ') || '—')],
           ['USDOT', esc(j.usdot || '—')],
-          ['MC / Docket', j.mcNumber ? esc(j.mcNumber) : '—'],
+          ['MC / Docket', fmtMc(j.mcNumber) || '—'],
           ['Allowed to operate', j.allowedToOperate === 'Y' ? '✓ Yes' : j.allowedToOperate === 'N' ? '✗ No' : '—'],
           ['Common authority', auth(j.authority && j.authority.common)],
           ['Contract authority', auth(j.authority && j.authority.contract)],
