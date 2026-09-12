@@ -733,8 +733,8 @@ html body.qf-wft .qf-hhero .hero-cta .btn .arr {
 }
 html body.qf-wft .qf-hhero .qf-aud-panel .qf-hhero__action .hero-cta .btn:hover {
   border-color: var(--hero-wash-ink) !important;
-  color: var(--accent-ink) !important;
-  background: var(--accent-fill) !important;
+  color: var(--hero-cta-ink) !important;
+  background: var(--hero-cta-fill-hover) !important;
   box-shadow: none !important;
   transform: none !important;
 }
@@ -743,12 +743,15 @@ html body.qf-wft .qf-hhero .qf-aud-panel .qf-hhero__action .hero-cta .btn:hover 
   color: inherit !important;
 }
 /* It had no focus style of its own, though — it fell through to the UA's 1px
-   auto ring, a near-black hairline on a near-white card. Same ring as every
-   other button here, so focus reads the same wherever you tab to, and it is
-   still clearly a different state from hover: hover repaints the border and
+   auto ring, a near-black hairline on a near-white card. The ring is the
+   HERO's ink rather than `--accent-legible`: the accent resolves to the indigo
+   #3356EE wherever the ground is light, which on this band is the same 1.02:1
+   the fill itself used to measure — a focus ring nobody can see. Same ring as
+   the finder field beside it, so focus reads the same across the card, and it
+   is still clearly a different state from hover: hover repaints the border and
    the ground, focus draws outside the box and touches neither. */
 html body.qf-wft .qf-hhero .hero-cta .btn:focus-visible {
-  outline: 2px solid var(--accent-legible) !important;
+  outline: 2px solid var(--hero-wash-ink) !important;
   outline-offset: 2px !important;
 }
 
@@ -941,65 +944,67 @@ html body.qf-wft .qf-hhero .qf-shipper-preview__label {
   color: var(--hero-wash-ink) !important;
 }
 
-/* THE PRIMARY CTA — THE SITE'S ONE ACCENT-FILLED BUTTON.
+/* THE PRIMARY CTA — THE PAGE'S ONE FILLED PRIMARY, ON THE BAND'S OWN HUE.
  *
- * It was a ghost (transparent fill, hairline border, neutral label). It is now
- * the accent, and it is the ONLY accent-filled control on the homepage. The
- * audit that changed it: every filled button on this page was counted, and the
- * page ran 16 near-black `--cta-bg` fills (the tool-card "Live demo →" / "Find
- * carriers →" / "All tools →" row), 9 white-on-near-black, one white pill —
- * and ZERO accent. The accent existed only as background art in the wash, so
- * the one thing our design law reserves it for (selection, focus, link-hover,
- * and the primary CTA) was the one thing it never marked.
+ * It was a ghost (transparent fill, hairline border, neutral label). #570 made
+ * it `--accent-fill` #3356EE. The owner's note on that repaint — "the blue
+ * color choice for CTA button, not sure about that, it doesn't match the
+ * background color" — is the same hue complaint Wave 9 already answered for
+ * the card icons: the band is hue 198, the indigo is hue 229, and 31 degrees
+ * apart on one surface is a mismatch you can see without measuring it.
  *
- * THE SIXTEEN TOOL-CARD BUTTONS STAY NEUTRAL, and that is the actual decision
- * here rather than an omission. Painting them accent would be sixteen
- * competing primaries on one page, at which point the accent marks nothing;
- * one accent CTA against sixteen neutral ones is what makes it read as the
- * primary at all.
+ * #570 ALSO UNDER-READ ITS OWN CONTRAST. It recorded 1.5:1 for the indigo on
+ * the band, computed against a nominal #0475A8. Pixel-sampled off the rendered
+ * page with the button hidden (Playwright, four widths, both themes), the
+ * darkest band pixel behind the button is #016FA0 and the indigo measured
+ * **1.02:1** against it at 1440/768/375. The rim was not reinforcing a weak
+ * boundary; it was the ONLY boundary.
  *
- * IT SITS ON THE AZURE, WHICH IS WHY THE HAIRLINE SURVIVED THE REPAINT.
- * Measured on the rendered page, `--accent-fill` #3356EE against the band
- * under it is 1.5:1 at 1440 (the band is #0475A8..#1787BA at y 418-465) and
- * 2.8:1 at 320, where the button sits lower and the ramp has already opened
- * up. Hue carries it — 229 on 198, at full saturation, is not a colour anyone
- * mistakes for its own ground — but 1.5:1 is under the 3:1 a control's visual
- * boundary needs, so the boundary is the BORDER's job, not the fill's:
- * `--hero-wash-line` (70% cream) measures 4.9:1 against the band and 5.7:1
- * against the fill, so the rim clears 3:1 on BOTH sides and the control has an
- * unambiguous edge whatever the ramp is doing behind it.
+ * SO THE FILL NOW CARRIES ITS OWN BOUNDARY. `--hero-cta-fill` is the band's
+ * hue at the luminance that clears 3:1 against the pixels actually behind the
+ * button — 3.07:1 in light (#001F2C), 3.67:1 in dark (#0496D7) — and the rim
+ * is now a detail rather than the load-bearing element. Derivation, the
+ * theme-flip, and the honest cost of the 3:1 target are written up in full at
+ * the foot of style.css (Wave 10); they are not restated here.
  *
- * THE LABEL IS `--accent-ink`, NOT `--hero-wash-ink`. #FFFFFF on #3356EE is
- * 5.68:1 in BOTH themes, because `--accent-fill` and `--accent-ink` are
- * theme-invariant — which is the point: the primary CTA is the same object in
- * light and dark rather than two different buttons. The ghost it replaced took
- * its ink from the ground, so it HAD to be theme-split; this one does not. */
+ * THE SIXTEEN TOOL-CARD BUTTONS STAY NEUTRAL, and that is still the actual
+ * decision rather than an omission. Sixteen filled primaries on one page means
+ * the primary marks nothing; one against sixteen neutral ones is what makes it
+ * read as the primary at all. Re-counted after this change at 1440/light:
+ * 16 `--cta-bg` fills, 9 white fills (the tenth was the toggle's white pill,
+ * which §below removes), one filled primary per hero panel, and ZERO
+ * `--accent-fill` left in the hero.
+ *
+ * THE LABEL IS `--hero-cta-ink`, WHICH IS `var(--cta-text)`. The site's own
+ * CTA ink already inverts per theme — white in light, #0C111D in dark — which
+ * is exactly the inversion this fill needs, so the button borrows it instead
+ * of declaring a second one. `--accent-ink` would have been white in both,
+ * i.e. white on a bright azure at 3.3:1 in dark. */
 html body.qf-wft .qf-hhero .qf-aud-panel .qf-hhero__action .hero-cta .btn {
-  background: var(--accent-fill) !important;
+  background: var(--hero-cta-fill) !important;
   border: 1px solid var(--hero-wash-line) !important;
-  color: var(--accent-ink) !important;
+  color: var(--hero-cta-ink) !important;
   box-shadow: none !important;
 }
 html body.qf-wft .qf-hhero .qf-aud-panel .qf-hhero__action .hero-cta .btn .arr {
   color: inherit !important;
 }
-/* Hover answers with the BORDER, never the label — the same rule the tool
-   buttons follow, so the label's contrast is always its resting value rather
-   than something that has to be re-argued per state.
-   THE GROUND NO LONGER ANSWERS EITHER, and that is a consequence of the
-   repaint rather than a softer hover. The accent fill IS this button's
-   identity, and the only two tokens that could darken it are theme-split the
-   wrong way round: `--accent-strong` is #2440C4 in light (fine) but #B4C2FC in
-   dark, so a fill swap would put a white label on a pale lavender at 1.4:1 on
-   hover — an AA failure that only exists while the pointer is on the button,
-   which is exactly how the last one of these survived (see §6). So hover takes
-   the rim from 70% cream to full `--hero-wash-ink` and slides the arrow; the
-   fill and the label hold, and every state of this control is AA by
-   construction. */
+/* Hover answers with the FILL AND the border, and never with the label.
+   #570 froze the fill on hover because the only darker token available was
+   theme-split the wrong way round: `--accent-strong` is #2440C4 in light but
+   #B4C2FC — a pale lavender — in dark (and landing-s-polish.css re-declares it
+   as the lavender on `.landing-v2` in both), so a fill swap put a white label
+   on a pale ground at 1.4:1 on hover: an AA failure that only exists while the
+   pointer is on the button, which is exactly how the last one of these
+   survived (see §6). `--hero-cta-fill-hover` is a step along the SAME hue-198
+   family in whichever direction that theme's band left room — down in light,
+   up in dark — so the label's contrast IMPROVES on hover in both themes
+   (17.0 -> 18.2 light, 5.70 -> 6.84 dark) instead of collapsing. The rim still
+   goes to full `--hero-wash-ink` and the arrow still slides. */
 html body.qf-wft .qf-hhero .qf-aud-panel .qf-hhero__action .hero-cta .btn:hover {
   border-color: var(--hero-wash-ink) !important;
-  color: var(--accent-ink) !important;
-  background: var(--accent-fill) !important;
+  color: var(--hero-cta-ink) !important;
+  background: var(--hero-cta-fill-hover) !important;
   box-shadow: none !important;
   transform: none !important;
 }
@@ -1109,4 +1114,32 @@ html[data-theme="light"] body.qf-wft .qf-hhero .qf-aud-panel .qf-shipper-hero .q
    what `--accent-legible` exists for (it picks by ground, not by theme). */
 html body.qf-wft .qf-hhero .qf-dir-chip {
   color: var(--accent-legible) !important;
+}
+
+/* THE SHIPPERS PANEL'S "Search" BUTTON HOVERS INTO AN AA FAILURE.
+   Found by the same sweep that measured the CTA above, NOT asked for — but it
+   is the identical bug §8 documents, still live on the other hero panel, so it
+   is fixed here rather than written down again.
+
+   `landing-audience-toggle.css` gives `.qf-dir-submit` a hover of
+   `--accent-strong`. On `.landing-v2` that token is the PALE LAVENDER #B4C2FC
+   in BOTH themes (landing-s-polish.css re-declares it), so the white label
+   measured **1.74:1** on hover at all four widths in both themes — an AA
+   failure that only exists while the pointer is on the button, which is
+   exactly how it survived this long.
+
+   THE RESTING COLOUR IS DELIBERATELY UNTOUCHED. This button is not the one
+   the owner's note is about: it sits on the search bar's own near-white
+   surface (measured #F5FAFC at 1440, #FCFEFF at 375), not on the azure, so it
+   has no hue clash to fix and its resting 5.39:1 is fine. Only the hover is
+   wrong. Same answer §8 uses: the FILL and the LABEL hold, the border reacts —
+   `--accent-strong` is a perfectly good rim colour on an indigo fill even
+   though it is a terrible ground for white text.
+
+   Appended at EOF per baseline-protocol.md rule 1. Scoped to `.qf-hhero` so
+   the directory subsite's own search bar is not touched. */
+html body.qf-wft .qf-hhero .qf-dir-search .qf-dir-submit:hover {
+  background: var(--accent-fill) !important;
+  border-color: var(--accent-strong) !important;
+  color: var(--accent-ink) !important;
 }
