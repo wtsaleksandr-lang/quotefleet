@@ -67,10 +67,21 @@ import {
   jsonLdFaq,
   jsonLdWebApplication,
 } from '../osow/hubShell.js';
+import { factList, toolPage } from '../tools/toolPage.js';
 
 export const BRIDGE_TOOL_PATH = '/tools/bridge-formula';
 export const AXLE_TOOL_PATH = '/tools/axle-weights';
 const OSOW_TOOL = '/tools/oversize-permits';
+const SEASONAL_TOOL = '/tools/seasonal-weight-restrictions';
+/**
+ * Where the header band's "embed this tool" affordance points TODAY.
+ *
+ * It is the same destination the shipped 'TOOL_PROMO_CTA' already sends people
+ * to, so nothing here 404s. When a real per-tool embed route exists this is the
+ * one line that changes — see 'EmbedAffordance' in ../tools/toolPage.ts, which
+ * is the template's single integration point for it.
+ */
+const EMBED_SURFACE = '/pricing';
 
 /** More axles than any legal combination on a US highway, by a wide margin. */
 const MAX_AXLES = 13;
@@ -400,11 +411,16 @@ const TOOL_CSS = `
   .qt-field input:focus + .qt-lab, .qt-field select:focus + .qt-lab { color: var(--accent); }
 
   /* Preset pills: exactly four, in two columns, so they wrap 2x2 and none is
-     ever left alone on a line. Selected = outline, never a bright fill. */
+     ever left alone on a line. Selected = outline, never a bright fill.
+
+     THE BORDER IS 2px IN EVERY STATE and only its COLOUR changes on select.
+     It used to go 1px -> 2px, which moved the pill's content by a pixel and
+     nudged the three pills beside it every time the selection changed. A
+     selected state must never reflow. */
   .qt-pills { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 2px; }
-  .qt-pill { min-height: 44px; padding: 8px 12px; font: inherit; font-size: 13px; text-align: left; color: var(--ink-soft); background: transparent; border: 1px solid var(--border); border-radius: var(--radius); cursor: pointer; }
+  .qt-pill { min-height: 44px; padding: 8px 12px; font: inherit; font-size: 13px; text-align: left; color: var(--ink-soft); background: transparent; border: 2px solid var(--border); border-radius: var(--radius); cursor: pointer; }
   .qt-pill:hover { border-color: var(--border-strong); }
-  .qt-pill[aria-pressed="true"] { border-color: var(--accent); border-width: 2px; padding: 8px 12px; background: var(--accent-soft); color: var(--ink); }
+  .qt-pill[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-soft); color: var(--ink); }
 
   .qt-axles { display: grid; gap: 2px; }
   .qt-axle { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 44px; gap: 2px; }
@@ -416,17 +432,48 @@ const TOOL_CSS = `
   .qt-actions .btn:disabled { opacity: 0.5; cursor: not-allowed; }
   .qt-hint { font-size: 12px; color: var(--muted); margin: 8px 0 0; line-height: 1.5; }
 
-  /* Verdict. Flat ink, never the accent, so it cannot collide with its surface. */
-  .qt-verdict { scroll-margin-top: 96px; background: var(--surface); border: 1px solid var(--border-strong); border-radius: var(--radius-lg); padding: 16px; }
-  .qt-verdict.is-over { border-color: var(--warn); }
-  .qt-verdict .qt-vl { font-size: 12px; font-family: var(--font-mono); letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); margin: 0 0 4px; }
-  .qt-verdict .qt-vv { font-size: 32px; font-weight: 700; line-height: 1.1; color: var(--ink); margin: 0; }
-  .qt-verdict .qt-vs { font-size: 13px; color: var(--ink-soft); margin: 4px 0 0; line-height: 1.55; }
+  /* ── THE RESULT TRAY ─────────────────────────────────────────────────────
+     A RECESSED tray holding ELEVATED result cards. The recess is the signal:
+     everything inside it is DERIVED OUTPUT, not something you can type into.
+     It is the one structural idea worth taking from the reference system's
+     result pane — and the only one, because its numeric hierarchy is inverted
+     (it sets the rate LABEL at 800/16px above the VALUE at 500/14.4px, so the
+     word "MFN" outweighs "18%").
 
-  .qt-stats { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-top: 12px; }
-  .qt-stat { border: 1px solid var(--border); border-radius: var(--radius); padding: 12px; background: var(--bg); }
-  .qt-stat .k { font-size: 11px; font-family: var(--font-mono); letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); display: block; margin-bottom: 4px; }
-  .qt-stat .v { font-size: 16px; font-weight: 600; color: var(--ink); }
+     OURS IS VALUE-DOMINANT, and for a calculator that is not a preference:
+       - the figure takes the top step at weight 700 in flat --ink. NEVER the
+         accent — the answer is not a link and must not read as one;
+       - 'font-variant-numeric: tabular-nums' on every figure, so a digit that
+         changes does not change the figure's WIDTH. Measured on this page
+         before the change: the gross-weight figure moved 74.88px -> 73.48px
+         between two results, a visible twitch on every recalculation;
+       - the label is subordinate at 12px uppercase, muted;
+       - the unit is INLINE and smaller than the figure, never above it.
+
+     PADDING IS CONSTANT ACROSS EVERY STATE. The reference's highlighted rows
+     carry 16px where its neutral rows carry 24px, so the row you are meant to
+     look at is 16px SHORTER than its neighbours. Only colour changes here. */
+  .qt-tray { scroll-margin-top: 96px; background: var(--surface-2); border-radius: var(--radius-lg); padding: 16px; display: grid; gap: 8px; }
+  .qt-rcard { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; }
+  .qt-rcard.is-over { border-color: var(--warn); background: var(--warn-bg); }
+  .qt-lab { display: block; font-size: 12px; font-family: var(--font-mono); font-weight: 500; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); margin: 0 0 4px; }
+  .qt-fig { font-size: 32px; font-weight: 700; font-variant-numeric: tabular-nums; line-height: 1.1; color: var(--ink); margin: 0; overflow-wrap: anywhere; }
+  .qt-fig--2 { font-size: 24px; }
+  .qt-fig--3 { font-size: 20px; }
+  .qt-unit { font-size: 0.55em; font-weight: 500; color: var(--muted); }
+  /* The qualifier is ABSOLUTE, not relative: at 0.45em of the 24px step it
+     rendered 10.8px, under the 11px floor this codebase holds step-3 metadata
+     to. A unit scales with its figure; a qualifier has to stay readable. */
+  .qt-qual { font-size: 12px; font-weight: 500; color: var(--muted); white-space: nowrap; }
+  .qt-rsub { font-size: 13px; color: var(--ink-soft); margin: 4px 0 0; line-height: 1.55; }
+  /* The margin ON the verdict, inside the verdict card: a pass/fail says
+     nothing about whether shifting a thousand pounds breaks the rig. Separated
+     by a GAP, not a rule — a divider is space. */
+  .qt-tight { margin: 16px 0 0; }
+
+  /* FOUR stat cards in two columns = 2x2 at every width that has two columns,
+     so a card is never left alone on a final row. */
+  .qt-stats { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
 
   .qt-note { border-radius: var(--radius-lg); padding: 16px; margin-top: 16px; border: 1px solid var(--border); background: var(--surface); }
   .qt-note h3 { font-size: 15px; margin: 0 0 8px; color: var(--ink); }
@@ -484,6 +531,20 @@ function toolScript(mode: 'bridge' | 'axle'): string {
   function el(id){ return document.getElementById(id); }
   function esc(s){ return String(s == null ? '' : s).replace(/[&<>"']/g, function(m){ return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[m]; }); }
   function lb(n){ return Number(n).toLocaleString('en-US') + ' lb'; }
+  function num(n){ return Number(n).toLocaleString('en-US'); }
+  /**
+   * A FIGURE AND ITS UNIT, not a string with a unit glued on.
+   *
+   * The unit renders in its own inline span so it can be SMALLER than the
+   * figure — the house rule is that a unit is a qualifier, never a peer of the
+   * number and never stacked above it. Concatenating them would have made the
+   * two one type step, which is the mistake the reference system makes.
+   * Rendered text is unchanged ("80,000 lb"); only its typography splits.
+   */
+  function fig(value, unit, cls){
+    return '<p class="qt-fig' + (cls ? ' ' + cls : '') + '" data-qtt="stat-value">' + value
+      + (unit ? '<span class="qt-unit"> ' + esc(unit) + '</span>' : '') + '</p>';
+  }
 
   function renderAxles(){
     var wrap = el('qt-axles');
@@ -549,17 +610,33 @@ function toolScript(mode: 'bridge' | 'axle'): string {
     if (!out) return;
     var worst = null;
     r.violations.forEach(function(v){ if (!worst || v.overageLbs > worst.overageLbs) worst = v; });
-    var html = '<div class="qt-verdict' + (r.compliant ? '' : ' is-over') + '" id="qt-verdict" tabindex="-1">'
-      + '<p class="qt-vl">Federal bridge formula</p>'
-      + '<p class="qt-vv">' + (r.compliant ? 'Compliant' : r.violations.length + ' violation' + (r.violations.length === 1 ? '' : 's')) + '</p>'
-      + '<p class="qt-vs">' + (r.compliant
+
+    /* THE TIGHTEST GROUP IS A MIN OVER A COLUMN THE TABLE ALREADY PRINTS, not
+       a new computation. It is promoted into the verdict card because it is
+       the number a dispatcher actually acts on: a pass/fail says nothing about
+       whether re-tarping a thousand pounds of freight breaks the rig, and the
+       group with the least headroom is the one that decides. */
+    var tight = null;
+    r.groups.forEach(function(g){ if (!tight || g.headroomLbs < tight.headroomLbs) tight = g; });
+
+    var html = '<div class="qt-tray" id="qt-verdict" tabindex="-1">'
+      + '<div class="qt-rcard' + (r.compliant ? '' : ' is-over') + '">'
+      + '<span class="qt-lab" data-qtt="verdict-label">Federal bridge formula</span>'
+      + '<p class="qt-fig" data-qtt="verdict">' + (r.compliant ? 'Compliant' : r.violations.length + ' violation' + (r.violations.length === 1 ? '' : 's')) + '</p>'
+      + '<p class="qt-rsub">' + (r.compliant
           ? 'All ' + r.groupsChecked + ' groups of two or more consecutive axles are within the formula, and the rig clears the flat federal single-axle, tandem and gross limits.'
           : (worst ? esc(worst.description) : '')) + '</p>'
+      + (tight ? '<div class="qt-tight"><span class="qt-lab">Tightest group</span>'
+          + '<p class="qt-fig qt-fig--2">'
+          + (tight.headroomLbs < 0 ? '\\u2212' + num(-tight.headroomLbs) : num(tight.headroomLbs))
+          + '<span class="qt-unit"> lb ' + (tight.headroomLbs < 0 ? 'over' : 'left') + '</span> '
+          + '<span class="qt-qual">\\u00b7 axles ' + tight.firstAxle + '\\u2013' + tight.lastAxle + '</span></p></div>' : '')
+      + '</div>'
       + '<div class="qt-stats">'
-      + '<div class="qt-stat"><span class="k">Gross weight</span><span class="v">' + lb(r.grossWeightLbs) + '</span></div>'
-      + '<div class="qt-stat"><span class="k">Outer wheelbase</span><span class="v">' + r.overallLengthFt.toFixed(2).replace(/\\.?0+$/, '') + ' ft</span></div>'
-      + '<div class="qt-stat"><span class="k">Axles</span><span class="v">' + r.axleCount + '</span></div>'
-      + '<div class="qt-stat"><span class="k">Groups checked</span><span class="v">' + r.groupsChecked + '</span></div>'
+      + '<div class="qt-rcard qt-stat"><span class="qt-lab" data-qtt="stat-label">Gross weight</span>' + fig(num(r.grossWeightLbs), 'lb', 'qt-fig--2') + '</div>'
+      + '<div class="qt-rcard qt-stat"><span class="qt-lab" data-qtt="stat-label">Outer wheelbase</span>' + fig(r.overallLengthFt.toFixed(2).replace(/\\.?0+$/, ''), 'ft', 'qt-fig--2') + '</div>'
+      + '<div class="qt-rcard qt-stat"><span class="qt-lab" data-qtt="stat-label">Axles</span>' + fig(r.axleCount, '', 'qt-fig--2') + '</div>'
+      + '<div class="qt-rcard qt-stat"><span class="qt-lab" data-qtt="stat-label">Groups checked</span>' + fig(r.groupsChecked, '', 'qt-fig--2') + '</div>'
       + '</div></div>';
 
     if (r.violations.length) {
@@ -732,47 +809,141 @@ export function renderBridgeToolPage(): string {
     },
   ];
 
-  const body = `<div class="qt-grid">
-      <div>${formHtml('bridge')}</div>
-      <div id="qt-out"><p class="qt-empty">Loading the calculator&hellip;</p></div>
-    </div>
-    ${seedScript()}
-    <section class="qh-sec" id="how" style="margin-top:32px">
-      <h2>How the answer is reached</h2>
-      <p>Three checks, in order. Each single axle against the federal ${FEDERAL_SINGLE_AXLE_LIMIT_LBS.toLocaleString('en-US')} lb limit. Then every group of two or more consecutive axles against the bridge formula, with the tandem cap applied by span and the two-tandem exception applied by geometry. Then the whole vehicle against the federal ${FEDERAL_GROSS_WEIGHT_LIMIT_LBS.toLocaleString('en-US')} lb gross limit.</p>
-      <p>The result is rounded to the nearest 500 lb with exact ties going <em>down</em>, which is what the statute and the published federal table both do — ordinary rounding sends halves up and would permit 500 lb the law does not.</p>
-      <p><a href="${OSOW_HUB_PATH}/bridge-formula">The formula, the full table and the five cells where the published federal table contradicts the federal formula →</a></p>
-    </section>
-    <section class="qh-sec" id="next">
-      <h2>Once you know you need a permit</h2>
-      <ul>
-        <li><a href="${AXLE_TOOL_PATH}">Check the same rig against a specific state's cited axle and gross limits</a></li>
-        <li><a href="${OSOW_TOOL}">Price the permit across a multi-state lane</a></li>
-        <li><a href="${OSOW_HUB_PATH}/escort-requirements">Find out whether it needs a pilot car</a> — usually the larger number</li>
-      </ul>
-    </section>
-    <section class="qh-sec" id="faq"><h2>Questions</h2><div class="qh-faq">${faqs
-      .map((f) => `<details><summary>${esc(f.q)}</summary><p>${esc(f.a)}</p></details>`)
-      .join('')}</div></section>`;
+  const fiveAxleGroups = (AXLE_PRESETS.find((p) => p.id === 'five-axle') as AxlePreset).axles.length;
+  const nineAxleGroups = (AXLE_PRESETS.find((p) => p.id === 'nine-axle') as AxlePreset).axles.length;
+  const combos = (n: number) => (n * (n - 1)) / 2;
 
-  return hubPage({
+  return toolPage({
     title: 'Federal Bridge Formula Calculator (Free, No Account) | QuoteFleet',
     description:
       'Check any axle layout against the Federal Bridge Formula — every group of two or more consecutive axles, not just the obvious three — with the headroom left on each group. Free, no sign-up, works above 80,000 lb.',
     path: BRIDGE_TOOL_PATH,
+
+    // ── 1 ──
     crumbs: [{ name: 'Free tools', path: '/tools' }, { name: 'Bridge formula calculator' }],
     eyebrow: 'Free calculator · no account needed',
     h1: 'Federal bridge formula calculator',
     lead: 'Type the axle positions and weights. Every group of two or more consecutive axles is checked — all of them — with the headroom left on each one.',
-    rail: [
-      { id: 'how', label: 'How the answer is reached' },
-      { id: 'next', label: 'What comes next' },
-      { id: 'faq', label: 'Questions' },
-    ],
-    bodyHtml: body,
+    embed: { href: EMBED_SURFACE, label: 'Embed this tool' },
+
+    // ── 2 ──
+    toolHtml: `<div class="qt-grid">
+      <div>${formHtml('bridge')}</div>
+      <div id="qt-out"><p class="qt-empty">Loading the calculator&hellip;</p></div>
+    </div>`,
+    afterToolHtml: seedScript(),
+
+    // ── 3 ── What it does, what it does not, what it costs. The third is a
+    // real differentiator on this page and not filler: nothing here is billed
+    // and the page answers with the database unreachable.
+    limits: {
+      head: {
+        eyebrow: 'Scope',
+        heading: 'What this answers, and where the answer stops',
+        sub: 'A weight check is not a route clearance. The three facts below are the whole boundary.',
+      },
+      facts: [
+        {
+          label: 'What it covers',
+          bodyHtml: `Every group of two or more consecutive axles against <strong>23 U.S.C. §127(a)</strong> — all of them, not the three anyone would name — plus the flat federal ${FEDERAL_SINGLE_AXLE_LIMIT_LBS.toLocaleString('en-US')} lb single-axle, ${FEDERAL_TANDEM_AXLE_LIMIT_LBS.toLocaleString('en-US')} lb tandem and ${FEDERAL_GROSS_WEIGHT_LIMIT_LBS.toLocaleString('en-US')} lb gross limits.`,
+        },
+        {
+          label: 'What it does not cover',
+          bodyHtml: `A state's own axle and gross limits, seasonal (spring thaw) restrictions posted road by road, local bridge postings, and permit fees. Any one of them can make a rig that passes here illegal on a specific route.`,
+        },
+        {
+          label: 'What it costs',
+          bodyHtml:
+            'Nothing, and no account. Every input is in the request and every limit is compiled in, so the page renders and the endpoint answers with the database unreachable, and neither calls anything billable.',
+        },
+      ],
+    },
+
+    // ── 4 ──
+    steps: {
+      head: { eyebrow: 'How it works', heading: 'Three checks, in order' },
+      items: [
+        {
+          title: 'Describe the rig',
+          bodyHtml: `Position is the distance in feet from the steer axle, measured centre to centre; weight is what that axle actually carries, not its rating. Start from one of ${AXLE_PRESETS.length} real configurations and edit from there.`,
+        },
+        {
+          title: 'Every group gets enumerated',
+          bodyHtml: `Each single axle against the federal ${FEDERAL_SINGLE_AXLE_LIMIT_LBS.toLocaleString('en-US')} lb limit. Then every group of two or more consecutive axles against the bridge formula, with the tandem cap applied by span and the two-tandem exception applied by geometry. Then the whole vehicle against ${FEDERAL_GROSS_WEIGHT_LIMIT_LBS.toLocaleString('en-US')} lb.`,
+        },
+        {
+          title: 'Read the headroom, not just the verdict',
+          bodyHtml:
+            'Each group shows what it carries, what it is allowed and what is left. Allowances round to the nearest 500 lb with exact ties going <em>down</em> — what the statute and the published federal table both do, where ordinary rounding would permit 500 lb the law does not.',
+        },
+      ],
+    },
+
+    // ── 5 ── Two rows. Each figure is FACTS, not decoration.
+    rows: {
+      head: { eyebrow: 'Why this one', heading: 'Two things most free calculators get wrong' },
+      items: [
+        {
+          heading: 'Every group, not the obvious three',
+          bodyHtml: `<p>Compliance is not "steer, drives, trailer tandems". It is every group of two or more consecutive axles — N(N−1)/2 of them. The classic failure is a rig whose every named group passes and whose interior span does not, and an interior span is exactly what a bridge cares about.</p>
+            <p>The count is returned with the result so you can see it rather than take it on trust.</p>
+            <p><a href="${OSOW_HUB_PATH}/bridge-formula">The formula, the full table and the five cells where the published federal table contradicts the federal formula →</a></p>`,
+          figureHtml: factList([
+            { label: `Groups on a ${fiveAxleGroups}-axle tractor-semitrailer`, value: String(combos(fiveAxleGroups)) },
+            { label: `Groups on a ${nineAxleGroups}-axle heavy haul`, value: String(combos(nineAxleGroups)) },
+            { label: 'Groups a named-group check looks at', value: '3' },
+          ]),
+        },
+        {
+          heading: 'It works above 80,000 lb, on purpose',
+          bodyHtml: `<p>A group's bridge-formula allowance is capped by the vehicle's own gross weight, not by the federal ${FEDERAL_GROSS_WEIGHT_LIMIT_LBS.toLocaleString('en-US')} lb limit. Clamping it there fabricates overages of up to 25,500 lb on permitted heavy-haul loads whose groups are in fact compliant.</p>
+            <p>The federal gross limit is still enforced — once, as a limit on the vehicle, which is what it is.</p>`,
+          figureHtml: factList([
+            { label: 'Federal single axle', value: FEDERAL_SINGLE_AXLE_LIMIT_LBS.toLocaleString('en-US'), unit: 'lb' },
+            { label: 'Federal tandem axle', value: FEDERAL_TANDEM_AXLE_LIMIT_LBS.toLocaleString('en-US'), unit: 'lb' },
+            { label: 'Federal gross weight', value: FEDERAL_GROSS_WEIGHT_LIMIT_LBS.toLocaleString('en-US'), unit: 'lb' },
+          ]),
+        },
+      ],
+    },
+
+    // ── 6 ── The reference system has NO cross-tool navigation on a tool page.
+    // Four cards, so the grid is 4 / 2x2 / 4x1 and never orphans one.
+    related: {
+      head: {
+        eyebrow: 'Next',
+        heading: 'Once you know the weight',
+        sub: 'A weight verdict is the first of four questions on an oversize move.',
+      },
+      items: [
+        {
+          href: AXLE_TOOL_PATH,
+          title: 'Axle weight checker',
+          blurb: "The same rig against a state's own cited axle and gross limits, with the statute on every line.",
+        },
+        {
+          href: OSOW_TOOL,
+          title: 'Oversize permit calculator',
+          blurb: 'Price the permit across a multi-state lane, state by state.',
+        },
+        {
+          href: `${OSOW_HUB_PATH}/escort-requirements`,
+          title: 'Escort requirements',
+          blurb: 'Whether the move needs a pilot car — usually the larger number of the two.',
+        },
+        {
+          href: SEASONAL_TOOL,
+          title: 'Seasonal restrictions',
+          blurb: 'Spring-thaw limits that can make a compliant axle group illegal in March.',
+        },
+      ],
+    },
+
+    // ── 7 ──
+    faq: { head: { eyebrow: 'FAQ', heading: 'Questions' }, items: faqs },
+
     extraCss: TOOL_CSS,
     extraScripts: toolScript('bridge'),
-    showPromoCta: true,
     jsonLd: [
       jsonLdBreadcrumb([
         { name: 'Free tools', path: '/tools' },

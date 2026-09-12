@@ -650,6 +650,24 @@ export interface HubPageOpts {
   truthHtml?: string;
   /** `{ id, label }` per H2, which IS the sticky rail AND the anchor set. */
   rail?: Array<{ id: string; label: string }>;
+  /**
+   * REPLACES the default hero section outright — crumbs, eyebrow, H1, lead and
+   * all. The tool-page template (`../tools/toolPage.ts`) uses it to swap the
+   * plain hero for its header band, which is a full-bleed raster surface with
+   * its own breadcrumb and in-chrome embed affordance and therefore cannot be
+   * expressed as options on the hero this shell renders.
+   *
+   * Everything else the shell owns — head, meta, canonical, JSON-LD, site
+   * header, footer, theme boot — is unchanged, which is the whole point of
+   * overriding one section rather than forking the document.
+   */
+  heroHtml?: string;
+  /**
+   * Extra class on `<body>`. The tool template scopes its focus-ring and
+   * reduced-motion rules to `body.qtt` so they cannot leak onto the ~35 hub
+   * pages that share this shell.
+   */
+  bodyClass?: string;
   bodyHtml: string;
   jsonLd: Array<Record<string, unknown>>;
   /** `max(retrievedOn)` over the sources rendered. NEVER the deploy time. */
@@ -678,7 +696,9 @@ export function hubPage(opts: HubPageOpts): string {
           .join('')}</ol></aside>`
       : '';
 
-  const body = `
+  const heroHtml =
+    opts.heroHtml ??
+    `
   <section class="hero qh-hero">
     <div class="container-narrow">
       ${crumbHtml}
@@ -688,7 +708,10 @@ export function hubPage(opts: HubPageOpts): string {
       ${opts.bandHtml ?? ''}
       ${opts.truthHtml ?? ''}
     </div>
-  </section>
+  </section>`;
+
+  const body = `
+  ${heroHtml}
 
   <main class="qh-shell">
     <div class="qh-body${railHtml === '' ? ' qh-body--full' : ''}">
@@ -727,7 +750,7 @@ export function hubPage(opts: HubPageOpts): string {
   <meta name="twitter:image" content="${SITE}/brand/og-image-1200x630.png">
   ${ld}
 </head>
-<body>
+<body${opts.bodyClass ? ` class="${esc(opts.bodyClass)}"` : ''}>
   ${FULL_SITE_HEADER}
   ${body}
   ${opts.showPromoCta ? TOOL_PROMO_CTA : ''}
