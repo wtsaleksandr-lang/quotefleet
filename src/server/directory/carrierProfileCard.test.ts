@@ -163,6 +163,52 @@ describe('carrier profile header — the reference affordances', () => {
     expect(html).toContain('Back to Directory');
   });
 
+  /**
+   * #550 made the non-US region crumb deliberately UNLINKED: stateByCode
+   * synthesises a slug for any code, so "TA" (Tamaulipas) and "ON" used to link
+   * confidently — inside BreadcrumbList markup Google reads — to /directory
+   * pages that do not exist. The back link reads the same crumb array, so it
+   * inherits that fix only because it targets the deepest crumb WITH a path.
+   * If anyone ever gives it the last crumb instead, these fail.
+   */
+  it('never sends a Mexican carrier to a synthesised state page', () => {
+    const html = renderCarrierProfile({
+      carrier: carrier({ country: 'MX', state: 'TA', city: 'MATAMOROS', zip: '87300', nearestPortCode: null }),
+    });
+    expect(html).toContain('<a class="cp-back" href="/directory">');
+    expect(html).toContain('Back to Directory');
+    expect(html).not.toContain('/directory/ta');
+    // The region still reads, as a plain crumb — the fact is not lost, the link is.
+    expect(html).toContain('Tamaulipas');
+  });
+
+  it('never sends a Canadian carrier to a synthesised province page', () => {
+    const html = renderCarrierProfile({
+      carrier: carrier({ country: 'CA', state: 'ON', city: 'MISSISSAUGA', zip: 'L5T 1A1', nearestPortCode: null }),
+    });
+    expect(html).toContain('<a class="cp-back" href="/directory">');
+    expect(html).not.toContain('/directory/on');
+    expect(html).toContain('Ontario');
+  });
+
+  it('renders a carrier with NO nearest hub without an empty label or a broken row', () => {
+    // #550 leaves nearest_port_code null for Mexican carriers on purpose
+    // (Tijuana → Baltimore was nonsense). Nothing may render a hub row, a hub
+    // chip or a dangling "Nearest port" label for them.
+    const html = renderCarrierProfile({
+      carrier: carrier({ country: 'MX', state: 'NL', city: 'MONTERREY', nearestPortCode: null }),
+      related: [],
+    });
+    expect(html).not.toContain('Nearest port');
+    expect(html).not.toContain('Nearest hub');
+    expect(html).not.toContain('/directory/port/');
+    // …and the location block still says something true.
+    expect(html).toContain('Based in MONTERREY, NL');
+    // NL is Nuevo León AND Newfoundland; the stored country decides, not the code.
+    expect(html).toContain('Nuevo León');
+    expect(html).not.toContain('Newfoundland');
+  });
+
   it('renders ONE claim affordance in the header — the pill — pointed at the real claim flow', () => {
     const html = renderCarrierProfile({ carrier: carrier() });
     const start = html.indexOf('<div class="cp-herocard">');
