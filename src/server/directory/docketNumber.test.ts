@@ -13,6 +13,7 @@ import { normalizeMc } from './carrierIngest.js';
 import { renderCarrierProfile, carrierCard } from './pages.js';
 import { carrierToExportRow } from './exportSheet.js';
 import { heroCarrierCard } from './queries.js';
+import { computeTrustBadges } from '../hostedPage.js';
 import type { VisibleCarrier } from './queries.js';
 
 describe('formatDocketNumber — stored forms that exist in the table', () => {
@@ -213,6 +214,20 @@ describe('no render site doubles the prefix', () => {
     expect(html).not.toMatch(/cp-hbadge--code">MC\s*</);
     expect(html).toContain('<span class="v">—</span>');
     expect(carrierCard(carrier({ mcNumber: null }))).not.toMatch(/·\s*MC\s*</);
+  });
+
+  it('hosted-page trust badge prints a CLAIMED tenant docket once', () => {
+    // Claiming copies carrier_directory.mc_number (prefixed) into tenants, so
+    // this badge sees "MC012892" for every claimed carrier.
+    expect(computeTrustBadges({ dotNumber: '107080', mcNumber: 'MC012892' }, true)).toEqual([
+      'USDOT 107080',
+      'MC 012892',
+      'Insured',
+    ]);
+    // A hand-typed bare number still reads as an MC docket.
+    expect(computeTrustBadges({ dotNumber: '2914776', mcNumber: '748213' }, true)).toContain('MC 748213');
+    // Prefix-only never yields a dangling badge.
+    expect(computeTrustBadges({ dotNumber: '107080', mcNumber: 'MC' }, true)).toEqual(['USDOT 107080', 'Insured']);
   });
 
   it('a prefix-only stored value renders nothing, not a bare "MC"', () => {
