@@ -60,6 +60,10 @@ import {
 import { CA_PROVINCE_CODES, provinceByCode } from './caProvinces.js';
 import { MX_STATE_CODES, mxStateByCode } from './mxStates.js';
 import { hubRobotsDirective } from './indexQualityFloor.js';
+// The shared tool-page template's PRIMITIVES, not its document. /compliance
+// renders the same eight blocks as the other free tools while staying on this
+// shell — see `LayoutOpts.extraCss` for why it does not move.
+import { BAND_TOKENS, TOOL_TEMPLATE_CSS, factList, sectionHeader } from '../tools/toolPage.js';
 import { curatedSquareLogoForUsdot } from './carrierLogos.js';
 import {
   NATIONAL_DRIVER_OOS_RATE,
@@ -2678,9 +2682,27 @@ interface LayoutOpts {
    *  'noindex, follow' on pages that must stay out of the index but whose links
    *  should still be crawled — the site-wide 404 body, gated/personal surfaces. */
   robots?: string;
+  /**
+   * Page-specific CSS, inlined after the directory stylesheet.
+   *
+   * /compliance uses it to pull in the shared tool-page template so it renders
+   * the same eight blocks as the other free tools WITHOUT leaving this shell.
+   * Leaving would have cost it three things the marketing shell has no way to
+   * provide: the FMCSA data-source attribution strip (which is TRUE on this
+   * surface and gated on the canonical path — see `rendersCarrierData`), the
+   * directory site map in the footer, and the shipper-account hydration. The
+   * template is brought to the page instead of the page to the template.
+   */
+  extraCss?: string;
+  /**
+   * Extra class on <body>. The tool template scopes its focus-ring and
+   * reduced-motion rules to `body.qtt`; a page that opts into the template's
+   * CSS must also opt into its scope or those rules never match.
+   */
+  bodyClass?: string;
 }
 
-export function layout({ title, description, canonicalPath, bodyHtml, jsonLd, relPrev, relNext, robots }: LayoutOpts): string {
+export function layout({ title, description, canonicalPath, bodyHtml, jsonLd, relPrev, relNext, robots, extraCss, bodyClass }: LayoutOpts): string {
   const ld = (jsonLd ?? [])
     .filter(Boolean)
     .map((j) => `<script type="application/ld+json">${j}</script>`)
@@ -2700,6 +2722,7 @@ export function layout({ title, description, canonicalPath, bodyHtml, jsonLd, re
   <link rel="stylesheet" href="/style.css">
   <link rel="stylesheet" href="/nav-unify.css">
   <link rel="stylesheet" href="${DIRECTORY_CSS_HREF}">
+  ${extraCss ? `<style>${extraCss}</style>` : ''}
   <link rel="icon" href="/favicon.ico" sizes="any">
   <link rel="icon" type="image/png" sizes="32x32" href="/brand/favicon-32.png">
   <link rel="icon" type="image/png" sizes="16x16" href="/brand/favicon-16.png">
@@ -2713,7 +2736,7 @@ export function layout({ title, description, canonicalPath, bodyHtml, jsonLd, re
   <meta name="twitter:image" content="${SITE}/brand/og-image-1200x630.png">
   ${ld}
 </head>
-<body>
+<body${bodyClass ? ` class="${esc(bodyClass)}"` : ''}>
   <header class="site-header">
     <div class="site-header-inner">
       <a href="/" class="site-brand" aria-label="QuoteFleet home"><span class="site-logo" aria-hidden="true"><img class="qf-brand-mark" src="/brand/mark-keys-ondark.png" alt="QuoteFleet" width="28" height="30" decoding="async"></span>QuoteFleet</a>
@@ -5954,6 +5977,56 @@ const COMPLIANCE_SOURCES: Array<{ name: string; href: string; desc: string }> = 
   },
 ];
 
+/**
+ * Self-declared credentials FMCSA does not publish, so we cannot verify them
+ * and do not pretend to. Named once: the chip row renders it and the "why this
+ * one" figure counts it, and a fifth credential must not need two edits.
+ */
+const COMING_SOON_CREDENTIALS = ['UIIA member', 'TWIC-ready', 'Hazmat', 'Reefer'] as const;
+
+/**
+ * The tool template, adapted to THIS shell.
+ *
+ * Everything structural comes from `TOOL_TEMPLATE_CSS`; these rules only do the
+ * two things that template cannot know about the directory shell:
+ *
+ *   1. The template sizes its band column to the OS/OW shell (1180px). The
+ *      directory body is `.dir-shell` at 1100px with 28px padding, so the band
+ *      and the breadcrumb are re-sized to match — hero column and body column
+ *      share one width and one centre, which is the invariant that stops a
+ *      heading overhanging the floating header card above it.
+ *   2. The template's focus ring is scoped to `.qtt .qh-shell`, which does not
+ *      exist here. The same 2px/2px accent ring is restated for `.dir-shell`.
+ *      Without this the page would fall back to the browser's own ring.
+ */
+const COMPLIANCE_TOOL_CSS = `
+  .qtt-band-in { max-width: 1100px; padding: 48px 28px; }
+  .qtt-crumbs { max-width: 1100px; padding: 12px 28px 0; }
+  .qtt .dir-shell { padding-top: 48px; }
+  .qtt .dir-shell .qtt-sec:last-child { margin-bottom: 0; }
+  /* The lookup card is the template's tool card; the widget keeps its own
+     styling from the directory stylesheet, which is why only the wrapper is
+     described here. */
+  .qtt .qtt-tool > .lookup-box { margin: 0; }
+
+  .qtt .dir-shell a:focus-visible,
+  .qtt .dir-shell button:focus-visible,
+  .qtt .dir-shell summary:focus-visible,
+  .qtt .dir-shell input:focus-visible,
+  .qtt .dir-shell select:focus-visible,
+  .qtt .dir-shell [tabindex]:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+    border-radius: var(--qtt-r-xs);
+  }
+
+  @media (max-width: 760px) {
+    .qtt-band-in { padding: 32px 18px; }
+    .qtt-crumbs { padding: 12px 18px 0; }
+    .qtt .dir-shell { padding-top: 32px; }
+  }
+`;
+
 export function renderCompliancePage(summary: DirectorySummary): string {
   const sourceCards = COMPLIANCE_SOURCES.map(
     (s) => `<a class="src-card" href="${s.href}" target="_blank" rel="noopener nofollow">
@@ -5971,40 +6044,176 @@ export function renderCompliancePage(summary: DirectorySummary): string {
   // "· soon" already says these are not live, so the state does NOT need an
   // opacity wash on top of it — style="opacity: 0.55" put this label at 3.0:1,
   // under AA. The class below carries the recessed-but-readable treatment.
-  const comingSoon = ['UIIA member', 'TWIC-ready', 'Hazmat', 'Reefer']
+  const comingSoon = COMING_SOON_CREDENTIALS
     .map((n) => `<span class="dir-chip dir-chip--soon">${esc(n)} · soon</span>`)
     .join('\n');
 
-  const body = `
-  <section class="hero dir-hero">
-    <div class="container-narrow">
-      <div class="eyebrow" style="color: var(--accent); font-family: var(--font-mono); font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 10px;">Compliance tools</div>
-      <h1>Verify a carrier before you book</h1>
-      <p class="lead">Check any US carrier's operating authority, insurance and safety status straight from FMCSA — and jump to the official government sources for a deeper look.</p>
-    </div>
-  </section>
-  <main class="dir-shell">
-    <div class="lookup-box">
-      <h2 style="font-size: 18px; margin: 0 0 4px;">Live USDOT / MC lookup</h2>
-      <p class="muted-small" style="margin: 0 0 16px;">Pulls a live snapshot from FMCSA's QCMobile system. Data is FMCSA's, updated on their schedule.</p>
-      <div class="lookup-row">
-        <div class="lookup-toggle" id="lk-toggle">
-          <button type="button" class="on" data-kind="dot">USDOT</button>
-          <button type="button" data-kind="mc">MC</button>
+  // ── The eight blocks ────────────────────────────────────────────────────
+  //
+  // Same order, same primitives and same section-header stack as every other
+  // tool page. The LOOKUP WIDGET ITSELF IS UNCHANGED, markup and script alike:
+  // it is the money path on this page, it talks to a government API, and the
+  // migration is presentation only.
+
+  const crumbs = `<nav class="qtt-crumbs" aria-label="Breadcrumb">`
+    + `<a href="/">Home</a><span class="qtt-sep" aria-hidden="true">›</span>`
+    + `<a href="/tools">Free tools</a><span class="qtt-sep" aria-hidden="true">›</span>`
+    + `<span aria-current="page">Compliance lookup</span></nav>`;
+
+  const band = `${crumbs}
+  <section class="qtt-band">
+    <div class="qtt-band-in">
+      <div class="qtt-band-row">
+        <div class="qtt-band-copy">
+          <span class="qtt-eyebrow">Free tool &middot; no account needed</span>
+          <h1>Verify a carrier before you book</h1>
+          <p class="qtt-lead">Check any US carrier's operating authority, insurance and safety status straight from FMCSA — and jump to the official government sources for a deeper look.</p>
         </div>
-        <input class="input" id="lk-input" inputmode="numeric" placeholder="e.g. 3733285" autocomplete="off">
-        <button class="btn btn-primary" id="lk-go">Verify <span class="arr">→</span></button>
+        <a class="qtt-embed" href="/pricing"><svg class="qtt-embed-ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 6l-6 6 6 6M16 6l6 6-6 6"/></svg><span>Embed this tool</span></a>
       </div>
-      <div id="lk-result" class="lookup-result"></div>
+    </div>
+  </section>`;
+
+  const FIELD_COUNT = 13; // the rows[] the client renders, counted below
+
+  const limits = `<section class="qtt-sec" id="limits">${sectionHeader({
+    eyebrow: 'Scope',
+    heading: 'What this answers, and where the answer stops',
+    sub: 'A lookup is a record check, not a recommendation. The three facts below are the whole boundary.',
+  })}<div class="qtt-strip" style="--qtt-strip-cols:3">
+      <div><span class="qtt-strip-k">What it covers</span><p class="qtt-strip-v">A live query to <strong>FMCSA's QCMobile</strong> by USDOT or MC number, returning ${FIELD_COUNT} fields: legal and DBA name, location, authority to operate, common and contract authority, BIPD insurance on file, safety rating, out-of-service status, and fleet size.</p></div>
+      <div><span class="qtt-strip-k">What it does not cover</span><p class="qtt-strip-v">It is <strong>FMCSA's data on FMCSA's schedule</strong>, reproduced as returned — not a credit check, not an insurance certificate, and not a judgement about whether a carrier suits your load. UIIA, TWIC, hazmat and reefer are self-declared credentials that are not in FMCSA public data, so they are marked "soon" rather than guessed at.</p></div>
+      <div><span class="qtt-strip-k">What it costs</span><p class="qtt-strip-v">Nothing, and no account. QCMobile is FMCSA's free public API; every field shown links back to a government source you can check us against.</p></div>
+    </div></section>`;
+
+  const steps = `<section class="qtt-sec" id="how">${sectionHeader({
+    eyebrow: 'How it works',
+    heading: 'Three steps, no account',
+  })}<div class="qtt-steps">
+      <div class="qtt-step"><span class="qtt-step-n" aria-hidden="true">1</span><h3>Enter a USDOT or MC number</h3><p>Either registry works — switch with the toggle. A docket number is printed back with the registry prefix it actually belongs to, so an FF or MX docket is never relabelled as MC.</p></div>
+      <div class="qtt-step"><span class="qtt-step-n" aria-hidden="true">2</span><h3>We ask FMCSA, live</h3><p>The request goes to QCMobile at the moment you press Verify. Nothing is served from a stale copy, and a number with no FMCSA record comes back saying exactly that rather than guessing.</p></div>
+      <div class="qtt-step"><span class="qtt-step-n" aria-hidden="true">3</span><h3>Open the official source</h3><p>The ${COMPLIANCE_SOURCES.length} government systems below are linked directly. For authority history, insurance forms or BASIC percentile scores, go to the system that owns them.</p></div>
+    </div></section>`;
+
+  const rows = `<section class="qtt-sec" id="detail">${sectionHeader({
+    eyebrow: 'Why this one',
+    heading: 'Two things a free carrier-check usually gets wrong',
+  })}<div class="qtt-rows">
+      <div class="qtt-row">
+        <div class="qtt-row-copy">
+          <h3>It links the source instead of summarising it</h3>
+          <p>Every field here is FMCSA's, and the ${COMPLIANCE_SOURCES.length} systems that own the detail are one click away. A commercial summary of a government record is somebody else's reading of it; the record is the thing that binds you.</p>
+          <p>Authority history, the BMC-91 and BOC-3 forms on file, and BASIC percentile scores are deliberately NOT reproduced here — they live in systems that show them properly.</p>
+        </div>
+        <div class="qtt-row-fig">${factList([
+          { label: 'Official systems linked', value: String(COMPLIANCE_SOURCES.length) },
+          { label: 'Fields returned per lookup', value: String(FIELD_COUNT) },
+          { label: 'Account required', value: 'None' },
+        ])}</div>
+      </div>
+      <div class="qtt-row">
+        <div class="qtt-row-copy">
+          <h3>It says which filters are real</h3>
+          <p>FMCSA public data reliably gives us drayage and intermodal today, so that filter is live and carries a count. UIIA membership, TWIC, hazmat and reefer are self-declared credentials that FMCSA does not publish — they are marked "soon", not shown as empty results.</p>
+          <p>A filter that silently returns nothing is worse than a filter that says it is not built yet.</p>
+        </div>
+        <div class="qtt-row-fig">${factList([
+          { label: 'Drayage / intermodal carriers', value: fmtNum(summary.intermodalTotal) },
+          { label: 'Carriers in the directory', value: fmtNum(summary.total) },
+          { label: 'Credentials not yet live', value: String(COMING_SOON_CREDENTIALS.length) },
+        ])}</div>
+      </div>
+    </div></section>`;
+
+  const related = `<section class="qtt-sec" id="related">${sectionHeader({
+    eyebrow: 'Next',
+    heading: 'Once the carrier checks out',
+    sub: 'Verification is the first of several questions on a booking.',
+  })}<div class="qtt-related">
+      <a class="qtt-rel" href="/directory"><span class="qtt-rel-t">Carrier directory</span><span class="qtt-rel-d">Browse FMCSA-registered carriers by state, city, fleet size and capability.</span></a>
+      <a class="qtt-rel" href="/directory/rfq?sort=featured"><span class="qtt-rel-t">Request freight quotes</span><span class="qtt-rel-d">Send one RFQ to several verified carriers at once.</span></a>
+      <a class="qtt-rel" href="/glossary"><span class="qtt-rel-t">Freight glossary</span><span class="qtt-rel-d">Plain-English definitions for the terms on this page and on a rate con.</span></a>
+      <a class="qtt-rel" href="/tools"><span class="qtt-rel-t">Free tools</span><span class="qtt-rel-d">Bridge formula, axle weights, permits and frost-law restrictions.</span></a>
+    </div></section>`;
+
+  /**
+   * FOUR QUESTIONS, AND NOT ONE OF THEM STATES A REGULATION.
+   *
+   * This is a compliance-adjacent surface, so every answer below describes
+   * either what OUR tool does or what a FIELD FMCSA returns means — and points
+   * at the government system that owns the rule. None asserts what the law
+   * requires of a carrier or of a shipper, because we cannot source that from
+   * our own data. The last one is the trap: "allowed to operate" invites a
+   * fitness judgement, and the honest answer is what the flag is plus where to
+   * look, not whether the carrier is safe to hire.
+   */
+  const faqs = [
+    {
+      q: 'Where does this data come from?',
+      a: "FMCSA's QCMobile system — the agency's own free public API — queried live when you press Verify. The fields are reproduced as returned, not re-derived, re-scored or re-worded.",
+    },
+    {
+      q: 'How current is it?',
+      a: 'It is as current as FMCSA is. Nothing is served from a cached copy on this page: each lookup is a fresh request, so what you see is what the agency was publishing at that moment. How often FMCSA itself refreshes a given field is theirs to decide, which is why every official system is linked below.',
+    },
+    {
+      q: 'Why does the MC / Docket line sometimes show a dash?',
+      a: "Because FMCSA returned no docket number for that carrier. Where one is returned it is printed with the registry prefix it actually belongs to — MC, FF or MX — rather than being relabelled as MC, so a freight-forwarder docket is never shown as motor-carrier authority.",
+    },
+    {
+      q: 'Does "allowed to operate: Yes" mean the carrier is safe to book?',
+      a: "No — it is one FMCSA field about operating authority, shown exactly as the agency returns it. It is not a view on insurance adequacy, crash history, or whether a carrier suits your freight. For the detail behind it, open SAFER for the company snapshot, SMS for BASIC percentile scores, and Licensing & Insurance for authority history and the forms on file.",
+    },
+  ];
+
+  const faq = `<section class="qtt-sec" id="faq"><div class="qtt-faq">${sectionHeader({
+    eyebrow: 'FAQ',
+    heading: 'Questions',
+  })}<div class="qh-faq">${faqs
+    .map(
+      (f) =>
+        `<details class="qh-fold"><summary><span>${esc(f.q)}</span><span></span></summary>`
+        + `<div class="qh-fold-b"><p>${esc(f.a)}</p></div></details>`,
+    )
+    .join('')}</div></div></section>`;
+
+  const body = `${band}
+  <main class="dir-shell">
+    <div class="qtt-tool">
+      <div class="lookup-box">
+        <h2 style="font-size: 18px; margin: 0 0 4px;">Live USDOT / MC lookup</h2>
+        <p class="muted-small" style="margin: 0 0 16px;">Pulls a live snapshot from FMCSA's QCMobile system. Data is FMCSA's, updated on their schedule.</p>
+        <div class="lookup-row">
+          <div class="lookup-toggle" id="lk-toggle">
+            <button type="button" class="on" data-kind="dot">USDOT</button>
+            <button type="button" data-kind="mc">MC</button>
+          </div>
+          <input class="input" id="lk-input" inputmode="numeric" placeholder="e.g. 3733285" autocomplete="off">
+          <button class="btn btn-primary" id="lk-go">Verify <span class="arr">→</span></button>
+        </div>
+        <div id="lk-result" class="lookup-result"></div>
+      </div>
     </div>
 
-    <div class="dir-section-h"><h2>Official verification sources</h2></div>
-    <div class="src-grid">${sourceCards}</div>
+    ${limits}
+    ${steps}
 
-    <div class="dir-section-h"><h2>Filter carriers by compliance</h2></div>
-    <p class="muted-small" style="margin: -6px 0 12px;">FMCSA public data reliably gives us drayage/intermodal today. UIIA, TWIC, Hazmat and Reefer are self-declared credentials we're adding next — we won't fake them.</p>
-    <div class="dir-chips">${availableChips}</div>
-    <div class="dir-chips" style="margin-top: 8px;">${comingSoon}</div>
+    <section class="qtt-sec" id="sources">${sectionHeader({
+      eyebrow: 'Go deeper',
+      heading: 'Official verification sources',
+      sub: 'The government systems that own the detail. Each opens in a new tab.',
+    })}<div class="src-grid">${sourceCards}</div></section>
+
+    <section class="qtt-sec" id="filters">${sectionHeader({
+      eyebrow: 'Filters',
+      heading: 'Filter carriers by compliance',
+      sub: "FMCSA public data reliably gives us drayage/intermodal today. UIIA, TWIC, Hazmat and Reefer are self-declared credentials we're adding next — we won't fake them.",
+    })}<div class="dir-chips">${availableChips}</div>
+    <div class="dir-chips" style="margin-top: 8px;">${comingSoon}</div></section>
+
+    ${rows}
+    ${related}
+    ${faq}
   </main>
   <script>
     (function () {
@@ -6067,5 +6276,29 @@ export function renderCompliancePage(summary: DirectorySummary): string {
     description: 'Free tools to verify a US freight carrier: live USDOT/MC lookup of authority, insurance and safety status from FMCSA, plus links to SAFER, SMS BASIC scores, L&I, UIIA and TWIC.',
     canonicalPath: '/compliance',
     bodyHtml: body,
+    // The template's CSS, then the two adaptations this shell needs. `body.qtt`
+    // is what the template's focus and reduced-motion rules are scoped to.
+    extraCss: `${TOOL_TEMPLATE_CSS}${BAND_TOKENS}${COMPLIANCE_TOOL_CSS}`,
+    bodyClass: 'qtt',
+    jsonLd: [
+      JSON.stringify({
+        '@context': 'https://schema.org',
+        '@type': 'BreadcrumbList',
+        itemListElement: [
+          { '@type': 'ListItem', position: 1, name: 'Home', item: `${SITE}/` },
+          { '@type': 'ListItem', position: 2, name: 'Free tools', item: `${SITE}/tools` },
+          { '@type': 'ListItem', position: 3, name: 'Compliance lookup', item: `${SITE}/compliance` },
+        ],
+      }),
+      JSON.stringify({
+        '@context': 'https://schema.org',
+        '@type': 'FAQPage',
+        mainEntity: faqs.map((f) => ({
+          '@type': 'Question',
+          name: f.q,
+          acceptedAnswer: { '@type': 'Answer', text: f.a },
+        })),
+      }),
+    ],
   });
 }

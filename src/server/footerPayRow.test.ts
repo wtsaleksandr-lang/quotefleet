@@ -207,3 +207,71 @@ describe('directory data-source attribution strip', () => {
     }
   });
 });
+
+describe('/compliance keeps the chrome its content depends on', () => {
+  /**
+   * /compliance moved onto the shared tool-page template. It did NOT move off
+   * the directory shell, and this is what pins that: the template's document
+   * has no FMCSA data-source strip, no directory site map and no shipper
+   * hydration, so rendering the page through it would have silently dropped an
+   * attribution that is TRUE and load-bearing on a page whose every field is
+   * FMCSA's. `rendersCarrierData` gates the strip on the path — but the gate
+   * only fires if the page still goes through `layout()`, which is precisely
+   * the thing a future refactor could change without noticing.
+   */
+  const summary = {
+    total: 330452,
+    intermodalTotal: 4211,
+    states: 51,
+    byState: [{ state: 'CA', count: 42000 }],
+  };
+
+  it('renders the FMCSA attribution strip, the directory footer and the shipper slot', async () => {
+    const { renderCompliancePage } = await import('./directory/pages.js');
+    const html = renderCompliancePage(summary as never);
+    expect(html).toContain(DIRECTORY_DATA_SOURCES);
+    expect((html.match(/dirfoot-col/g) ?? []).length).toBe(4);
+    expect(html).toContain('id="nav-shipper"');
+    expect(html).toContain(FOOTER_PAY_ROW);
+  });
+
+  it('renders the tool template around the UNCHANGED lookup widget', async () => {
+    const { renderCompliancePage } = await import('./directory/pages.js');
+    const html = renderCompliancePage(summary as never);
+    // The template: band, breadcrumb above it, body scope, fixed block order.
+    expect(html).toContain('<body class="qtt">');
+    expect(html.indexOf('qtt-crumbs')).toBeLessThan(html.indexOf('class="qtt-band"'));
+    let cursor = -1;
+    for (const marker of ['class="qtt-band"', 'id="lk-go"', 'id="limits"', 'id="how"', 'id="detail"', 'id="related"', 'id="faq"']) {
+      const at = html.indexOf(marker);
+      expect(at, `${marker} is missing`).toBeGreaterThan(-1);
+      expect(at, `${marker} is out of order`).toBeGreaterThan(cursor);
+      cursor = at;
+    }
+    // The money path is untouched: same endpoint, same toggle, same fields.
+    expect(html).toContain("fetch('/api/public/directory/lookup?'");
+    expect(html).toContain('data-kind="dot"');
+    expect(html).toContain('data-kind="mc"');
+    expect(html).toContain('Allowed to operate');
+    expect(html).toContain('BIPD insurance on file');
+  });
+
+  it('only claims FAQ schema for questions that are actually on the page', async () => {
+    const { renderCompliancePage } = await import('./directory/pages.js');
+    const html = renderCompliancePage(summary as never);
+    const ld = [...html.matchAll(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/g)]
+      .map((m) => JSON.parse(m[1]!))
+      .find((o) => o['@type'] === 'FAQPage');
+    expect(ld).toBeDefined();
+    // The rendered question is HTML-escaped; the schema's is not. Compare the
+    // escaped form, or a question quoting a field value ("allowed to operate")
+    // looks absent purely because its quotes became &quot;.
+    const escHtml = (s: string) =>
+      s.replace(/[&<>"']/g, (m) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[m] as string);
+    for (const q of ld.mainEntity) {
+      expect(html, `${q.name} is in schema but not rendered`).toContain(escHtml(q.name));
+      expect(html, `answer for "${q.name}" is not rendered`).toContain(escHtml(q.acceptedAnswer.text));
+      expect(q.acceptedAnswer.text.length).toBeGreaterThan(40);
+    }
+  });
+});
