@@ -1425,19 +1425,43 @@ body:has(#site-burger[aria-expanded="true"]) .qf-mc-fab { display: none; }
      on /, /directory and a tool page, in all three theme states:
 
        0.86  worst row 5.77:1   (the frost barely reads)
-       0.80  worst row 5.05:1   ← shipped: 12% of headroom over the 4.5 floor
-                                  and the azure is genuinely visible through it
+       0.80  worst row 5.05:1   ← WAVE 6 shipped this
 
-     The worst row is always a 10px `--muted` sub-heading, never a link. Going
-     further was not attempted: the hero raster is generated (scripts/make-hero
-     -wash.mjs) and can be re-cut, so the tint keeps margin for a darker wash
-     rather than sitting on the limit. Legibility beats the effect, and when
-     the two disagreed the numbers above decided it. */
-  --qf-menu-tint: rgba(255, 255, 255, 0.80);
+     RAISED TO 0.92 IN WAVE 7, AND THE REASON IS GEOMETRY RATHER THAN TASTE.
+     At WAVE 6 the panel was a card under the bar, so what showed through it
+     was a card's worth of page. Full-bleed, the SAME alpha is now frosting
+     the entire viewport — and the report that opened WAVE 6 was "when I
+     scroll down I can actually see the hero section of the website under the
+     menu". At 0.80 across 100dvh the hero's own headline is still legible
+     through the blur in the empty space below a collapsed menu, which is that
+     complaint again with more surface. 0.92 keeps the tint and the saturate —
+     you can still see there IS a page behind it, and the blur still bends the
+     colour of whatever is under each row — without any of it being readable.
+     It also moves every contrast number the right way. Re-measured the same
+     way — panel photographed with the ink made transparent, worst background
+     pixel per element, 1,152 samples over /, /directory and a tool page at
+     four scroll offsets in all three theme states — the worst role is the
+     12px subtitle at 6.39:1 dark and 6.64:1 light, against a 4.5 floor; the
+     glyph's worst is 13.05:1 against a 3.0 floor. Nothing fails. */
+  --qf-menu-tint: rgba(255, 255, 255, 0.92);
   --qf-menu-hair: rgba(255, 255, 255, 0.62);
   --qf-menu-hover: rgba(2, 6, 24, 0.06);
-  --qf-menu-blur: 24px;
+  /* 24px in WAVE 6, 40px in WAVE 7 — for the same reason the tint went up.
+     Blur radius is what decides whether a SHAPE survives, and a 48px hero
+     headline blurred at 24px is still a readable silhouette once the panel is
+     covering the whole viewport rather than a card's worth of it. At 40px the
+     large forms dissolve into colour, which is what frost is supposed to do.
+     It costs one composite, not one per frame: the page behind is scroll-
+     locked for as long as the panel is open, so the backdrop never changes. */
+  --qf-menu-blur: 40px;
   --qf-menu-sat: 180%;
+  /* WAVE 7 — the icon tile. A tint OF the ink rather than a surface token,
+     because both --surface-2 (the tile's natural candidate) and
+     --chrome-panel-bg resolve to the same value: a tile painted in either is
+     invisible on the panel it sits on. Alpha over the frost instead, so the
+     tile tracks whatever the panel resolves to in all three theme states. */
+  --qf-menu-tile: rgba(2, 6, 24, 0.05);
+  --qf-menu-tile-edge: rgba(2, 6, 24, 0.10);
   /* The two durations the design law allows, used the conventional way round:
      the longer one enters, the shorter one exits. */
   --qf-menu-dur-in: .3s;
@@ -1454,16 +1478,20 @@ body:has(#site-burger[aria-expanded="true"]) .qf-mc-fab { display: none; }
 }
 html[data-theme="dark"] {
   --qf-menu-scrim: rgba(2, 6, 24, 0.58);
-  --qf-menu-tint: rgba(19, 26, 40, 0.78);
+  --qf-menu-tint: rgba(19, 26, 40, 0.92);
   --qf-menu-hair: rgba(226, 232, 240, 0.16);
   --qf-menu-hover: rgba(226, 232, 240, 0.10);
+  --qf-menu-tile: rgba(226, 232, 240, 0.09);
+  --qf-menu-tile-edge: rgba(226, 232, 240, 0.16);
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
     --qf-menu-scrim: rgba(2, 6, 24, 0.58);
-    --qf-menu-tint: rgba(19, 26, 40, 0.78);
+    --qf-menu-tint: rgba(19, 26, 40, 0.92);
     --qf-menu-hair: rgba(226, 232, 240, 0.16);
     --qf-menu-hover: rgba(226, 232, 240, 0.10);
+    --qf-menu-tile: rgba(226, 232, 240, 0.09);
+    --qf-menu-tile-edge: rgba(226, 232, 240, 0.16);
   }
 }
 
@@ -1538,12 +1566,15 @@ html[data-qf-menu="open"] body {
    its specificity or load order. See HEADER_SCRIPTS in siteChrome.ts. */
 
 /* ── The scrim ────────────────────────────────────────────────────────────
-   Starts at the header's bottom edge, so the bar stays crisp and its burger
-   stays the close control. Fades on the SAME durations as the panel: one
-   gesture, not two. */
+   Full-viewport from y=0 since WAVE 7, because the panel is: the panel's
+   backdrop-filter blurs whatever is painted behind it in this stacking
+   context, and a scrim that stopped at the bar's bottom edge would have put a
+   seam across the frost 69px down. The bar's own contents are lifted ABOVE
+   both (see THE BAR FLOATS below), so nothing it carries is dimmed. Fades on
+   the SAME durations as the panel: one gesture, not two. */
 #site-menu-scrim {
   position: fixed;
-  top: var(--qf-menu-top, var(--chrome-h-compact));
+  top: 0;
   left: 0;
   right: 0;
   bottom: 0;
@@ -1561,29 +1592,84 @@ html[data-qf-menu="open"] body {
   transition: opacity var(--qf-menu-dur-in) var(--qf-menu-ease-emphasized);
 }
 
+/* ═══════════════════════════════════════════════════════════════════════════
+   WAVE 7 — THE PANEL GOES FULL-BLEED AND THE INTERIOR BECOMES A ROW.
+
+   Reported as: "it's very basic, you didn't add any premium folding/unfolding
+   effect. I don't see any clear separation between categories, I don't like
+   the large gaps on the left and right sides and between menu container and
+   the top bar."
+
+   THE GAPS WERE GEOMETRY, AND THEY ARE THE CHEAPEST THING HERE TO FIX. WAVE 6
+   left the panel inset `var(--space-2)` (16px) left and right and dropped it
+   `var(--space-1)` (8px) below the bar, with a 12px radius and a hairline —
+   i.e. a card that landed ON the page. Measured at 375px: 16 / 16 / 16 left,
+   right and top-gap. A menu that reads as "the app changed mode" instead is
+   `inset: 0` with the BAR'S CONTROLS LIFTED OVER IT, which costs nothing and
+   deviates from nothing:
+
+     • The panel is `inset: 0`, `100dvh`, radius 0, no border, no shadow —
+       there is no edge left to inset. Measured after: 0 / 0 / 0 / 0 and 0px
+       to the bar at 320, 375, 390.
+     • `.mm-barpad` is an opaque `aria-hidden` spacer INSIDE the panel, the
+       height of the bar the script already measures into --qf-menu-top. The
+       content clears the bar without the panel ever starting lower.
+     • THE BAR FLOATS: `.site-header-inner` takes z-index 3 over the panel's 2
+       while the drawer is open, so the logo, the theme toggle and the burger
+       stay hit-testable on top of a full-screen sheet. The burger is the
+       close control — it has to be reachable, which is precisely why the
+       panel cannot simply be raised above the whole header.
+     • The 16px gutter moves to the SCROLL AREA's padding, so the surface runs
+       edge to edge while the rows and the category rules sit 16px in.
+
+   THE SHADOW IS DROPPED at phone width rather than restated: nothing is
+   visible outside a full-bleed panel, so it would spend one of the system's
+   three shadow tokens on pixels no one sees. It is restored for the 600-1023
+   band, where the drawer really is a floating 360px sheet.
+
+   CATEGORY SEPARATION IS A 1px HAIRLINE, WHICH IS A DECLARED DEVIATION. The
+   house rule is that dividers are GAPS over the canvas (see the mega-panel
+   contract in siteChromeSingleSource.test.ts, which is unchanged and still
+   governs the desktop flyout). WAVE 6 applied that rule here — an 8px gap
+   between transparent groups — and the report is the evidence that it does
+   not read on a frosted surface where every group shares one fill. So the
+   drawer, and only the drawer, delimits its top-level rows with a
+   --border-strong hairline across the full 343px track. --border-strong
+   rather than --border for the same reason the panel's own edge uses it: on
+   the dark theme --border is rgba(202,213,226,0.14), which over the frost is
+   the invisible boundary this change exists to remove.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
 @media (max-width: 1023px) {
   /* ── The panel ─────────────────────────────────────────────────────────
-     `position: fixed` is what fixes the reported bug. Everything else here is
-     the surface. The panel is NOT full-bleed to the bottom: it is as tall as
-     its content up to the viewport, so a short menu does not paint an empty
-     glass slab over two thirds of the hero. */
+     `position: fixed` is what fixed the WAVE 6 bug; `inset: 0` is what fixes
+     the WAVE 7 one. The panel itself no longer scrolls — `.mm-scroll` does,
+     so the bar spacer stays pinned at the top of the sheet. */
   #site-mobile-menu:not([hidden]) {
     position: fixed !important;
-    top: calc(var(--qf-menu-top, var(--chrome-h-compact)) + var(--space-1)) !important;
-    left: var(--space-2) !important;
-    right: var(--space-2) !important;
-    bottom: auto !important;
+    top: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    height: 100vh;
+    height: 100dvh;
     z-index: 2 !important;
     margin: 0 !important;
-    padding: var(--space-1) !important;
-    max-height: calc(100vh - var(--qf-menu-top, var(--chrome-h-compact)) - var(--space-3));
-    max-height: calc(100dvh - var(--qf-menu-top, var(--chrome-h-compact)) - var(--space-3));
-    overflow-y: auto;
+    padding: 0 !important;
+    max-height: none !important;
+    display: flex !important;
+    flex-direction: column;
+    gap: 0 !important;
+    overflow: hidden;
     overscroll-behavior: contain;
-    -webkit-overflow-scrolling: touch;
-    border-radius: var(--radius) !important;
-    border: 1px solid var(--qf-menu-hair) !important;
-    box-shadow: var(--qf-shadow-lift) !important;
+    border-radius: 0 !important;
+    border: 0 !important;
+    box-shadow: none !important;
+    /* nav-ia.css runs `animation: qf-flyout-in .2s ease !important` on this
+       element at (0,4,2). It is a THIRD motion on top of the two below, and
+       at full bleed its `translateY(-4px)` opens a 4px seam along the bottom
+       edge for the length of the keyframe. The id out-specifies it. */
+    animation: none !important;
     /* THE FALLBACK IS THE BASE DECLARATION. A browser with backdrop-filter
        disabled or unimplemented never enters the @supports block below and
        gets a fully opaque --chrome-panel-bg sheet — never body text floating
@@ -1616,64 +1702,285 @@ html[data-qf-menu="open"] body {
     }
   }
 
-  /* ── Inside the sheet: one surface, gaps for dividers ──────────────────
-     nav-ia.css paints every `.mm-group` with an OPAQUE --chrome-card-bg card,
-     which on glass is a solid rectangle covering the frost it sits on. The
-     groups go transparent; the 8px gap between them is the divider, which is
-     the house rule anyway. */
+  /* ── THE BAR FLOATS OVER THE PANEL ─────────────────────────────────────
+     Only while the drawer is open. `.site-header` is the stacking context
+     (z-index 70); inside it the scrim is 1, the panel 2 and the bar 3, so the
+     logo / theme toggle / burger are painted on top of a full-screen sheet
+     and stay hit-testable. `.site-header-inner` already carries
+     `position: relative` (see the Header shell block), so this is the z-index
+     and nothing else. */
+  html[data-qf-menu="open"] .site-header-inner {
+    z-index: 3;
+  }
+
+  /* ── The shell: a fixed bar spacer over a scrolling track ──────────────
+     The spacer is the reference's trick and the reason the panel can start at
+     y=0: the surface is full-bleed, the CONTENT starts below the bar. Its
+     height is --qf-menu-top, which the script measures from the real bar on
+     every open and every resize, so it cannot drift from the header it is
+     reserving space for. */
+  #site-mobile-menu .mm-barpad {
+    flex: 0 0 auto;
+    height: var(--qf-menu-top, var(--chrome-h-compact));
+  }
+  #site-mobile-menu .mm-scroll {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+    /* The gutter lives HERE, not on the panel — that is what lets the surface
+       run to the screen edge while the rows sit 16px in. */
+    padding: 0 var(--space-2) var(--space-4);
+  }
+
+  /* ── Category separation: one hairline, full track, no inset ───────────
+     On every TOP-LEVEL row — the three collapsible groups and the two plain
+     links — so the rule delimits the GROUP, not the heading: expanded, it
+     falls below the last tool row and binds the heading and its children into
+     one block; collapsed, it sits directly under the heading. The last row in
+     the track has nothing below it to separate from. */
   #site-mobile-menu .mm-group {
     background: transparent !important;
     border: 0 !important;
     border-top: 0 !important;
+    border-bottom: 1px solid var(--border-strong) !important;
+    border-radius: 0 !important;
     margin: 0 !important;
     padding: 0 !important;
   }
   /* .mm-flat (Pricing) and .mm-account (Sign in) are the <a> elements
-     THEMSELVES, not wrappers. Folding them into the rule above zeroed their
-     padding — `#site-mobile-menu .mm-flat` (1,1,0) outranks the link rule's
-     (1,0,1) — and both rows rendered flush against the panel's inner edge,
-     12px to the left of every heading. They keep the row padding and lose only
-     the card fill and the divider rule. */
+     THEMSELVES, not wrappers — which is why THEIR hairline is a pseudo-element
+     and the groups' is a border. A border on a row participates in layout: it
+     put Pricing at 61px against every other row's 60px, because the 36px tile
+     plus 12px of padding each side already fills the box and the extra pixel
+     has nowhere to go. Measured before and after; every row is now 60.00. */
   #site-mobile-menu .mm-flat,
   #site-mobile-menu .mm-account {
+    position: relative;
     background: transparent !important;
     border: 0 !important;
     border-top: 0 !important;
+    border-bottom: 0 !important;
+    border-radius: 0 !important;
     margin: 0 !important;
-    padding: var(--space-1) var(--space-1-5) !important;
   }
-  #site-mobile-menu {
-    gap: var(--space-1) !important;
+  #site-mobile-menu .mm-flat::after,
+  #site-mobile-menu .mm-account::after {
+    content: '';
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: 1px;
+    background: var(--border-strong);
   }
+  #site-mobile-menu .mm-scroll > :last-child { border-bottom: 0 !important; }
+  #site-mobile-menu .mm-scroll > :last-child::after { content: none; }
+
+  /* ── The group heading ─────────────────────────────────────────────────
+     16px / 500 / sentence case, the same size and weight as a plain link:
+     this is a navigation row that happens to open, not a section label. It
+     replaces an 11px mono uppercase eyebrow in --muted, which was a second
+     type system inside a menu that now has three text roles already.
+
+     RAMP SNAP: the reference pads 14px top and bottom. 14 is off our 8px
+     ramp, so it is 16 (--space-2). Reviewed on screen at 320/375/390: the
+     extra 2px per side is an improvement, not a cost — it puts the 52px
+     heading at 56px, comfortably over the 44px tap floor, and gives the
+     collapsed state a rhythm that reads as rows rather than as a dense list. */
   #site-mobile-menu .mm-head {
-    color: var(--muted) !important;
-    min-height: var(--tap-target);
-    padding: var(--space-1) var(--space-1-5) !important;
-    border-radius: var(--radius-md);
-  }
-  #site-mobile-menu .mm-sub {
-    color: var(--muted) !important;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-1);
     margin: 0 !important;
-    padding: var(--space-1) var(--space-1-5) var(--space-0-5) !important;
+    padding: var(--space-2) 0 !important;
+    min-height: var(--tap-target);
+    list-style: none;
+    cursor: pointer;
+    font-family: var(--font-sans);
+    font-size: 16px;
+    font-weight: 500;
+    line-height: 24px;
+    letter-spacing: -0.02em;
+    text-transform: none;
+    color: var(--ink) !important;
+    border-radius: 0;
   }
-  #site-mobile-menu a {
+  #site-mobile-menu .mm-head::-webkit-details-marker { display: none; }
+  #site-mobile-menu .mm-head::marker { content: ''; }
+  /* The old '▾' text caret. Replaced by a real 16px chevron in the markup so
+     it can rotate on a transform rather than restyle a glyph. */
+  #site-mobile-menu summary.mm-head::after { content: none !important; }
+  #site-mobile-menu .mm-chev {
+    width: 16px;
+    height: 16px;
+    flex: 0 0 auto;
+    opacity: .7;
+    color: var(--ink);
+    transition: transform var(--qf-menu-dur-out) ease;
+  }
+  /* `[open]` is on for the whole exit (the script holds it so the collapse can
+     be seen), so it leads the fold by a frame and trails it by 200ms. Where
+     `:has()` exists the chevron is keyed to the FOLD instead and the two move
+     together; `[open]` stays the fallback, and is also the no-JS answer. */
+  #site-mobile-menu .mm-group[open] > .mm-head .mm-chev { transform: rotate(180deg); }
+  @supports selector(:has(*)) {
+    #site-mobile-menu[data-fold-js] .mm-group[open] > .mm-head .mm-chev { transform: none; }
+    #site-mobile-menu[data-fold-js] .mm-group:has(> .mm-fold[data-fold="open"]) > .mm-head .mm-chev {
+      transform: rotate(180deg);
+    }
+  }
+
+  /* ── The fold ──────────────────────────────────────────────────────────
+     `0fr -> 1fr` resolves to the content's intrinsic height, so a two-row
+     group and a nine-row group both land on their own height with no
+     max-height guess to clip one or overshoot the other. The inner div is
+     required: it is the grid ITEM, and it is what clips.
+
+     GATED ON `[data-fold-js]`, WHICH THE CONTROLLER SETS ON ITSELF. Only the
+     script ever writes `data-fold`, so an unconditional collapsed state would
+     mean a group that opens to nothing for anyone the script does not reach —
+     scripting off, or a throw earlier in the same inline block. Unset, the
+     <details> is just a <details> and the browser's own disclosure works. */
+  #site-mobile-menu[data-fold-js] .mm-fold {
+    display: grid;
+    grid-template-rows: 0fr;
+    opacity: 0;
+    transition:
+      grid-template-rows var(--qf-menu-dur-out) ease,
+      opacity var(--qf-menu-dur-out) ease;
+  }
+  #site-mobile-menu[data-fold-js] .mm-fold[data-fold="open"] {
+    grid-template-rows: 1fr;
+    opacity: 1;
+  }
+  #site-mobile-menu[data-fold-js] .mm-fold__in {
+    overflow: hidden;
+    min-height: 0;
+  }
+  /* The 16px between the last row and the group's hairline. A MARGIN on the
+     last child rather than padding on `.mm-fold__in`, because padding on a
+     grid item in a 0fr track does not collapse with the track. */
+  #site-mobile-menu .mm-fold__in > :last-child { margin-bottom: var(--space-2) !important; }
+
+  /* ── In-group sub-heading ──────────────────────────────────────────────
+     Kept, because our groups run to nine rows where the reference's runs to
+     five, and nine undifferentiated rows is the "unscannable dump" the
+     sub-headings were added to fix. Re-cut to the house type so it cannot be
+     mistaken for either the 16px heading above it or the 12px subtitle
+     beside it: same size as the subtitle, but --ink at 600 against the
+     subtitle's --muted at 400. */
+  #site-mobile-menu .mm-sub {
+    margin: 0 !important;
+    padding: var(--space-2) 0 var(--space-1) !important;
+    font-family: var(--font-sans);
+    font-size: 12px;
+    line-height: 16px;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    text-transform: none;
+    color: var(--ink) !important;
+  }
+  #site-mobile-menu .mm-fold__in > .mm-sub:first-child { padding-top: 0 !important; }
+
+  /* ── The row ───────────────────────────────────────────────────────────
+     60px = 12 + 36 + 12, driven by the icon tile rather than the text, which
+     is why the pitch survives any copy length. Flush left to the gutter, no
+     left padding: the tile IS the left edge.
+
+     RAMP SNAP: the reference's right padding is 28px, off our ramp; 24
+     (--space-3) is the nearest and loses nothing — it is dead space that only
+     keeps a long subtitle off the screen edge, and at 320px it BUYS 4px of
+     subtitle track, which is where the margin is tightest. */
+  #site-mobile-menu .mm-scroll a {
     display: flex !important;
     align-items: center;
-    min-height: var(--tap-target);
+    gap: var(--space-1-5);
+    min-height: 60px;
     margin: 0 !important;
-    padding: var(--space-1) var(--space-1-5) !important;
-    border-radius: var(--radius-md) !important;
+    padding: var(--space-1-5) var(--space-3) var(--space-1-5) 0 !important;
+    border-radius: var(--radius-sm) !important;
     color: var(--ink) !important;
     text-decoration: none;
+    transition: background-color var(--qf-menu-dur-out) ease;
+  }
+  #site-mobile-menu .mm-tile {
+    flex: 0 0 auto;
+    width: 36px;
+    height: 36px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: var(--radius-sm);
+    background: var(--qf-menu-tile);
+    border: 1px solid var(--qf-menu-tile-edge);
+    color: var(--ink);
     transition: background-color var(--qf-menu-dur-out) ease, color var(--qf-menu-dur-out) ease;
   }
-  #site-mobile-menu .mm-group > a {
-    padding-left: var(--space-3) !important;
+  /* 20-in-36, drawn at 1:1 — the ratio that stops the glyphs reading as
+     scaled-down clip art. Same 24px box and 1.3px stroke as the homepage tool
+     bento, so the menu and the page agree on what a tool looks like. */
+  #site-mobile-menu .mm-tile svg {
+    width: 20px;
+    height: 20px;
+    display: block;
   }
-  #site-mobile-menu a:hover {
-    color: var(--accent) !important;
+  #site-mobile-menu .mm-txt {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-0-5);
+    min-width: 0;
+  }
+  #site-mobile-menu .mm-t {
+    display: block;
+    font-size: 14px;
+    font-weight: 500;
+    line-height: 16px;
+    letter-spacing: -0.02em;
+    color: var(--ink);
+  }
+  /* THE ONE-LINE SUBTITLE IS EDITORIAL — every string in SITE_MOBILE_MENU_HTML
+     is written to a <=28 character budget, which is what actually keeps it on
+     one line down to 320px. These three declarations are a BACKSTOP for a
+     future long string, so a bad edit degrades to an ellipsis instead of
+     wrapping and breaking the 60px pitch. If the ellipsis is ever visible,
+     the copy is wrong, not the sheet. */
+  #site-mobile-menu .mm-s {
+    display: block;
+    font-size: 12px;
+    font-weight: 400;
+    line-height: 16px;
+    letter-spacing: -0.02em;
+    color: var(--muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  /* 16 + 4 + 16 = 36, the tile's own height, so the text block is optically
+     centred against it and the row lands on 60 without a magic number.
+     RAMP SNAP: the reference's title/subtitle gap is 6px; 4 (--space-0-5) is
+     the nearest ramp value. Reviewed on screen — it reads BETTER, not worse:
+     the pair binds harder into one object, which is the whole point of the
+     gap being small. */
+
+  /* THE HOVER CUE IS THE TILE, not the row — the reference's one genuinely
+     good state, and it costs nothing. Gated on a real pointer because on a
+     phone it is either invisible or sticky-after-tap. The row's own tint
+     stays for the tap/active feedback that touch DOES see. */
+  #site-mobile-menu .mm-scroll a:hover {
+    color: var(--ink) !important;
     background-color: var(--qf-menu-hover) !important;
   }
+  @media (hover: hover) and (pointer: fine) {
+    #site-mobile-menu .mm-scroll a:hover .mm-tile {
+      background: var(--ink);
+      border-color: var(--ink);
+      color: var(--chrome-panel-bg);
+    }
+  }
+  #site-mobile-menu .mm-head:hover { color: var(--accent) !important; }
   /* The focus ring is an OUTLINE, the hover cue is a FILL — the two states are
      never mistaken for one another, which is the point of :focus-visible. */
   #site-mobile-menu a:focus-visible,
@@ -1685,23 +1992,29 @@ html[data-qf-menu="open"] body {
   /* [hidden] stays authoritative over the display rules above (nav-auth.js
      gates /importers/saved on a session). */
   #site-mobile-menu a[hidden],
-  #site-mobile-menu .mm-group > a[hidden] { display: none !important; }
+  #site-mobile-menu .mm-group > a[hidden],
+  #site-mobile-menu .mm-fold__in > a[hidden] { display: none !important; }
 }
 
-/* ── Tablet: a sheet, not a wall ─────────────────────────────────────────
-   The collapse point is 1023px, so at 600-1023 a full-bleed drawer is a 1000px
-   pane holding a 200px-wide column of links with the rest left empty, and it
-   covers the page completely for no reason. It becomes a 360px sheet on the
-   burger's own side instead — the end-drawer shape, and the panel now points
-   at the control that opened it. `left: auto` because a fixed box with left,
-   right AND a width is over-constrained, and in LTR the browser drops `right`,
-   which would anchor it to the wrong edge. */
+/* ── Tablet: still full-bleed, but the track stops widening ──────────────
+   WAVE 6 turned the 600-1023 band into a 360px sheet floating off the
+   burger's own corner, on the reasoning that a full-bleed drawer at 1000px is
+   a wall holding a 200px column of bare links. WAVE 7 removes the exception
+   for two reasons: the rows are no longer bare links (a 60px tile + title +
+   subtitle needs ~340px, not 200px), and an inset sheet at ONE band is the
+   same "a dropdown landed on the page" reading the report is about — it would
+   have meant the menu changed shape at 600px for no reason a visitor can see.
+
+   So the surface is `inset: 0` at every width the burger exists at, and the
+   only thing the extra room buys is a centred track: the rows keep a readable
+   measure instead of stranding against the left edge of a 1000px pane. Below
+   600px the viewport is narrower than the cap, so the rule does nothing. */
 @media (min-width: 600px) and (max-width: 1023px) {
-  #site-mobile-menu:not([hidden]) {
-    left: auto !important;
-    right: var(--space-2) !important;
-    width: 360px;
-    transform-origin: top right;
+  #site-mobile-menu .mm-scroll {
+    max-width: 560px;
+    margin-left: auto;
+    margin-right: auto;
+    width: 100%;
   }
 }
 
@@ -1771,7 +2084,15 @@ html[data-qf-menu="open"] body {
   #site-menu-scrim,
   #site-menu-scrim[data-state="open"],
   #site-burger .qf-burger-bar,
-  #site-burger[aria-expanded="true"] .qf-burger-bar {
+  #site-burger[aria-expanded="true"] .qf-burger-bar,
+  /* WAVE 7: the fold and its chevron ride the same rule. The script reads the
+     same query and drops its 200ms hold to 0, so a collapse is not held open
+     waiting for a transition that will never run. */
+  #site-mobile-menu[data-fold-js] .mm-fold,
+  #site-mobile-menu[data-fold-js] .mm-fold[data-fold="open"],
+  #site-mobile-menu .mm-chev,
+  #site-mobile-menu .mm-tile,
+  #site-mobile-menu .mm-scroll a {
     transition: none !important;
     animation: none !important;
   }
