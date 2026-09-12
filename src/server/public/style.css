@@ -2128,3 +2128,69 @@ html[data-theme="dark"],
     --hero-wash-focus: 0 0 0 2px rgba(var(--hero-wash-ink-rgb), 0.85);
   }
 }
+
+/* ── Wave 9: THE CARD ICON FOLLOWS THE HERO'S AZURE ───────────────────────
+   Wave 8 moved the hero wash to the owner's reference azure — hue 198, the
+   band's body sampled at #0179AD and rendered at #0171A2 (the generator's
+   `base` anchor, scripts/make-hero-wash.mjs). The fifteen card icons under it
+   were still `--accent`/#3356EE at hue 229. Thirty-two degrees apart on one
+   surface is a mismatch you can see without measuring it, and the owner did.
+   The icons follow the band.
+
+   ONE SOURCE, NOT A SECOND HARD-CODED BLUE. Everything below is the hero
+   wash generator's own two anchors for the LIGHT band, restated as tokens so
+   the tile and the raster cannot drift:
+
+     --hero-azure-rgb    1, 113, 162   = `base`, the body of the band
+     --hero-azure-deep   #016490       = `deep`, the band's top edge
+
+   Both are hue 198 (198.5 and 198.0). `src/server/home/heroWashAzure.test.ts` reads the
+   generator's VARIANTS table and fails if either token stops matching it, so
+   a future re-tune of the wash cannot leave the icons behind.
+
+   WHY THE GLYPH IS `deep` AND THE TILE IS `base`. The tile is the band colour
+   at 10% (28% in dark, the same alphas #545 measured for the indigo tile), so
+   a glyph painted in `base` itself would sit on a 10%-dilution of itself:
+   4.28:1 on the bento card's `--surface-2` ground — over the 3:1 floor for a
+   non-text graphic but under AA, which is the bar #545 set for this glyph and
+   is the bar the owner's brief restates. `deep` is one step down the same band
+   and clears it: 5.16:1 / 5.65:1 light. No new hue, no invented colour.
+
+   DARK IS A LIFT OF THE SAME BAND, BY THE SAME FACTOR THE SITE ALREADY USES.
+   The dark wash runs deep teal to near-black (#05263A), so it has no azure
+   light enough to draw a glyph with — exactly the situation `--accent-legible`
+   was created for on the indigo side, where dark swaps `--accent-fill` for the
+   lightened `--footer-accent`. That swap is a x2.83 move in relative
+   luminance (0.1353 -> 0.3834). Applying the same factor to the band's
+   luminance (0.1443) targets 0.4087; `--hero-azure-lift` #3EB6E9 is hue 197.9
+   at luminance 0.4036, i.e. the band lifted the way this site already lifts
+   its accent rather than a colour chosen by eye. 5.24:1 on the dark tile.
+
+   SCOPE. These tokens are used by the card icon tiles and the partner
+   banner's matching tile, and by nothing else. `--accent`, `--accent-fill`,
+   `--accent-legible`, `--icon-tile-bg`, links, buttons and focus rings are
+   untouched and still indigo — whether the whole palette should follow the
+   hero is the owner's call, raised in the PR and not decided here. In
+   particular `--icon-tile-bg` / `--accent-legible` keep their indigo values
+   because the directory's carrier-profile tiles read them too.
+
+   Appended at EOF for baseline-protocol.md rule 1 (the guards key file:line).
+   ───────────────────────────────────────────────────────────────────────── */
+:root {
+  --hero-azure-rgb:     1, 113, 162;
+  --hero-azure-deep:    #016490;
+  --hero-azure-lift:    #3EB6E9;
+  --icon-azure:         var(--hero-azure-deep);
+  --icon-tile-azure-bg: rgba(var(--hero-azure-rgb), 0.10);
+}
+html[data-theme="dark"],
+:root:not([data-theme="light"]) {
+  --icon-azure:         var(--hero-azure-lift);
+  --icon-tile-azure-bg: rgba(var(--hero-azure-rgb), 0.28);
+}
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]) {
+    --icon-azure:         var(--hero-azure-deep);
+    --icon-tile-azure-bg: rgba(var(--hero-azure-rgb), 0.10);
+  }
+}

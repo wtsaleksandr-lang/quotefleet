@@ -101,9 +101,16 @@ html body.landing-v2.qf-wft main > section.qf-marquee-section::after {
 /* Icon tile — a rounded SQUARE, not a circle, so it echoes the card's own
    corner. Same metric and the same two tokens as the icon tile #545 put on all
    fifteen cards in the hero and bento grids (`.qf-toolcard__ico`): 48px, 12px
-   radius, `--icon-tile-bg` behind an `--accent-legible` glyph. Matching it
-   rather than inventing a third tile treatment is the point — this banner sits
-   directly under those cards. */
+   radius, a tinted ground behind an accent glyph. Matching it rather than
+   inventing a third tile treatment is the point — this banner sits directly
+   under those cards.
+
+   WHICH IS WHY IT FOLLOWS THEM TO AZURE. The card tiles moved off the brand
+   indigo and onto the hero wash's own hue (style.css Wave 9); a banner two
+   sections below them that stayed indigo would be the third tile treatment
+   this rule exists to prevent. Its ground is the partner card's flat
+   `--surface-hero` tail, where the glyph measures 5.15:1 light / 5.74:1 dark.
+   The banner's CTA is untouched and still `--accent-fill`. */
 .qf-partner-ico {
   box-sizing: border-box;
   display: inline-flex;
@@ -112,9 +119,9 @@ html body.landing-v2.qf-wft main > section.qf-marquee-section::after {
   width: 48px;
   height: 48px;
   padding: var(--space-1);
-  background: var(--icon-tile-bg);
+  background: var(--icon-tile-azure-bg);
   border-radius: var(--radius);
-  color: var(--accent-legible);
+  color: var(--icon-azure);
 }
 .qf-partner-ico svg {
   display: block;
