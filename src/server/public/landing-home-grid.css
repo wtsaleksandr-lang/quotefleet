@@ -352,6 +352,12 @@ html body.qf-wft .qf-toolgrid-head h2 {
   letter-spacing: -1.28px;
   color: var(--ink);
   text-align: left;
+  /* Carried for the same no-orphan reason as its two siblings on this band,
+     though this heading is the one that does NOT currently strand a word at any
+     width — it breaks 2+3 at 375 and 4+5 at 320. It is here so the four
+     headings on the page balance identically and a copy edit cannot quietly
+     reintroduce the orphan the other three were fixed for. */
+  text-wrap: balance;
 }
 /* The category noun is de-emphasised so the sentence, not the label, leads.
 

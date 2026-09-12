@@ -81,6 +81,12 @@ html body.qf-wft h2.qf-marquee-head {
   letter-spacing: -1.28px;
   color: var(--ink);
   text-align: left;
+  /* Same no-orphan rule, same one-line answer, as the card titles and the hero
+     h1. Measured: at 375 and 320 this heading broke to "Built for drivers,
+     brokers and / importers", stranding the last word. It has enough words to
+     balance cleanly, and above 414 it is a single line where the property is
+     inert. */
+  text-wrap: balance;
 }
 html body.qf-wft .qf-marquee-head .qf-marquee-head__lead { color: var(--ink); }
 /* `--muted`, NOT `--muted-soft`, for the same reason and by the same

@@ -181,6 +181,9 @@ html body.qf-wft .qf-partner-title {
   letter-spacing: -1.28px;
   color: var(--ink);
   text-align: left;
+  /* No orphans, as everywhere else on this band. Measured: "…on your own /
+     site" at 414 and again at 320, one word alone on the last line. */
+  text-wrap: balance;
 }
 html body.qf-wft .qf-partner-title .qf-partner-title__soft { color: var(--muted); }
 
