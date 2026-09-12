@@ -19,8 +19,13 @@
  *      tint, so a tile is literally a 10% dilution of the band above it.
  *   2. `--hero-azure-deep` IS the light band's `deep` anchor (its top edge).
  *      The glyph is a step down the same band rather than a second blue,
- *      because `base` on its own dilution measures 4.28:1 — over the 3:1 floor
+ *      because `base` on its own dilution measures 4.18:1 — over the 3:1 floor
  *      for a non-text graphic but under the AA bar #545 set for this glyph.
+ *      This is ALSO the second of the two bounds that stopped the re-tuned
+ *      band going as light as the owner's reference: `deep` is the band's top
+ *      edge, and at #026A98 the glyph measures 4.75:1 on its tile, i.e. about
+ *      one step from failing. Lifting the top edge further means giving the
+ *      icons a colour that is no longer the band's.
  *   3. THE HUES AGREE. Every azure token, and the band, inside a degree of
  *      198 — and all of them a good 25+ degrees off `--accent`'s 229, which is
  *      the whole point of the change.
@@ -47,8 +52,8 @@ const GENERATOR = read('scripts/make-hero-wash.mjs');
 
 type RGB = [number, number, number];
 
-/** `{ name: 'hero-wash-light', ..., deep: [1, 100, 144], base: [1, 113, 162], ... }` */
-function generatorAnchors(variant: string): { deep: RGB; base: RGB } {
+/** `{ name: 'hero-wash-light', ..., deep: [2, 106, 152], base: [4, 117, 168], sky: [...] }` */
+function generatorAnchors(variant: string): { deep: RGB; base: RGB; sky: RGB } {
   const entry = GENERATOR.split(/\{\s*name:/)
     .find((chunk) => chunk.startsWith(` '${variant}'`));
   if (!entry) throw new Error(`no '${variant}' variant in make-hero-wash.mjs`);
@@ -57,7 +62,7 @@ function generatorAnchors(variant: string): { deep: RGB; base: RGB } {
     if (!m) throw new Error(`no ${key} anchor on '${variant}'`);
     return [Number(m[1]), Number(m[2]), Number(m[3])];
   };
-  return { deep: triple('deep'), base: triple('base') };
+  return { deep: triple('deep'), base: triple('base'), sky: triple('sky') };
 }
 
 /** The value side of a `--token:` declaration in the :root (light) block. */
@@ -117,6 +122,38 @@ describe('the card icon tile is derived from the hero wash', () => {
     }
     // The mismatch this change exists to close: the brand accent is elsewhere.
     expect(hue(hexToRgb('#3356EE'))).toBeGreaterThan(225);
+  });
+
+  /**
+   * THE BAND'S CEILING IS A CONTRAST BOUND, AND THIS IS WHERE IT IS WRITTEN
+   * DOWN. The owner asked for the wash to be lighter and to keep brightening
+   * on the way down, against a reference whose sky reaches rgb(6,140,198) at
+   * 40% — 3.77:1 for white, i.e. a sky that cannot carry body copy and, in the
+   * reference, does not have to. Our card runs an 18px carriers lead and a
+   * 16px shippers lead on the band down to y=417, so `base` is pinned to the
+   * lightest azure that still clears AA for white BODY text before the grain
+   * is on it. If a future re-tune wants a lighter band it has to move the copy
+   * off the band first; this test is the thing that will say so.
+   */
+  it('tops the band out at the lightest azure white body copy can sit on', () => {
+    const white: RGB = [255, 255, 255];
+    expect(contrast(white, LIGHT_BAND.base)).toBeGreaterThanOrEqual(4.5);
+    // ...and it really is at the ceiling: one more step of the same climb
+    // (the per-channel delta from `deep` to `base`) would fail.
+    const overshoot = LIGHT_BAND.base.map(
+      (c, i) => Math.min(255, c + (c - LIGHT_BAND.deep[i])),
+    ) as RGB;
+    expect(contrast(white, overshoot)).toBeLessThan(4.5);
+    // The band CLIMBS. `deep` is the top edge and `base` the body, so a
+    // re-tune that makes the top the brighter of the two has inverted the
+    // fade the owner asked for rather than adjusted it.
+    expect(luminance(LIGHT_BAND.base)).toBeGreaterThan(luminance(LIGHT_BAND.deep));
+    // `sky` is the waypoint the ramp opens up through on its way to white —
+    // the thing that makes the run read as a fade rather than a dump. It is
+    // the same hue family as the band, and unambiguously lighter than it.
+    expect(hue(LIGHT_BAND.sky)).toBeGreaterThan(197);
+    expect(hue(LIGHT_BAND.sky)).toBeLessThan(200);
+    expect(luminance(LIGHT_BAND.sky)).toBeGreaterThan(luminance(LIGHT_BAND.base) * 2.5);
   });
 
   it('lifts for dark by the same factor the site already lifts its accent', () => {

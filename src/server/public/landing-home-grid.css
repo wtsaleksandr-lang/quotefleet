@@ -70,18 +70,21 @@
       `50% 100%` showed only its BOTTOM 65%, so a saturated top would simply
       not have been on screen. `100% 1240px` at `0 0` pins raster row N to card
       row N at EVERY width instead, which is what lets the stops be chosen
-      against where the copy actually sits (475px / 585px — see the generator).
-      1240 is taller than the tallest card measured (1200px at 375), so the
-      raster covers the card outright at every width tested.
+      against where the copy actually sits (the band climbs 0→420, the ramp
+      runs 420→760 — see the generator). 1240 is taller than the tallest card
+      measured (1200px at 375), so the raster covers the card outright at every
+      width tested.
 
    THE HAIRLINE IS STILL LOAD-BEARING, but only at ONE end now, and the brief
    asked the question explicitly. At the TOP the card announces itself: the
-   #026692 band against the #F8FAFC page ground is a 6.6:1 step, and the 12px
+   #026A98 band against the #F8FAFC page ground is a 6.1:1 step, and the 12px
    corners read on their own with the rim removed — it is genuinely redundant
-   there. At the BOTTOM the fade has landed on `--surface-hero` #EDF5F9, which
-   is 1.06:1 against the page. That is not an edge by any measure, so the lower
-   corners and the rails beside the action cards exist ONLY because of the 1px
-   `--border-strong` rim.
+   there. At the BOTTOM the fade has landed on `--surface-hero`, which is now
+   TRUE WHITE and 1.06:1 against the page. That is not an edge by any measure,
+   so the lower corners and the rails beside the action cards exist ONLY
+   because of the 1px `--border-strong` rim — which is also what lets the tail
+   be pure white without the bento cards (`--surface`, also white) dissolving
+   into it: they carry their own rim and shadow.
 
    So it stays, on all four sides. A rim that fades out half way down the card
    is a worse artefact than a redundant one: `border-image` is the only way to
@@ -707,9 +710,13 @@ html body.qf-wft .qf-toolbtn--secondary:hover {
    half-applied rule in the sheet.
 
    Same answer as the outline variant above, for the same reason: the BORDER
-   and the ground react, the ink does not. `--ink` on the tinted ground
-   measures 15.9:1 light / 15.2:1 dark, where an accent label would be 4.01:1
-   on the light wash — under AA for 16px, so the label stays ink in both. */
+   reacts, the ink does not.
+
+   SINCE THE BUTTON BECAME THE ACCENT CTA (§8) the ground does not react
+   either, and this rule is now stated in the same terms §8 uses so the two
+   cannot contradict each other — they are the same specificity, §8 is later
+   and therefore wins, and a pair of same-weight rules saying different things
+   about one button is how the dark-hover bug above got in. */
 /* `.2s` and a named property list, for the reason given on `.qf-toolbtn` above.
    This one matters slightly more: the legacy `.btn` skin animates a transform
    on hover elsewhere on the site, and the hover rule below has to pass
@@ -725,9 +732,9 @@ html body.qf-wft .qf-hhero .hero-cta .btn .arr {
   transition-property: transform;
 }
 html body.qf-wft .qf-hhero .qf-aud-panel .qf-hhero__action .hero-cta .btn:hover {
-  border-color: var(--accent-legible) !important;
-  color: var(--ink) !important;
-  background: var(--cta-sec-bg-hover) !important;
+  border-color: var(--hero-wash-ink) !important;
+  color: var(--accent-ink) !important;
+  background: var(--accent-fill) !important;
   box-shadow: none !important;
   transform: none !important;
 }
@@ -867,32 +874,44 @@ html[data-theme="light"] body.qf-wft a.qf-toolgrid-head__all:not(.btn):not(.nav-
 }
 
 /* ── 8 · INK ON THE BLUE BAND ────────────────────────────────────────────── */
-/* The wash's top 475px is saturated azure, so every piece of copy that
-   lands there has to invert. Which pieces those are is not a guess: the hero
-   card was driven with Playwright at 375 / 1024 / 1440 / 2560 in BOTH audience
-   panels and every text run's box recorded against the card's top edge.
+/* The wash's top 420px is azure, so every piece of copy that lands there has
+   to invert. Which pieces those are is not a guess: the hero card was driven
+   with Playwright at 320 / 375 / 430 / 600 / 768 / 900 / 1024 / 1200 / 1280 /
+   1440 / 1920 / 2560 in BOTH audience panels and every text run's box recorded
+   against the card's top edge.
 
    ON THE BLUE (offsets are px from the card's top, worst case across widths):
      audience toggle      33-127   — but it sits on its own 96%-white track,
                                      so it is NOT in this block. Self-contained.
      h1                  111-289   carriers and shippers both
-     lead                237-391
-     company-name input  321-406   opaque `--surface` fill; only its FOCUS ring
+     lead                209-417   the shippers lead's last line at 320 is the
+                                   DEEPEST white copy on the wash anywhere, and
+                                   it is the reason the band climbs to 420 and
+                                   not one pixel further
+     company-name input  278-443   opaque `--surface` fill; only its FOCUS ring
                                    is inverted, see below
-     "Start free" ghost  394-465   the deepest thing on the blue, and the
-                                   reason the band runs to 475 rather than 440
-     preview label       159-175   (shippers)
+     "Start free"        394-511   no longer on the band at all in the sense
+                                   that matters — it is accent-FILLED now, so
+                                   its label is on #3356EE rather than on the
+                                   wash. See the CTA note below.
+     preview label       159-183   (shippers)
 
-   PAST THE TRANSITION, on the pale, and therefore NOT inverted:
-     action cards        477-1167  opaque `--surface`; their TEXT starts 573+
-     stat row            538-754   see the `--ink-soft` note below
-     "browse the full…"  574-792   stays `--accent`, 4.9:1 on the pale
+   PAST THE BAND, on the ramp and then the white, and therefore NOT inverted:
+     action cards        434-1167  opaque `--surface`; their TEXT starts 508+
+     stat row            487-806   see the `--ink-soft` note below
+     "browse the full…"  525-841   stays `--accent`
 
-   THE ONE THING THAT IS NEITHER is the shippers stat row, whose top edge
-   (538px at 1440) lands 47px inside the transition. `--muted` measures 3.8:1
-   there; `--ink-soft` measures 6.0:1 there and 10.9:1 once the fade has
-   finished, so the row goes one step darker rather than the stops being bent
-   around it. Everything else clears both ends by construction.
+   THE ONE THING THAT IS NEITHER is the shippers stat row, which lands
+   somewhere different at every width — 487 at 768, 538 at 1440, 573 at 1024,
+   709 at 375 — i.e. anywhere from the top of the ramp to well inside the
+   white. `--ink-soft` is a step darker than `--muted` for exactly that reason.
+   It is also the one run on this card the longer ramp did not fix: at 768 it
+   sits at 487, 67px into a 340px ramp, where the ground is still azure enough
+   that a dark ink cannot clear AA on it. The 110px transition it replaced put
+   that same row at 1.8:1; this one puts it at ~2.8:1. Better, still short, and
+   NOT fixable by moving the stops — 417 (white copy, needs a dark ground) and
+   487 (dark copy, needs a light ground) are 70px apart in the same column.
+   Fixing it means moving the row, which is a layout change and not this one's.
 
    SPECIFICITY. landing-glass.css is injected at RUNTIME by landing-motion.js,
    after every static <link> including this one, so source order cannot be
@@ -922,28 +941,65 @@ html body.qf-wft .qf-hhero .qf-shipper-preview__label {
   color: var(--hero-wash-ink) !important;
 }
 
-/* THE GHOST BUTTON. Same idea it always had — transparent fill, hairline
-   border, neutral label, visually subordinate to the finder above it — just
-   expressed in the ink the band needs. `--hero-wash-line` is 70% cream, which
-   is where the outline clears the 3:1 a UI boundary needs (0.42 alpha is
-   2.0:1, 0.55 is 2.63:1). In dark the same two tokens resolve to `--ink` and
-   `--border-strong`, i.e. exactly what this button already was. */
+/* THE PRIMARY CTA — THE SITE'S ONE ACCENT-FILLED BUTTON.
+ *
+ * It was a ghost (transparent fill, hairline border, neutral label). It is now
+ * the accent, and it is the ONLY accent-filled control on the homepage. The
+ * audit that changed it: every filled button on this page was counted, and the
+ * page ran 16 near-black `--cta-bg` fills (the tool-card "Live demo →" / "Find
+ * carriers →" / "All tools →" row), 9 white-on-near-black, one white pill —
+ * and ZERO accent. The accent existed only as background art in the wash, so
+ * the one thing our design law reserves it for (selection, focus, link-hover,
+ * and the primary CTA) was the one thing it never marked.
+ *
+ * THE SIXTEEN TOOL-CARD BUTTONS STAY NEUTRAL, and that is the actual decision
+ * here rather than an omission. Painting them accent would be sixteen
+ * competing primaries on one page, at which point the accent marks nothing;
+ * one accent CTA against sixteen neutral ones is what makes it read as the
+ * primary at all.
+ *
+ * IT SITS ON THE AZURE, WHICH IS WHY THE HAIRLINE SURVIVED THE REPAINT.
+ * Measured on the rendered page, `--accent-fill` #3356EE against the band
+ * under it is 1.5:1 at 1440 (the band is #0475A8..#1787BA at y 418-465) and
+ * 2.8:1 at 320, where the button sits lower and the ramp has already opened
+ * up. Hue carries it — 229 on 198, at full saturation, is not a colour anyone
+ * mistakes for its own ground — but 1.5:1 is under the 3:1 a control's visual
+ * boundary needs, so the boundary is the BORDER's job, not the fill's:
+ * `--hero-wash-line` (70% cream) measures 4.9:1 against the band and 5.7:1
+ * against the fill, so the rim clears 3:1 on BOTH sides and the control has an
+ * unambiguous edge whatever the ramp is doing behind it.
+ *
+ * THE LABEL IS `--accent-ink`, NOT `--hero-wash-ink`. #FFFFFF on #3356EE is
+ * 5.68:1 in BOTH themes, because `--accent-fill` and `--accent-ink` are
+ * theme-invariant — which is the point: the primary CTA is the same object in
+ * light and dark rather than two different buttons. The ghost it replaced took
+ * its ink from the ground, so it HAD to be theme-split; this one does not. */
 html body.qf-wft .qf-hhero .qf-aud-panel .qf-hhero__action .hero-cta .btn {
-  background: transparent !important;
+  background: var(--accent-fill) !important;
   border: 1px solid var(--hero-wash-line) !important;
-  color: var(--hero-wash-ink) !important;
+  color: var(--accent-ink) !important;
   box-shadow: none !important;
 }
 html body.qf-wft .qf-hhero .qf-aud-panel .qf-hhero__action .hero-cta .btn .arr {
   color: inherit !important;
 }
-/* Hover answers with the BORDER and the ground, never the label — the same
-   rule the tool buttons follow, so the label's contrast is always its resting
-   value rather than something that has to be re-argued per state. */
+/* Hover answers with the BORDER, never the label — the same rule the tool
+   buttons follow, so the label's contrast is always its resting value rather
+   than something that has to be re-argued per state.
+   THE GROUND NO LONGER ANSWERS EITHER, and that is a consequence of the
+   repaint rather than a softer hover. The accent fill IS this button's
+   identity, and the only two tokens that could darken it are theme-split the
+   wrong way round: `--accent-strong` is #2440C4 in light (fine) but #B4C2FC in
+   dark, so a fill swap would put a white label on a pale lavender at 1.4:1 on
+   hover — an AA failure that only exists while the pointer is on the button,
+   which is exactly how the last one of these survived (see §6). So hover takes
+   the rim from 70% cream to full `--hero-wash-ink` and slides the arrow; the
+   fill and the label hold, and every state of this control is AA by
+   construction. */
 html body.qf-wft .qf-hhero .qf-aud-panel .qf-hhero__action .hero-cta .btn:hover {
   border-color: var(--hero-wash-ink) !important;
-  color: var(--hero-wash-ink) !important;
-  background: var(--hero-wash-wipe) !important;
+  color: var(--accent-ink) !important;
+  background: var(--accent-fill) !important;
   box-shadow: none !important;
   transform: none !important;
 }
@@ -968,6 +1024,83 @@ html body.qf-wft .qf-hhero .qf-finder__input:focus {
 html body.qf-wft .qf-hhero .qf-dir-stats,
 html body.qf-wft .qf-hhero .qf-dir-stats li + li::before {
   color: var(--ink-soft) !important;
+}
+
+/* "Or browse the full carrier directory →" — THE ONE RUN THE LONGER RAMP COST
+   SOMETHING, AND THE ONE INK THAT PAYS IT BACK.
+   It is never on the azure at any width (its shallowest position is y=525 at
+   768), so it has always taken its ground from the transition. The 110px
+   transition put it on the near-white tail at 1440, where `--accent` #3356EE
+   measured 5.9:1; a 340px ramp puts the same y on a light sky instead and that
+   drops to 3.18:1. Same answer as the stat row above — bend the INK, not the
+   stops, because the row's y moves 316px across the width range (525 at 768,
+   576 at 1440, 639 at 1024, 772 at 375) and no set of stops is right for all
+   of them.
+
+   IT GOES TO `--ink-soft`, THE SAME INK THE STAT ROW BESIDE IT ALREADY USES,
+   and the two obvious alternatives are both dead ends worth recording so the
+   next person does not re-try them. `--accent-strong` looks like the answer —
+   the accent's own darker step, still unmistakably a link — but it is not
+   #2440C4 on this page: landing-s-polish.css re-declares it as #B4C2FC on
+   `.landing-v2`, i.e. a PALE lavender in both themes, which on a light sky is
+   worse than what it replaced. And `--accent-legible` resolves to
+   `--accent-fill` wherever the ground is light, which is exactly the value
+   that is failing. `--ink-soft` measures 5.85:1 at 1440, ~7:1 at 1024, 10.4:1
+   at 375 and 4.32:1 at 768 — every width at least as good as before the ramp
+   changed (768 was 2.91:1), and the widths this brief verifies are AA. The
+   arrow and the hover underline are what keep it reading as a link.
+   LIGHT ONLY: dark already paints it `--hero-wash-ink` at 13.4:1.
+
+   THE SELECTOR IS LONGER THAN IT LOOKS LIKE IT NEEDS TO BE. It repeats the
+   element's whole ancestry to (0,6,4) because quotefleet-color-system.css
+   ships `body.qf-wft a { color: var(--qf-color-white) !important }` and three
+   sheets after this one re-state link colour with !important; a short chain
+   here silently loses. */
+html[data-theme="light"] body.qf-wft .qf-hhero .qf-aud-panel .qf-shipper-hero .qf-shipper-copy p.qf-shipper-browse a {
+  color: var(--ink-soft) !important;
+}
+
+/* THE SHIPPERS PANEL RESTACKS AT 1000px, AND TWO RUNS CHANGE GROUND WITH IT.
+   This is the one place on the card where a pixel-pinned raster meets a
+   responsive layout, so it is the one place the ink has to follow a
+   breakpoint rather than a token.
+
+   `.qf-shipper-preview__label` — at >=1000px the preview column sits BESIDE
+   the copy and the label is at y=165-197, on the azure, where white measures
+   4.93:1. Below 1000px the column stacks UNDER the copy and the same label
+   lands at y=545-648, on the ramp, where white measures 1.66:1. That is NOT
+   new (it measured 1.75:1 against the 110px transition this ramp replaced —
+   it has been illegible at these widths since the wash shipped) but it is
+   fixable in one line now that the section is open. `--ink-soft`: 5.25:1.
+
+   `.qf-dir-stats` — same story, opposite direction. Its labels are already a
+   step darker than `--muted` for exactly this reason (see the note at the top
+   of §8), but below 1000px the row lands at y=487, only 67px into a 340px
+   ramp, where `--ink-soft` is 2.87:1. Its own `<strong>` numbers are `--ink`
+   and measure 5.58:1 on that same ground, so the row's labels join them; the
+   weight difference (700 vs 400), not the colour, is what carries the
+   hierarchy. Against the old transition this row measured 1.79:1, so the
+   longer ramp improved it on its own — this closes the rest.
+
+   `.qf-shipper-browse` — the row immediately under the stat row, and the last
+   4.42:1 on the card. It is `--ink-soft` at every other width (5.86:1 at 1440,
+   9.42:1 at 375); here it is 18px lower than the stat row on the same steep
+   part of the ramp, so it joins the stat row on `--ink` and reads as one block
+   with it. 8.73:1.
+
+   LIGHT ONLY, all three: in dark these sit on the dark ramp at 12.19:1,
+   10.14:1 and 12.65:1 already. */
+@media (max-width: 999px) {
+  html[data-theme="light"] body.qf-wft .qf-hhero .qf-shipper-preview__label {
+    color: var(--ink-soft) !important;
+  }
+  html[data-theme="light"] body.qf-wft .qf-hhero .qf-dir-stats,
+  html[data-theme="light"] body.qf-wft .qf-hhero .qf-dir-stats li + li::before {
+    color: var(--ink) !important;
+  }
+  html[data-theme="light"] body.qf-wft .qf-hhero .qf-aud-panel .qf-shipper-hero .qf-shipper-copy p.qf-shipper-browse a {
+    color: var(--ink) !important;
+  }
 }
 
 /* Pre-existing, fixed here because it is inside this card: the equipment chips

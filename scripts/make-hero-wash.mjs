@@ -56,25 +56,52 @@
    proportional fade therefore has no solution (at 375 the action cards begin
    at 40% of the card, at 1440 at 61%); a pixel-pinned one has an easy one.
 
-   THE STOPS, AND THE MEASUREMENTS THAT CHOSE THEM:
+   THE STOPS, AND THE MEASUREMENTS THAT CHOSE THEM. The owner's note on the
+   first cut was that it is too dark at the top, does not brighten on the way
+   down, and then changes to white too abruptly and too low. Sampled, that was
+   exactly right: the band held a flat #0171A2 to 475 and then crossed to an
+   off-white in 110px. The shape below replaces the hold-then-dump with one
+   continuous climb.
 
-       0 → 475px   SATURATED. #016490 at the very top edge easing to #0171A2
-                   by 404px and holding. Deepest where the 54px headline sits
-                   (111-289) and at its brightest under the button, which is
-                   the element with the least contrast headroom.
-     475 → 585px   THE TRANSITION, smoothstep. Everything a reader looks at is
-                   outside it: carriers CTA ends 465, carriers card TEXT starts
-                   573 (375) / 609 (1440), shippers stat row starts 538 — and
-                   smoothstep is flat at both ends, so 538px is already 97% of
-                   the way to pale rather than halfway.
-    585 → 1240px   FLAT `--surface-hero`, held all the way down. 1240 is not a
+       0 → 420px   THE BAND, CLIMBING. #026A98 at the very top edge easing to
+                   #0475A8 by 420. Both anchors are LIGHTER than the first
+                   cut's (#016490 / #0171A2) and the band brightens by 24% of
+                   relative luminance on the way down instead of holding flat.
+                   It stops climbing at 420 because that is where the deepest
+                   WHITE copy on the wash ends (the shippers lead's last line
+                   at 320px, 417) — `base` is pinned to the lightest azure that
+                   still measures 4.5:1 for white body copy with the grain's
+                   brightest pixel on it, so 420 is a contrast bound, not taste.
+     420 → 760px   THE OPENING-UP, 340px of it against the first cut's 110.
+                   ONE smoothstep parameter `p` carries the whole run and the
+                   colour is linear in `p` through a waypoint at p=0.28:
+                   `sky` #60CBFA, the light sky the ramp passes through before
+                   it whitens (y≈557). That waypoint is the difference between
+                   a fade and a dump — without it a straight line from the band
+                   to white runs through grey-blues, which is what read as
+                   "changes to white" rather than "opens up".
+    760 → 1240px   FLAT `--surface-hero`, held all the way down, and now TRUE
+                   WHITE rather than the old #EDF5F9 off-white. 1240 is not a
                    round number: the tallest the card gets at any width tested
-                   is 1200px (375, carriers), so the raster COVERS the card
-                   outright and its bottom edge is never on screen. The flat
-                   base colour underneath is therefore a fallback for a failed
-                   image rather than a visible neighbour — but it is still set
-                   to the tail's ENCODED value, so a card taller than 1240
-                   would meet its own colour rather than a step.
+                   is 1355px at 320 / 1200px at 375, so the raster covers the
+                   card outright at every width that matters and its bottom
+                   edge is never on screen. The flat base colour underneath is
+                   therefore a fallback for a failed image rather than a
+                   visible neighbour — but it is still set to the tail's
+                   ENCODED value, so a taller card meets its own colour rather
+                   than a step.
+
+   WHERE THIS STOPS SHORT OF THE REFERENCE, AND WHY. The owner's reference sky
+   runs rgb(15,129,178) at its crown to rgb(6,140,198) at 40% and rgb(96,203,250)
+   at 50%. Its crown is 4.37:1 against white and its 40% is 3.77:1 — i.e. the
+   reference cannot carry white BODY copy at all, and does not: it carries 90px
+   display type (AA at 3:1) over a sky with nothing else on it. Our card runs an
+   18px lead and a 16px shippers lead down to y=417. So the band tops out at
+   #0475A8 (5.10:1 bare, 4.5:1 with the worst grain pixel) rather than at the
+   reference's #0F81B2, and the top edge at #026A98 rather than #0F81B2 — the
+   second bound being that `--hero-azure-deep` IS this anchor and doubles as the
+   card-icon glyph, which measures 4.75:1 on its own tile and has ~1 level left
+   before it fails. Everything the reference does BELOW its copy, we do.
 
    The band is not a dead rectangle: a two-octave low-frequency mesh and a wide
    shallow lift toward the upper centre give it some direction. Both are capped
@@ -189,9 +216,17 @@ const QUALITY = 0.9;
 const WASH_QUALITY = 0.97;
 
 /* ── THE FADE, IN CARD PIXELS. See the header for how these were measured. ── */
-const BLUE_END = 475;     // saturated down to here
-const PALE_START = 585;   // near-white from here
-const BAND_SETTLE = 404;  // where the top's deepening has finished easing
+const BAND_SETTLE = 420;  // where the band has finished climbing `deep` -> `base`
+const FADE_START = 420;   // the band starts opening up here
+const FADE_END = 760;     // flat `pale` from here down
+/* Where `sky` sits on the fade's smoothstep parameter, NOT on y. Putting the
+   waypoint in `p` rather than in pixels is what keeps the ramp C1-continuous
+   through it: `p` is a single smoothstep over [FADE_START, FADE_END] and the
+   colour is piecewise-LINEAR in `p`, so the only discontinuity anywhere in the
+   run is a slope change in colour at one point — invisible — instead of the
+   value shelf a second smoothstep would park there. p = 0.28 lands `sky` at
+   y = 557. */
+const SKY_P = 0.28;
 
 /* ── GRAIN AMPLITUDES, 0-1. The reference measures sigma 4.6-6.0 levels on its
    saturated panel; these land ours at ~5 on the blue and ~3.5 on the pale.
@@ -222,13 +257,21 @@ const GRAIN_QUALITY = 0.72;
 
 /* Ceiling on the wash's own low-frequency life, in 8-bit levels. The lightest
    pixel of the blue band is the worst case for the light ink on top of it, so
-   the mesh is not allowed to add more than this to it. */
-const MESH_CAP = 3;
+   the mesh is not allowed to add more than this to it.
+
+   IT CAME DOWN FROM 3 TO 2 WHEN THE BAND CAME UP. The mesh exists so the band
+   does not read as a printed rectangle; a band that now CLIMBS continuously
+   from its top edge to its body and then opens into a 340px ramp is already
+   not a rectangle, so the mesh has less work to do — and every level it spends
+   is a level off the white copy's contrast, which the lighter band no longer
+   has to give. 3 -> 2 buys back ~1.2 levels at the worst pixel. */
+const MESH_CAP = 2;
 
 const VARIANTS = [
   /* HOMEPAGE — `field: 'wash'`, a pixel-pinned vertical fade. Anchors:
-     `deep`  the top edge          -> #016490
-     `base`  the body of the band  -> #0171A2
+     `deep`  the top edge          -> #026A98
+     `base`  the body of the band  -> #0475A8   (also --hero-azure-rgb)
+     `sky`   the ramp's waypoint   -> #60CBFA
      `pale`  the flat tail         -> --surface-hero
 
      Every anchor is stated PRE-GRAIN and PRE-ENCODE. The grain tile composites
@@ -237,10 +280,13 @@ const VARIANTS = [
      so the contrast claims are measured rather than asserted.
 
      `pale` is the tail, and the `--surface-hero` token is set to what this
-     anchor ENCODES to rather than to the anchor itself — WebP is lossy, the
-     tail came out of the encoder at #F1F6FF, and it is the encoded value the
-     base colour has to match if the two are ever to meet without a step.
-     `--measure` prints it, so the token is checkable rather than asserted.
+     anchor ENCODES to rather than to the anchor itself — WebP is lossy, so it
+     is the encoded value the base colour has to match if the two are ever to
+     meet without a step. `--measure` prints it, so the token is checkable
+     rather than asserted. The tail is TRUE WHITE now: the previous #EDF5F9
+     plateau was the other half of the owner's "it never gets there" note, and
+     the card's own 1px `--border-strong` rim (not a colour step) is what draws
+     its bottom edge, so a white tail costs the card nothing.
 
      THE BAND IS NOT OUR BRAND BLUE, AND THAT IS DELIBERATE AND OWNER-VISIBLE.
      The owner supplied three reference panels and they are not one palette.
@@ -258,31 +304,45 @@ const VARIANTS = [
      the hero no longer matches `--accent`; whether the site's accent should
      follow is the owner's call and is raised in the PR, not decided here.
 
-     `base` #0171A2 is a shade under the reference's own #0172A4 mid-band, and
-     the margin is the grain's. The band's brightest pixel is the worst case
-     for the white ink on it and the grain's brightest pixel lands on top of
-     that: white needs the ground under luminance 0.1833, #0171A2 is 0.1442
-     bare and 0.1732 with the brightest grain and mesh on it (4.70:1). The
-     reference's own #017BB1 is 0.174 bare, which leaves nothing at all — it
-     carries 90px display type and no body copy, and we carry an 18px lead. */
+     `base` #0475A8 is, to within a level, the reference's own DARKEST sky
+     sample (rgb(4,117,170) at 25% of its column) — and that is not a
+     coincidence, it is the ceiling. The band's brightest pixel is the worst
+     case for the white ink on it and the grain's brightest pixel lands on top
+     of that: white needs the ground under luminance 0.1833, #0475A8 is 0.1558
+     bare and lands at 4.5:1 once the grain and the (now 2-level) mesh are on
+     it. Everything the reference does above that value it does below its own
+     copy, which is exactly where `sky` takes us. */
   { name: 'hero-wash-light', home: true, field: 'wash', W: 1440, H: 1240,
-    deep: [1, 100, 144], base: [1, 113, 162], pale: [237, 245, 250] },
-  /* Dark sibling — the same IDEA inverted, not a suppression. A saturated
-     blue-to-white fade is meaningless on a dark page, so this runs deep navy
-     to near-black: #0E1A4C at the top edge, #142363 through the band, landing
-     on the dark `--surface-hero` #131A28 so the card still separates from the
-     #0C111D page ground rather than dissolving into it.
+    deep: [2, 106, 152], base: [4, 117, 168], sky: [96, 203, 250], pale: [255, 255, 255] },
+  /* Dark sibling — the same IDEA inverted, not a suppression, and it takes the
+     same SHAPE change in its own register rather than the light one's values.
+     A saturated blue-to-white fade is meaningless on a dark page, so this runs
+     teal-navy to near-black: #042031 at the top edge, #062B42 through the
+     band, landing on the dark `--surface-hero` #131A28 so the card still
+     separates from the #0C111D page ground rather than dissolving into it.
+
+     WHAT IT TOOK FROM THE RE-TUNE, and what it deliberately did not. It took
+     the climb (a lighter top edge easing into a lighter body, so the band
+     opens up on the way down here too) and it took the 340px ramp in place of
+     the old 110px one. It did NOT take the light band's brightness: every
+     value here is within three levels of where it was, because a dark theme
+     that follows a light theme's lightening is just the light theme.
+
+     `sky` is the ramp's waypoint here as well, but in dark the ramp runs
+     DOWNHILL, so the waypoint's job is the opposite: #08283D sits bluer than
+     the straight line from `base` to `pale` would, which holds the azure a
+     little longer before the ground goes neutral, instead of draining to grey
+     in the first third.
 
      The dark theme needs NO text inversion — its ink is already light — so the
      constraint here is the opposite one: the ground has to stay DARK ENOUGH.
-     `--muted` #90A1B9 needs the ground under luminance 0.0361, so the band is
-     capped there INCLUDING the grain's lightest pixel, which is why it tops out
-     at #05263A (0.0173 bare, 0.0308 under the brightest grain, 4.80:1) rather
-     than at the more obviously teal #062F45 (0.0250 bare, which fails once the
-     grain is on it). Same 198-degree hue as the light band, so the two themes
-     are the same idea rather than two colours. */
+     `--muted` #90A1B9 needs the ground under luminance 0.0387, so the band is
+     capped there INCLUDING the grain's lightest pixel, which is why it tops
+     out at #062B42 (0.0215 bare, ~0.035 under the brightest grain, 4.6:1).
+     Same hue as the light band, so the two themes are the same idea rather
+     than two colours. */
   { name: 'hero-wash-dark', home: true, field: 'wash', W: 1440, H: 1240,
-    deep: [3, 28, 43], base: [5, 38, 58], pale: [19, 26, 40] },
+    deep: [4, 32, 49], base: [6, 43, 66], sky: [8, 40, 61], pale: [19, 26, 40] },
   /* The tiled texture. Theme-agnostic; see the `grain` note above. */
   { name: 'hero-grain',     home: true, field: 'grain', side: 'white', W: 256, H: 256, quality: GRAIN_QUALITY },
   { name: 'hero-grain-ink', home: true, field: 'grain', side: 'black', W: 256, H: 256, quality: GRAIN_QUALITY },
@@ -309,8 +369,8 @@ function resolveChromium() {
 
 /* Runs inside the page: everything below here is browser-side. */
 const draw = (cfg) => {
-  const { W, H, pale, base, deep, quality, washQuality, field, maxQuality,
-    blueEnd, paleStart, bandSettle, grainWhite, grainBlack, grainFloor, grainLevels, meshCap, side } = cfg;
+  const { W, H, pale, base, deep, sky, quality, washQuality, field, maxQuality,
+    fadeStart, fadeEnd, skyP, bandSettle, grainWhite, grainBlack, grainFloor, grainLevels, meshCap, side } = cfg;
   const canvas = document.createElement('canvas');
   canvas.width = W;
   canvas.height = H;
@@ -442,35 +502,44 @@ const draw = (cfg) => {
 
       /* ── THE VERTICAL FADE, IN CARD PIXELS (y IS the card's y). ───────── */
 
-      /* 1. The band's own top-deepening: `deep` at y=0 easing to `base` by
-            BAND_SETTLE, then held flat through to BLUE_END. The button with
-            the least headroom sits in the held part, so its ground is a known
-            constant rather than wherever a ramp happened to be. */
+      /* 1. The band CLIMBS: `deep` at y=0 easing to `base` by BAND_SETTLE.
+            Both ends of that easing are flat, so the headline sits on the
+            steepest part of the climb (which is where the eye reads the band
+            as opening up) and the deepest white copy sits on the settled
+            `base` rather than somewhere mid-slope. */
       const bandMix = smooth(0, bandSettle, y);
 
-      /* 2. The fade out of the band. Smoothstep rather than linear precisely
-            BECAUSE it is flat at both ends: the two elements closest to the
-            transition (the CTA above it, the stat row below it) are inside
-            those flat runs, so neither lands on a genuinely intermediate
-            tone. */
-      const fade = smooth(blueEnd, paleStart, y);
+      /* 2. ONE parameter for the whole opening-up, FADE_START -> FADE_END.
+            Smoothstep so it is flat at both ends: the last white copy sits
+            just above FADE_START in its flat run, and the tail is reached
+            without a corner. */
+      const fade = smooth(fadeStart, fadeEnd, y);
 
       /* 3. Low-frequency life, capped and tapered to EXACTLY zero before the
             flat tail begins, so the tail can match the base token bit for
             bit. Two octaves of mesh plus a wide shallow lift toward the upper
             centre, which is what stops the band reading as a printed
             rectangle. */
-      const live = 1 - smooth(blueEnd - 60, paleStart - 20, y);
+      const live = 1 - smooth(fadeStart - 60, fadeEnd - 20, y);
       const mesh = ((vnoise(u * 2.4 + 0.7, v * 3.1 + 0.4) - 0.5) * 1.25
         + (vnoise(u * 5.1 + 3.1, v * 6.4 + 1.9) - 0.5) * 0.55);
-      const lift = (1 - smooth(0, 0.62, Math.abs(u - 0.5) * 1.55)) * (1 - smooth(0, blueEnd, y)) * 0.8;
+      const lift = (1 - smooth(0, 0.62, Math.abs(u - 0.5) * 1.55)) * (1 - smooth(0, fadeStart, y)) * 0.8;
       const wobble = (mesh + lift) * meshCap * live;
+
+      /* The two legs of the ramp, in `fade` rather than in y. See SKY_P. */
+      const leg = fade <= skyP ? fade / skyP : (fade - skyP) / (1 - skyP);
+      const toSky = fade <= skyP;
 
       for (let ch = 0; ch < 3; ch++) {
         const band = deep[ch] + (base[ch] - deep[ch]) * bandMix;
-        let val = band + (pale[ch] - band) * fade;
-        if (live > 0.0005) {
-          val += wobble;
+        const from = toSky ? band : sky[ch];
+        const to = toSky ? sky[ch] : pale[ch];
+        let val = from + (to - from) * leg;
+        if (live > 0.0005) val += wobble;
+        /* Dither wherever the field MOVES — which is now further down than the
+           mesh reaches, because the ramp outlives the band's own life. The
+           flat tail gets neither, so it stays bit-exact and can be the token. */
+        if (y < fadeEnd) {
           val += rnd() + rnd() - 1;                   // triangular-PDF dither
           val = Math.round(val);
         }
@@ -515,7 +584,7 @@ const measure = async ({ dataUrl, cfg, pairUrl }) => {
        ARE the contrast bound the CSS comments claim. */
     const P = pairUrl ? (await read(pairUrl)).d : null;
     const out = [];
-    for (const [label, g] of [['on band #0171A2', [1, 113, 162]], ['on pale #EDF5FA', [237, 245, 250]], ['on dark #05263A', [5, 38, 58]]]) {
+    for (const [label, g] of [['on band #0475A8', [4, 117, 168]], ['on sky  #60CBFA', [96, 203, 250]], ['on pale #FFFFFF', [255, 255, 255]], ['on dark #062B42', [6, 43, 66]]]) {
       let sum = 0, sq = 0, n = 0, lo = 9, hi = -1;
       for (let i = 0; i < D.length; i += 4) {
         const a = D[i + 3] / 255;
@@ -549,7 +618,7 @@ const measure = async ({ dataUrl, cfg, pairUrl }) => {
     }
     return { lo, hi, hex: hex(sr / n, sg / n, sb / n) };
   };
-  const rows = [0, 111, 289, 326, 465, cfg.blueEnd, 530, cfg.paleStart, 640, c.height - 1];
+  const rows = [0, 111, 200, 289, 326, 417, cfg.fadeStart, 470, 520, 557, 600, 660, cfg.fadeEnd, 800, c.height - 1];
   const lines = rows.map((y) => {
     const r = rowAt(y);
     return `y=${String(y).padStart(4)}  ${r.hex}  L ${r.lo.toFixed(4)}..${r.hi.toFixed(4)}`;
@@ -557,7 +626,7 @@ const measure = async ({ dataUrl, cfg, pairUrl }) => {
   /* The one number the CSS depends on: is the tail actually flat, and at what
      value did the encoder leave it? */
   let tailMin = [255, 255, 255], tailMax = [0, 0, 0];
-  for (let y = cfg.paleStart + 30; y < c.height; y++) {
+  for (let y = cfg.fadeEnd + 5; y < c.height; y++) {
     for (let x = 0; x < c.width; x++) {
       const i = (y * c.width + x) * 4;
       for (let ch = 0; ch < 3; ch++) {
@@ -587,7 +656,7 @@ await page.goto('about:blank');
 for (const variant of targets) {
   const cfg = {
     quality: QUALITY, washQuality: WASH_QUALITY,
-    blueEnd: BLUE_END, paleStart: PALE_START, bandSettle: BAND_SETTLE,
+    fadeStart: FADE_START, fadeEnd: FADE_END, skyP: SKY_P, bandSettle: BAND_SETTLE,
     grainWhite: GRAIN_WHITE, grainBlack: GRAIN_BLACK, grainFloor: GRAIN_FLOOR,
     grainLevels: GRAIN_LEVELS,
     meshCap: MESH_CAP, ...variant,
