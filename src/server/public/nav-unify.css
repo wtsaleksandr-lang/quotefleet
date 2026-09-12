@@ -1201,8 +1201,11 @@ body:has(#site-burger[aria-expanded="true"]) .qf-mc-fab { display: none; }
 .premium-footer .qf-fdisc-chev { color: var(--footer-quiet); }
 
 .premium-footer .footer-bottom {
-  margin: var(--space-3) auto 0;
-  padding: var(--space-2) 0 0;
+  /* 16 + 12, down from 24 + 16. This rule outranks the (0,1,0) `.footer-bottom`
+     in style.css, so the legal block's band gap is set HERE for every marketing
+     surface — tightening it there alone would have changed nothing. */
+  margin: var(--space-2) auto 0;
+  padding: var(--space-1-5) 0 0;
   display: block;
   border-top: 1px solid var(--footer-rule);
 }

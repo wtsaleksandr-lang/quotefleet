@@ -2266,7 +2266,7 @@ html[data-theme="dark"],
 .qf-payrow-trust {
   display: block;
   font-size: 11.5px;
-  line-height: 1.5;
+  line-height: 1.4;
 }
 .qf-payrow-trust li { display: inline; }
 .qf-payrow-trust li + li::before {
@@ -2274,10 +2274,15 @@ html[data-theme="dark"],
   margin: 0 var(--space-0-5);
 }
 .qf-footer-payrow {
-  margin: var(--space-2) auto 0;
-  padding: var(--space-1-5) 0 0;
+  margin: var(--space-1) auto 0;
+  padding: var(--space-1) 0 0;
   gap: var(--space-1) var(--space-3);
+  line-height: 1.4;
 }
+/* style.css:1685 sets this band's top margin for the directory subsite at
+   (0,2,0), which outranks the (0,1,0) above — match it so the directory
+   footer gets the same tightened gap as the marketing one. */
+.site-footer .qf-footer-payrow { margin-top: var(--space-1); }
 .qf-payrow-methods { gap: var(--space-1); }
 .qf-paymark { width: 34px; height: 22px; }
 .qf-paymark .qf-pm { width: 28px; height: 14px; }
@@ -2286,30 +2291,63 @@ html[data-theme="dark"],
    Copyright, operator attribution, the carrier names/marks note and the OOG
    line. NONE of it is a disclosure and none of it is display:none at any
    width — a compliance statement a reader must click to reveal has not been
-   made. Smaller and tighter, yes; hidden, never. */
+   made.
+
+   TIGHTER, NOT SMALLER (Alex, 2026-09). The ask was for this block to feel
+   lighter, and the type was never where its weight came from: 11.5px against
+   13px links is already a step below body, and shrinking a compliance
+   statement is the one move here with real downside. The weight was in the
+   BLOCK — 1.5 leading, a 4px gap turning two legal lines into two paragraphs,
+   and 40px of dead space opening the band. So the budget is spent there:
+
+     • leading 1.5 -> 1.4, a 16.1px line box instead of 17.25. 1.4 is the FLOOR
+       check-spacing.mjs allows for body text and where fine print is set; it
+       is not a licence to go lower.
+     • the copyright line and the carrier-marks note stop being two spaced
+       paragraphs and become one tight run (4px -> 0). They are one statement.
+     • the band opens at 16 + 12 instead of 24 + 16.
+
+   NOT ONE WORD OF ANY COMPLIANCE STATEMENT CHANGED, and nothing here is
+   smaller than it was. Two runs got BIGGER — see `.qf-ds-note` below. */
 .footer-bottom {
-  margin: var(--space-3) auto 0;
-  padding: var(--space-2) 0 0;
+  margin: var(--space-2) auto 0;
+  padding: var(--space-1-5) 0 0;
   font-size: 11.5px;
-  line-height: 1.5;
+  line-height: 1.4;
 }
 .footer-bottom .qf-foot-line { margin: 0; }
-.footer-bottom .qf-foot-line + .qf-foot-line { margin-top: var(--space-0-5); }
+.footer-bottom .qf-foot-line + .qf-foot-line { margin-top: 0; }
 .footer-bottom .qf-foot-links a { margin-left: var(--space-1); }
-.qf-foot-marks { max-width: 96ch; }
+/* MEASURE. This cap was written for `.qf-foot-marks` — a class the markup has
+   never emitted: siteChrome.ts#footerBottomHtml ships the carrier-marks note
+   as `qf-foot-line qf-foot-operator`. So it never applied, and the note ran
+   877px / ~165 characters on ONE line at 1440. Re-keyed to the class the
+   markup actually carries (`.qf-foot-line` alone is the copyright line, which
+   is short and wants no cap), at the same 78ch its sibling `.qf-ds-note` has
+   used all along. Costs one line above ~1000px; 78 characters is a line a
+   reader can track back to the start of. */
+.footer-bottom .qf-foot-line.qf-foot-operator { max-width: 78ch; }
 
 /* ── The FMCSA attribution, tightened ──────────────────────────────────────
    Same claims, same five sources, same non-affiliation sentence — this only
    pulls the band in. The 5/3/1 track ladder above is untouched: it is what
    keeps the fifth source off a line of its own. */
 .qf-datasources {
-  margin: var(--space-2) auto 0;
-  padding: var(--space-1-5) 0 0;
+  margin: var(--space-1) auto 0;
+  padding: var(--space-1) 0 0;
 }
-.qf-ds-label { margin-bottom: var(--space-1); font-size: 11px; }
-.qf-datasources .qf-ds-list li { font-size: 11.5px; line-height: 1.45; }
-.qf-ds-list svg { width: 13px; height: 16.675px; }
-.qf-datasources .qf-ds-note { margin: var(--space-1) 0 0; font-size: 11px; }
+.qf-ds-label { margin-bottom: var(--space-0-5); font-size: 11.5px; line-height: 1.4; }
+.qf-datasources .qf-ds-list li { font-size: 11.5px; line-height: 1.4; }
+/* Box height = the 11.5px/1.4 line box, so the glyph optically centres on the
+   FIRST line when a source name wraps. Tracks the line-height above it. */
+.qf-ds-list svg { width: 13px; height: 16.1px; }
+/* THIS RUN CAME UP, NOT DOWN. It is the FMCSA non-affiliation + self-declared
+   sentence — the most legally loaded line in the footer — and it was sitting
+   at 11px, half a step under every other compliance run, while `.qf-ds-label`
+   above it (11px) undercut its own peer `.qf-payrow-label` (11.5px). Both
+   join the rest of the block at 11.5px. The height this costs is paid for
+   several times over by the leading and the band gaps. */
+.qf-datasources .qf-ds-note { margin: var(--space-0-5) 0 0; font-size: 11.5px; line-height: 1.4; }
 
 /* ═══ WAVE 5b — TWO GROUPED CLAIM RUNS, AND LAUNCHER CLEARANCE ═══════════════
    `.qf-payrow-platform` is the second of the strip's two claim lists. It takes
@@ -2325,8 +2363,23 @@ html[data-theme="dark"],
   padding: 0;
   display: block;
   font-size: 11.5px;
-  line-height: 1.5;
+  line-height: 1.4;
 }
+/* THE TWO CLAIM RUNS, SIZED IN ONE DECLARATION — which is what "peers with
+   deliberately identical styling" was always supposed to mean. They have in
+   fact been rendering at 12px and 11.5px: `.qf-payrow-trust` declares 11.5 at
+   (0,1,0), but `.qf-payrow-trust li` at style.css:1665 is (0,1,1) and carries
+   `font-size: 12px`, so it won on the payment run and never applied to the
+   platform one. Matching that specificity here, for BOTH runs at once, repairs
+   the accident and makes a future divergence impossible to introduce by
+   editing one of them. 11.5px is the floor every reading run in this block
+   shares; nothing in it is smaller. */
+.qf-payrow-trust li,
+.qf-payrow-platform li { font-size: 11.5px; line-height: 1.4; }
+/* The processor line sets its own 1.5 at (0,3,0) in the block above, so the
+   1.4 on `.qf-footer-payrow` never reached it and it was the one run in the
+   strip still on the old leading. Same size, same colour — leading only. */
+.qf-footer-payrow .qf-payrow-methods .qf-payrow-proc { line-height: 1.4; }
 .qf-footer-payrow .qf-payrow-platform li { color: var(--muted) !important; }
 .qf-payrow-platform li { display: inline; }
 .qf-payrow-platform li + li::before {

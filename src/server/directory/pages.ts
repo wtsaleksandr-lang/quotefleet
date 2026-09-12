@@ -2460,11 +2460,19 @@ export const DIRECTORY_CSS = `
   .site-footer .dirfoot-col a { padding: 4px 0; font-size: 13px; }
   /* LEFT, like every other header and legal line on the site — the base
      .site-footer centres its text, which is what made the old one-line
-     .dirfoot-legal a centred row under a left-aligned site map. */
+     .dirfoot-legal a centred row under a left-aligned site map.
+
+     THE BAND GAP IS 16 + 12, down from 24 + 16 — the same tightening
+     nav-unify.css and nav-ia.css apply to the marketing footer's legal block,
+     declared here because this (0,2,0) selector is what the directory subsite
+     resolves. HAND-AUDITED, because check-spacing.mjs and
+     check-hardcoded-colors.mjs walk .css files only and never read CSS inside
+     a .ts template literal: 16 and 12 are both on the 8px ramp, and no colour,
+     radius, shadow or gradient is touched. */
   .site-footer .footer-bottom {
     max-width: 1120px;
-    margin: 24px auto 0;
-    padding-top: 16px;
+    margin: 16px auto 0;
+    padding-top: 12px;
     border-top: 1px solid var(--border);
     text-align: left;
   }
