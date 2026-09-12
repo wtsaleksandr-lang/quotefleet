@@ -160,10 +160,16 @@ describe('homepage: the partner / embed banner', () => {
     expect(html.match(/qf-partner-cta"/g) ?? []).toHaveLength(1);
   });
 
-  it('uses the generated hero wash, not a CSS gradient or a backdrop filter', () => {
+  it('uses the generated grain tiles, not a CSS gradient or a backdrop filter', () => {
     const css = strip(read('src/server/public/landing-partner-banner.css'));
     expect(css).toContain('background-color: var(--surface-hero)');
-    expect(css).toContain('var(--surface-hero-grain), var(--surface-hero-image)');
+    // The wash raster itself is GONE from this card. It became a pixel-pinned
+    // vertical fade whose top 475 rows are saturated azure, and there is no
+    // crop of that a 260px-tall band with dark ink on it can take. Its flat
+    // tail is `--surface-hero` by construction, so the token alone is
+    // pixel-identical to sampling it. What the card keeps is the texture.
+    expect(css).toContain('var(--surface-hero-grain), var(--surface-hero-grain-ink)');
+    expect(css).not.toContain('--surface-hero-image');
     expect(css).not.toMatch(/linear-gradient|radial-gradient|conic-gradient/);
     expect(css).not.toContain('backdrop-filter');
     // No keyframes on this one — the marquee's scroll is the page's single,

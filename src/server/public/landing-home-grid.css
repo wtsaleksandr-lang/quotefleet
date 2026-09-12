@@ -41,28 +41,52 @@
 
    Layer order is top-to-bottom in the shorthand:
 
-   1. `--surface-hero-grain` — a 256×256 tile of fine WHITE STREAKS, `repeat`
-      at its NATURAL size. It must not be part of the wash: the wash is painted
-      with `cover`, and `cover` downscales a 2560px field to ~1411px at a 1440
-      viewport, which averages per-pixel texture straight out of existence.
-      Tiled at 1:1 it survives at every card width unchanged. One asset serves
-      both themes — every pixel is white and only the alpha varies, so it
-      lightens whatever it sits on by the same amount either way.
-   2. `--surface-hero-image` — the wash, `cover` at `50% 100%`. The field is a
-      centre-lit vignette: a light column down the middle (the only slice a
-      narrow viewport ever sees) with the tone falling away to the left and
-      right rails and toward the bottom. Anchoring to centre-bottom keeps the
-      deep base pinned to the foot of the card from a 367px-wide portrait crop
-      at 375px right out to a 2509px-wide ultrawide one.
+   1-2. `--surface-hero-grain` + `--surface-hero-grain-ink` — a matched PAIR of
+      256×256 film-grain tiles, `repeat` at their NATURAL size. One is white at
+      a varying alpha, the other black, and exactly one of them is opaque at
+      any given pixel, so together they are a single bidirectional grain field
+      that works whatever it sits on: the white half carries the texture on the
+      saturated top, the black half carries it on the near-white bottom. (Two
+      files rather than one RGBA field is an ENCODER decision — WebP stores
+      alpha losslessly and colour lossily, so a random black-and-white colour
+      plane is the most expensive thing you can hand it: 67 KB as one tile
+      against 36 KB as two. See scripts/make-hero-wash.mjs.)
 
-   THE HAIRLINE IS LOAD-BEARING, not decoration. The wash's rails do most of
-   the work of separating the card from `--bg` — at 1440 the visible crop puts
-   luminance ~0.48 against the page's 0.954, a 1.89:1 step — but at 375 the
-   card is 368px of a 375px viewport, `cover` shows only the light centre
-   column, and there is barely any page ground left beside the corners. A 1px
-   `--border-strong` rim (light #CAD5E2 = 1.77:1 against the page ground; dark
-   a 28% light wash) makes the 12px radius read as an edge at every width,
-   independently of what the crop happens to show. */
+      They must not be part of the wash. The wash is RESAMPLED to the card's
+      width — 1440 up to 2509 at a 2560 viewport, 1440 down to 368 at 375 —
+      and resampling averages per-pixel texture straight out of existence.
+      Tiled at 1:1 they are identical at every card width, and they carry on
+      over the flat base colour so the texture never stops where the raster
+      does. One pair serves both themes.
+   3. `--surface-hero-image` — the wash: a VERTICAL FADE from saturated AZURE
+      at the top to the near-white `--surface-hero` at the bottom, painted
+      `100% 1240px` at `0 0`. The azure is the owner's hero reference sampled
+      (#0179AD, hue 198) and is NOT `--accent` (#3356EE, hue 229); see the
+      Wave 5 block in style.css.
+
+      NOT `cover`, and that is the whole reason this card used to wear a
+      centre-lit vignette instead of a fade. `cover` crops whichever axis is
+      surplus: at 2560 the card is 2509x839 and a 2560x1100 field anchored at
+      `50% 100%` showed only its BOTTOM 65%, so a saturated top would simply
+      not have been on screen. `100% 1240px` at `0 0` pins raster row N to card
+      row N at EVERY width instead, which is what lets the stops be chosen
+      against where the copy actually sits (475px / 585px — see the generator).
+      1240 is taller than the tallest card measured (1200px at 375), so the
+      raster covers the card outright at every width tested.
+
+   THE HAIRLINE IS STILL LOAD-BEARING, but only at ONE end now, and the brief
+   asked the question explicitly. At the TOP the card announces itself: the
+   #026692 band against the #F8FAFC page ground is a 6.6:1 step, and the 12px
+   corners read on their own with the rim removed — it is genuinely redundant
+   there. At the BOTTOM the fade has landed on `--surface-hero` #EDF5F9, which
+   is 1.06:1 against the page. That is not an edge by any measure, so the lower
+   corners and the rails beside the action cards exist ONLY because of the 1px
+   `--border-strong` rim.
+
+   So it stays, on all four sides. A rim that fades out half way down the card
+   is a worse artefact than a redundant one: `border-image` is the only way to
+   express it, it would have to track the fade stops in a second place, and the
+   top 475px is exactly where nobody is looking for an edge anyway. */
 
 /* THE 8px OF PAGE GROUND ABOVE THE CARD IS DELIBERATE, and it is the second
    half of the "the menu bar has a border" fix. The card used to start at
@@ -76,10 +100,10 @@
    page frame already uses for its rails. */
 .qf-hhero__card {
   background-color: var(--surface-hero);
-  background-image: var(--surface-hero-grain), var(--surface-hero-image);
-  background-repeat: repeat, no-repeat;
-  background-position: 0 0, 50% 100%;
-  background-size: auto, cover;
+  background-image: var(--surface-hero-grain), var(--surface-hero-grain-ink), var(--surface-hero-image);
+  background-repeat: repeat, repeat, no-repeat;
+  background-position: 0 0, 0 0, 0 0;
+  background-size: auto, auto, 100% 1240px;
   border: 1px solid var(--border-strong);
   border-radius: var(--radius);
   max-width: 98%;
@@ -141,7 +165,7 @@ html body.qf-wft .qf-hhero__head h1 {
   font-weight: 500;
   line-height: 1.2;
   letter-spacing: -2.16px;
-  color: var(--ink);
+  color: var(--hero-wash-ink);
   text-align: center;
   text-wrap: balance;
 }
@@ -155,7 +179,7 @@ html body.qf-wft .qf-hhero__lead {
   font-weight: 400;
   line-height: 1.4;
   letter-spacing: -0.18px;
-  color: var(--muted);
+  color: var(--hero-wash-ink);
   text-align: center;
 }
 
@@ -668,4 +692,116 @@ html[data-theme="light"] body.qf-wft a.qf-toolgrid-head__all:not(.btn):not(.nav-
 @media (min-width: 701px) and (max-width: 920px) {
   .qf-hhero__cards .qf-toolcard__actions { flex-wrap: wrap; }
   .qf-hhero__cards .qf-toolbtn { flex: 1 1 100%; }
+}
+
+/* ── 8 · INK ON THE BLUE BAND ────────────────────────────────────────────── */
+/* The wash's top 475px is saturated azure, so every piece of copy that
+   lands there has to invert. Which pieces those are is not a guess: the hero
+   card was driven with Playwright at 375 / 1024 / 1440 / 2560 in BOTH audience
+   panels and every text run's box recorded against the card's top edge.
+
+   ON THE BLUE (offsets are px from the card's top, worst case across widths):
+     audience toggle      33-127   — but it sits on its own 96%-white track,
+                                     so it is NOT in this block. Self-contained.
+     h1                  111-289   carriers and shippers both
+     lead                237-391
+     company-name input  321-406   opaque `--surface` fill; only its FOCUS ring
+                                   is inverted, see below
+     "Start free" ghost  394-465   the deepest thing on the blue, and the
+                                   reason the band runs to 475 rather than 440
+     preview label       159-175   (shippers)
+
+   PAST THE TRANSITION, on the pale, and therefore NOT inverted:
+     action cards        477-1167  opaque `--surface`; their TEXT starts 573+
+     stat row            538-754   see the `--ink-soft` note below
+     "browse the full…"  574-792   stays `--accent`, 4.9:1 on the pale
+
+   THE ONE THING THAT IS NEITHER is the shippers stat row, whose top edge
+   (538px at 1440) lands 47px inside the transition. `--muted` measures 3.8:1
+   there; `--ink-soft` measures 6.0:1 there and 10.9:1 once the fade has
+   finished, so the row goes one step darker rather than the stops being bent
+   around it. Everything else clears both ends by construction.
+
+   SPECIFICITY. landing-glass.css is injected at RUNTIME by landing-motion.js,
+   after every static <link> including this one, so source order cannot be
+   relied on — these chains carry the `.qf-hhero` ancestor and `!important`
+   to win on specificity instead. */
+
+/* THE CARRIERS HEADLINE AND LEAD NEED `!important` HERE EVEN THOUGH §2 ALREADY
+   SETS THEM, and it is worth saying why rather than leaving a duplicate that
+   looks like an oversight. Two sheets in this bundle repaint EVERY heading and
+   EVERY paragraph on the page:
+
+     body.qf-wft h1, h2, h3, h4                  -> --qf-color-white  !important
+     html[data-theme="light"] body.qf-wft h1..h4 -> --ink             !important
+     body.qf-wft p, .lead, .micro-copy, .muted   -> --qf-color-muted  !important
+
+   The last two are (0,2,3) and (0,2,1) WITH !important, so §2's plain
+   (0,2,3) declaration loses to them at every width — the headline stayed
+   near-black on the new blue band and the lead stayed `--muted`, which is the
+   1.02:1 the first measured pass caught. §2 still carries the intent; this is
+   the chain that carries the specificity. */
+html body.qf-wft .qf-hhero .qf-hhero__head h1,
+html body.qf-wft .qf-hhero .qf-hhero__head .qf-hhero__lead,
+html body.qf-wft .qf-hhero .qf-shipper-copy h1,
+html body.qf-wft .qf-hhero .qf-shipper-hero .qf-shipper-lead,
+html body.qf-wft .qf-hhero .qf-shipper-hero .qf-shipper-lead strong,
+html body.qf-wft .qf-hhero .qf-shipper-preview__label {
+  color: var(--hero-wash-ink) !important;
+}
+
+/* THE GHOST BUTTON. Same idea it always had — transparent fill, hairline
+   border, neutral label, visually subordinate to the finder above it — just
+   expressed in the ink the band needs. `--hero-wash-line` is 70% cream, which
+   is where the outline clears the 3:1 a UI boundary needs (0.42 alpha is
+   2.0:1, 0.55 is 2.63:1). In dark the same two tokens resolve to `--ink` and
+   `--border-strong`, i.e. exactly what this button already was. */
+html body.qf-wft .qf-hhero .qf-aud-panel .qf-hhero__action .hero-cta .btn {
+  background: transparent !important;
+  border: 1px solid var(--hero-wash-line) !important;
+  color: var(--hero-wash-ink) !important;
+  box-shadow: none !important;
+}
+html body.qf-wft .qf-hhero .qf-aud-panel .qf-hhero__action .hero-cta .btn .arr {
+  color: inherit !important;
+}
+/* Hover answers with the BORDER and the ground, never the label — the same
+   rule the tool buttons follow, so the label's contrast is always its resting
+   value rather than something that has to be re-argued per state. */
+html body.qf-wft .qf-hhero .qf-aud-panel .qf-hhero__action .hero-cta .btn:hover {
+  border-color: var(--hero-wash-ink) !important;
+  color: var(--hero-wash-ink) !important;
+  background: var(--hero-wash-wipe) !important;
+  box-shadow: none !important;
+  transform: none !important;
+}
+html body.qf-wft .qf-hhero .hero-cta .btn:focus-visible {
+  outline: 2px solid var(--hero-wash-ink) !important;
+  outline-offset: 2px !important;
+}
+
+/* THE COMPANY-NAME FIELD is an opaque white box, so its fill, its value ink
+   and its placeholder are all ground-independent and stay exactly as they
+   were. Its FOCUS STATE is not: the site ring is `--accent-soft`, an
+   8%-opacity blue, which on a blue ground is nothing at all — the hero would
+   have become the one surface on the site where you cannot see what you have
+   tabbed to. White ring, white border, same 2px metric. */
+html body.qf-wft .qf-hhero .qf-finder__input:focus {
+  border-color: var(--hero-wash-ink);
+  box-shadow: var(--hero-wash-focus);
+}
+
+/* The stat row and its "·" separators — see the note at the top of this
+   section. One step darker so the row is AA wherever the fade leaves it. */
+html body.qf-wft .qf-hhero .qf-dir-stats,
+html body.qf-wft .qf-hhero .qf-dir-stats li + li::before {
+  color: var(--ink-soft) !important;
+}
+
+/* Pre-existing, fixed here because it is inside this card: the equipment chips
+   on the preview cards are painted `--accent`, which the landing bundle pins
+   to the FILL blue #3356EE in both themes — 2.70:1 on the dark card. This is
+   what `--accent-legible` exists for (it picks by ground, not by theme). */
+html body.qf-wft .qf-hhero .qf-dir-chip {
+  color: var(--accent-legible) !important;
 }
