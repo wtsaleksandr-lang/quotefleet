@@ -420,7 +420,14 @@ export const TOOL_TEMPLATE_CSS = `
 // The alphas are the ones style.css already justified for a ghost control on a
 // saturated ground: 0.70 measures 3.50:1 as a boundary (the 3:1 UI floor) and
 // 0.14 is a wipe, not a fill.
-const BAND_TOKENS = `
+//
+// EXPORTED so a page that renders the band WITHOUT going through `toolPage()`
+// can still get them. /compliance is that page: it stays on the directory
+// shell — which carries the FMCSA data-source attribution, the directory site
+// map and the shipper-account hydration that the marketing footer does not —
+// and composes the same blocks from these primitives. Exporting the two alphas
+// is what stops that page re-declaring them and drifting from this definition.
+export const BAND_TOKENS = `
   .qtt-band { --qtt-band-line: rgba(255, 255, 255, 0.70); --qtt-band-wipe: rgba(255, 255, 255, 0.14); }
 `;
 
