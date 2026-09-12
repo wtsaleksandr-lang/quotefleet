@@ -1847,7 +1847,7 @@ html[data-theme="light"] .site-footer strong { color: var(--ink); }
    ───────────────────────────────────────────────────────────────────────── */
 :root {
   /* Surfaces the legacy set had no name for. */
-  --surface-hero:  #EDF5F9;   /* = the hero wash raster's ENCODED pale tail */
+  --surface-hero:  #FFFFFF;   /* = the hero wash raster's ENCODED pale tail */
   --surface-dark:  #0C111D;   /* the dark surface (CTA fills, dark bands) */
 
   /* Focus. 2px is reserved for selection + focus; everything else is 1px. */
@@ -1879,7 +1879,7 @@ html[data-theme="dark"],
   --surface-hero: #131A28;    /* the blue wash has no legible dark twin */
 }
 @media (prefers-color-scheme: light) {
-  :root:not([data-theme="dark"]) { --surface-hero: #EDF5F9; }
+  :root:not([data-theme="dark"]) { --surface-hero: #FFFFFF; }
 }
 
 /* Container — the measured 1328/24/1280 geometry. Declared here rather than
@@ -1951,7 +1951,10 @@ html[data-theme="dark"],
    The assets are generated, not licensed: scripts/make-hero-wash.mjs computes
    the field per-pixel in float, adds a low-frequency mesh so it is never a pure
    ramp, and applies ±1 LSB triangular dither, which is what keeps a long ramp
-   from banding at 8 bits. 1440×1240, 12.6 KB light / 11.6 KB dark.
+   from banding at 8 bits. 1440×1240, 18.6 KB light / 15.1 KB dark. (They grew
+   6 KB / 3.5 KB when the transition went from 110px to 340px: three times as
+   many rows are now MOVING, and a moving, dithered row is the only thing in
+   the file a lossy encoder cannot compress away.)
 
    THE FADE IS PINNED IN PIXELS, NOT IN PERCENT, and the card paints it
    `100% 1240px` at `0 0` rather than with `cover`. Both of those are forced.
@@ -1961,11 +1964,21 @@ html[data-theme="dark"],
    at 375/1024/1440/2560 in both audience panels, the card's height ranges
    727→1200px while the copy's ABSOLUTE offsets barely move (the headline
    starts at 111px at every width), so a proportional fade has no solution and
-   a pixel-pinned one has an easy one. Stops: saturated 0→475px, smoothstep
-   475→585px, flat `--surface-hero` from 585 to 1240.
+   a pixel-pinned one has an easy one. Stops: the band CLIMBS #026A98→#0475A8
+   over 0→420px, opens up through #60CBFA over 420→760px (one smoothstep, the
+   sky as a waypoint at p=0.28 ≈ y 557), then flat `--surface-hero` — TRUE
+   WHITE — from 760 to 1240. The first cut held a flat #0171A2 to 475 and
+   crossed to an off-white in 110px; the owner read that as too dark, too flat
+   and too abrupt, and sampled it is exactly that. The band is now bounded by
+   contrast rather than by taste: #0475A8 is the lightest azure that still
+   measures 4.5:1 for white body copy with the grain's brightest pixel on it,
+   and the deepest white copy on the wash ends at y=417.
 
    THE BAND IS AZURE, NOT OUR BRAND BLUE. The owner's hero reference samples
    #0179AD at hue 198 with saturation 0.99; `--accent` is #3356EE at hue 229.
+   The accent now marks the one primary CTA on the page ("Start free"), which
+   is why the two blues meet: see §8 of landing-home-grid.css for the pair's
+   measured contrast and for the hairline that carries the control's boundary.
    That is 32 degrees apart — a different colour, not a near-duplicate — and
    the hero panel is the surface he is judging, so the raster follows it. The
    raster introduces no token and trips no guard, but the hero card no longer
@@ -2002,12 +2015,15 @@ html[data-theme="dark"],
    one switch drives the base colour and the image together. The dark variant
    is a real sibling rather than a suppression — a flat rectangle in dark next
    to a faded card in light reads as the unfinished theme — and it inverts the
-   idea rather than copying it: deep teal-navy #041D2D at the top to the dark
+   idea rather than copying it: teal-navy #042031 at the top to the dark
    `--surface-hero` #131A28 at the bottom, i.e. azure to near-black, at the
-   SAME 198-degree hue as the light band. Its envelope is bounded at the TOP
-   instead of the bottom, because dark `--muted` #90A1B9 needs the ground under
-   luminance 0.0361; it runs 0.0093 → 0.0182 bare and 0.0312 under the
-   brightest grain pixel, which is 4.74:1.
+   SAME hue as the light band. It took the re-tune's SHAPE (a climbing band and
+   a 340px ramp) and not its values: every anchor moved by at most five levels,
+   because a dark theme that follows a light theme's lightening is just the
+   light theme. Its envelope is bounded at the TOP instead of the bottom,
+   because dark `--muted` #90A1B9 needs the ground under luminance 0.0387; it
+   runs 0.0118 → 0.0215 bare and ~0.035 under the brightest grain pixel, which
+   is 4.6:1.
 
    Appended at EOF for baseline-protocol.md rule 1 (the guards key file:line).
    ───────────────────────────────────────────────────────────────────────── */
@@ -2141,30 +2157,38 @@ html[data-theme="dark"],
    wash generator's own two anchors for the LIGHT band, restated as tokens so
    the tile and the raster cannot drift:
 
-     --hero-azure-rgb    1, 113, 162   = `base`, the body of the band
-     --hero-azure-deep   #016490       = `deep`, the band's top edge
+     --hero-azure-rgb    4, 117, 168   = `base`, the body of the band
+     --hero-azure-deep   #026A98       = `deep`, the band's top edge
 
-   Both are hue 198 (198.5 and 198.0). `src/server/home/heroWashAzure.test.ts` reads the
+   Both moved when the band was re-tuned lighter (see the stop table in the
+   generator): the band's body went #0171A2 -> #0475A8 and its top edge
+   #016490 -> #026A98, so the tiles went with them. That is the whole point of
+   deriving them — the re-tune could not leave the icons behind.
+
+   Both are hue 198 (198.7 and 198.4). `src/server/home/heroWashAzure.test.ts` reads the
    generator's VARIANTS table and fails if either token stops matching it, so
    a future re-tune of the wash cannot leave the icons behind.
 
    WHY THE GLYPH IS `deep` AND THE TILE IS `base`. The tile is the band colour
    at 10% (28% in dark, the same alphas #545 measured for the indigo tile), so
    a glyph painted in `base` itself would sit on a 10%-dilution of itself:
-   4.28:1 on the bento card's `--surface-2` ground — over the 3:1 floor for a
+   4.18:1 on the bento card's `--surface-2` ground — over the 3:1 floor for a
    non-text graphic but under AA, which is the bar #545 set for this glyph and
    is the bar the owner's brief restates. `deep` is one step down the same band
-   and clears it: 5.16:1 / 5.65:1 light. No new hue, no invented colour.
+   and clears it: 4.75:1 light. That margin is thin ON PURPOSE and it is the
+   second of the two bounds that stopped the band going as light as the
+   reference's: `deep` IS the top edge, so lifting the top edge one more step
+   takes the glyph under AA.
 
    DARK IS A LIFT OF THE SAME BAND, BY THE SAME FACTOR THE SITE ALREADY USES.
-   The dark wash runs deep teal to near-black (#05263A), so it has no azure
+   The dark wash runs teal-navy to near-black (#062B42), so it has no azure
    light enough to draw a glyph with — exactly the situation `--accent-legible`
    was created for on the indigo side, where dark swaps `--accent-fill` for the
    lightened `--footer-accent`. That swap is a x2.83 move in relative
    luminance (0.1353 -> 0.3834). Applying the same factor to the band's
-   luminance (0.1443) targets 0.4087; `--hero-azure-lift` #3EB6E9 is hue 197.9
-   at luminance 0.4036, i.e. the band lifted the way this site already lifts
-   its accent rather than a colour chosen by eye. 5.24:1 on the dark tile.
+   luminance (0.1558) targets 0.4413; `--hero-azure-lift` #45BDF3 is hue 198.6
+   at luminance 0.4413, i.e. the band lifted the way this site already lifts
+   its accent rather than a colour chosen by eye. 5.58:1 on the dark tile.
 
    SCOPE. These tokens are used by the card icon tiles and the partner
    banner's matching tile, and by nothing else. `--accent`, `--accent-fill`,
@@ -2177,9 +2201,9 @@ html[data-theme="dark"],
    Appended at EOF for baseline-protocol.md rule 1 (the guards key file:line).
    ───────────────────────────────────────────────────────────────────────── */
 :root {
-  --hero-azure-rgb:     1, 113, 162;
-  --hero-azure-deep:    #016490;
-  --hero-azure-lift:    #3EB6E9;
+  --hero-azure-rgb:     4, 117, 168;
+  --hero-azure-deep:    #026A98;
+  --hero-azure-lift:    #45BDF3;
   --icon-azure:         var(--hero-azure-deep);
   --icon-tile-azure-bg: rgba(var(--hero-azure-rgb), 0.10);
 }
