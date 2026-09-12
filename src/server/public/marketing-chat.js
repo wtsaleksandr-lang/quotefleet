@@ -10,12 +10,18 @@
  * Talks to POST /api/public/marketing-chat. Conversation history is
  * kept in-memory only — refreshing the page resets the chat.
  *
- * Premium redesign (2026-07): rounded-square gradient launcher with an
- * inline white SVG icon, a bright white panel with a cobalt gradient
- * header + brand avatar, gradient user bubbles, bounce-dot typing,
- * a square paper-plane send button, starter chips on first open, an
- * entrance animation, and a full-screen mobile sheet with a backdrop.
- * Brand cobalt #0D3CFC — a near-1:1 port of the WeFixTrades chat.
+ * Premium redesign (2026-07): rounded-square launcher with an inline white
+ * SVG icon, a bright white panel with a flat accent header + brand avatar,
+ * accent user bubbles, bounce-dot typing, a square paper-plane send button,
+ * starter chips on first open, an entrance animation, and a full-screen
+ * mobile sheet with a backdrop.
+ *
+ * 2026-09: de-gradiented. The launcher, the panel header, the user bubbles
+ * and the send button each painted linear-gradient(135deg, #0D3CFC, #0A2FC4);
+ * the launcher's was the only CSS gradient rendering anywhere on the site,
+ * and the design system's rule is zero of them. All four are now the flat
+ * site accent, taken from --accent-fill / --accent-ink via the widget-local
+ * --qf-mc-accent tokens defined at the top of the stylesheet below.
  *
  * NOTE ON CLASS NAMES: this widget deliberately AVOIDS the legacy class
  * names `.qf-mc-bubble`, `.qf-mc-bubble-msg`, `.qf-mc-send`, `.qf-mc-input`.
@@ -60,27 +66,52 @@
 
   // ── styles ─────────────────────────────────────────────────────
   var css = `
+    /* Widget colour tokens. The literals appear HERE ONLY — as var() fallbacks
+       so the launcher still renders on a host page that ships without
+       style.css — and every rule below refers to the token, never to a hex.
+       Both --accent-fill and --accent-ink are theme-INVARIANT in the site token
+       set (identical under :root, [data-theme="light"] and [data-theme="dark"]).
+       That invariance is what makes the badge legible in both themes: the
+       launcher's ground can never flip out from under the badge sitting on it. */
+    .qf-mc-fab, .qf-mc-panel, .qf-mc-backdrop {
+      --qf-mc-accent: var(--accent-fill, #3356EE);
+      --qf-mc-accent-ink: var(--accent-ink, #FFFFFF);
+    }
+    /* Flat, not a gradient: the design system has zero CSS gradients (the hero
+       blues are rasters over a flat base precisely so none exists in CSS), and
+       this launcher was the last one left rendering on the site. 12px, not the
+       old 16px, snaps it onto the 6/8/12 radius scale; a rounded SQUARE rather
+       than a 50% circle because that is the launcher's deliberate identity
+       (see the header note) and because the unread badge is pinned to the
+       bounding box's top-right corner — on a circle it would float free of the
+       edge instead of sitting against it. */
     .qf-mc-fab {
       position: fixed; right: 12px; bottom: 12px;
       width: 56px; height: 56px;
-      border-radius: 16px;
-      background: linear-gradient(135deg, #0D3CFC, #0A2FC4);
+      border-radius: 12px;
+      background: var(--qf-mc-accent);
       border: 0; cursor: pointer; padding: 0;
       display: flex; align-items: center; justify-content: center;
-      box-shadow: 0 4px 16px rgba(13,60,252,0.28);
+      box-shadow: var(--shadow-lg, 0 4px 24px rgba(165,176,204,0.20));
       z-index: 2147483000;
-      transition: transform 0.16s cubic-bezier(0.4,0,0.2,1), box-shadow 0.16s ease;
+      transition: transform 0.16s cubic-bezier(0.4,0,0.2,1);
     }
-    .qf-mc-fab:hover { transform: scale(1.06); box-shadow: 0 6px 22px rgba(13,60,252,0.38); }
-    .qf-mc-fab:focus-visible { outline: 3px solid rgba(13,60,252,0.4); outline-offset: 2px; }
+    .qf-mc-fab:hover { transform: scale(1.06); }
+    .qf-mc-fab:focus-visible { outline: 2px solid var(--qf-mc-accent); outline-offset: 2px; }
     .qf-mc-fab.open { display: none; }
+    /* Unread count. Was white on #F97316 — 2.8:1, a fail for 11px text, and a
+       second hue in a single-accent system. Inverted instead: the accent as
+       INK on the accent's own ink as ground is 5.67:1, clears AA for small
+       text, and holds that exact ratio in both themes because neither token
+       flips. The 2px ring is the same accent, so the chip stays separated from
+       whatever page background it overhangs. */
     .qf-mc-badge {
       position: absolute; top: -6px; right: -6px;
       min-width: 18px; height: 18px; padding: 0 4px;
       border-radius: 999px;
-      background: #F97316;
-      border: 2px solid #ffffff;
-      color: #ffffff; font-weight: 800; font-size: 11px; line-height: 1;
+      background: var(--qf-mc-accent-ink);
+      border: 2px solid var(--qf-mc-accent);
+      color: var(--qf-mc-accent); font-weight: 800; font-size: 11px; line-height: 1;
       display: flex; align-items: center; justify-content: center;
       font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
     }
@@ -124,7 +155,7 @@
 
     .qf-mc-head {
       padding: 14px 16px;
-      background: linear-gradient(135deg, #0D3CFC, #0A2FC4);
+      background: var(--qf-mc-accent);
       display: flex; align-items: center; gap: 12px;
       flex-shrink: 0;
     }
@@ -169,8 +200,8 @@
     }
     .qf-mc-msg.user {
       align-self: flex-end; max-width: 82%;
-      background: linear-gradient(135deg, #0D3CFC, #0A2FC4);
-      color: #ffffff;
+      background: var(--qf-mc-accent);
+      color: var(--qf-mc-accent-ink);
       border-radius: 14px 14px 4px 14px;
     }
     .qf-mc-msg.assistant {
@@ -189,7 +220,7 @@
     }
     .qf-mc-typing span {
       width: 6px; height: 6px; border-radius: 50%;
-      background: #0D3CFC;
+      background: var(--qf-mc-accent);
       animation: qf-mc-bounce 1.4s ease-in-out infinite both;
     }
     .qf-mc-typing span:nth-child(2) { animation-delay: 0.2s; }
@@ -207,15 +238,15 @@
       padding: 8px 14px;
       background: #ffffff;
       border: 1px solid #C7D2FE;
-      color: #0D3CFC;
+      color: var(--qf-mc-accent);
       border-radius: 999px;
       font-size: 13px; font-weight: 600; line-height: 1.2;
       cursor: pointer;
       font-family: inherit;
       transition: background 0.15s ease, border-color 0.15s ease;
     }
-    .qf-mc-chip:hover { background: #EEF2FF; border-color: #0D3CFC; }
-    .qf-mc-chip:focus-visible { outline: 2px solid rgba(13,60,252,0.4); outline-offset: 1px; }
+    .qf-mc-chip:hover { background: #EEF2FF; border-color: var(--qf-mc-accent); }
+    .qf-mc-chip:focus-visible { outline: 2px solid var(--qf-mc-accent); outline-offset: 1px; }
 
     .qf-mc-input-row {
       display: flex; align-items: center; gap: 8px; padding: 12px 14px;
@@ -229,16 +260,16 @@
       font-size: 13px; font-family: inherit; line-height: 1.4;
     }
     .qf-mc-field::placeholder { color: #9CA3AF; }
-    .qf-mc-field:focus { outline: 0; border-color: #0D3CFC; box-shadow: 0 0 0 3px rgba(13,60,252,0.12); }
+    .qf-mc-field:focus { outline: 0; border-color: var(--qf-mc-accent); box-shadow: 0 0 0 3px rgba(51,86,238,0.12); }
     .qf-mc-submit {
       width: 38px; height: 38px; flex-shrink: 0;
-      background: linear-gradient(135deg, #0D3CFC, #0A2FC4);
+      background: var(--qf-mc-accent);
       border: 0; border-radius: 10px; cursor: pointer;
       display: flex; align-items: center; justify-content: center;
       transition: transform 0.15s ease, opacity 0.15s ease;
     }
     .qf-mc-submit:hover:not(:disabled) { transform: scale(1.05); }
-    .qf-mc-submit:focus-visible { outline: 3px solid rgba(13,60,252,0.4); outline-offset: 1px; }
+    .qf-mc-submit:focus-visible { outline: 2px solid var(--qf-mc-accent); outline-offset: 1px; }
     .qf-mc-submit:disabled { opacity: 0.5; cursor: not-allowed; }
     .qf-mc-foot {
       padding: 8px 14px 12px;
