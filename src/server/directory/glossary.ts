@@ -26,7 +26,11 @@
  */
 import type { Express, Request, Response } from 'express';
 import { setPublicDirectoryCache } from './httpCache.js';
-import { FULL_SITE_HEADER, PREMIUM_FOOTER, HEADER_SCRIPTS } from '../siteChrome.js';
+// The JSON-LD objects below are built inline rather than through hubShell's
+// `jsonLdBreadcrumb()`: these pages are in the sitemap and every byte a crawler
+// reads is held identical across this migration.
+import { hubPage } from '../osow/hubShell.js';
+import { toolPage } from '../tools/toolPage.js';
 
 const SITE = 'https://quotefleet.net';
 
@@ -535,120 +539,75 @@ export function glossaryTermBySlug(slug: string): GlossaryTerm | undefined {
 
 // ─── Glossary-specific CSS (matches the directory design tokens) ───────────
 const GLOSSARY_CSS = `
-  .gl-shell { max-width: 900px; margin: 0 auto; padding: 28px; }
-  /* Left-align the hero (shared .hero centers text; glossary must read left-aligned). */
-  .gl-hero { padding: 40px 28px 22px; text-align: left; }
-  /* LEFT-ALIGNED, NOT LEFT-FLUSHED. "margin: 0" pinned the hero's 900px box to
-     the viewport edge, so the eyebrow and H1 rendered at x=52 at 1440px — 78px
-     LEFT of the floating header card above them (x=130) and 246px left of the
-     page's own body column (.gl-shell content, x=298). /glossary was the only
-     page on the site whose content overhung its header card. Centring the same
-     column the body uses fixes both: the text stays left-ALIGNED, it now starts
-     on the body's left edge, and it can no longer escape the card.
-     844 = .gl-shell's 900px box minus its 2 × 28px padding, i.e. the hero's
-     inner column and the body's inner column are the same width and the same
-     centre, so their left edges land on the same pixel at every width. */
-  .gl-hero .container-narrow { max-width: 844px; margin: 0 auto; padding: 0; }
-  .gl-hero h1 { font-size: 40px; line-height: 1.1; margin: 0 0 10px; }
-  .gl-hero p.lead { max-width: 640px; margin-left: 0; margin-right: 0; }
-  .gl-hero .hero-cta { justify-content: flex-start; }
-  .gl-crumbs { font-size: 12px; font-family: var(--font-mono); letter-spacing: 0.04em; color: var(--muted); margin: 0 0 12px; }
-  .gl-crumbs a { color: var(--muted); text-decoration: none; }
-  .gl-crumbs a:hover { color: var(--accent); }
-  /* No opacity wash — see .dir-crumbs .sep in pages.ts. */
-  .gl-crumbs .sep { margin: 0 8px; color: var(--muted); }
-  .gl-pill { display: inline-block; font-size: 11px; font-family: var(--font-mono); letter-spacing: 0.06em; text-transform: uppercase; padding: 4px 12px; border-radius: 999px; border: 1px solid var(--accent); background: var(--accent-soft); color: var(--accent); }
-  .gl-cat-block { margin: 34px 0 0; }
-  .gl-cat-h { display: flex; align-items: baseline; gap: 12px; margin: 0 0 14px; padding-bottom: 8px; border-bottom: 1px solid var(--border); }
-  .gl-cat-h h2 { font-size: 20px; margin: 0; }
-  .gl-cat-h .cnt { font-size: 12px; font-family: var(--font-mono); color: var(--muted); letter-spacing: 0.04em; }
-  .gl-grid { display: grid; gap: 14px; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); }
-  .gl-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 18px 20px; text-decoration: none; color: inherit; display: block; transition: border-color 0.15s ease, transform 0.15s ease; }
-  .gl-card:hover { border-color: var(--border-strong); transform: translateY(-2px); }
-  .gl-card h3 { margin: 0 0 6px; font-size: 17px; }
-  .gl-card p { margin: 0; font-size: 13px; color: var(--muted); line-height: 1.5; }
-  .gl-def { margin-top: 20px; }
+  /* The category jump list, at the top of the index's tool card. */
+  .gl-toc { display: flex; gap: 8px; flex-wrap: wrap; margin: 0 0 24px; }
+  .gl-toc a { font-size: 12px; font-family: var(--font-mono); letter-spacing: 0.04em; padding: 6px 12px; border-radius: var(--radius-pill); border: 1px solid var(--border); background: var(--surface-2); color: var(--ink-soft); text-decoration: none; }
+  .gl-toc a:hover { border-color: var(--accent); color: var(--accent); }
+
+  .gl-cat-block { scroll-margin-top: 96px; }
+  .gl-cat-block + .gl-cat-block { margin-top: 32px; }
+  /* A DIVIDER IS SPACE. This was a 1px bottom border under every category
+     heading — eight rules down one page where the 16px gap already separates
+     the heading from its cards. */
+  .gl-cat-h { display: flex; align-items: baseline; gap: 12px; margin: 0 0 16px; }
+  .gl-cat-h h3 { font-size: 16px; margin: 0; text-align: left; color: var(--ink); }
+  .gl-cat-h .cnt { font-size: 12px; font-family: var(--font-mono); color: var(--muted); letter-spacing: 0.04em; font-variant-numeric: tabular-nums; }
+
+  /* Stated column counts, never auto-fill — see the seasonal grid for why. */
+  .gl-grid { display: grid; gap: 16px; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .gl-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 16px; text-decoration: none; color: inherit; display: block; }
+  /* NO HOVER LIFT. This carried 'transform: translateY(-2px)' on hover across
+     37 cards: a 2px move that costs a paint, shifts the text under the cursor
+     and reads as jitter on a dense index. The hover delta is a border colour. */
+  @media (prefers-reduced-motion: no-preference) {
+    .gl-card { transition: border-color 0.15s cubic-bezier(0.22, 1, 0.36, 1); }
+  }
+  .gl-card:hover { border-color: var(--accent); }
+  .gl-card h4 { margin: 0 0 4px; font-size: 15px; font-weight: 600; line-height: 1.4; text-align: left; color: var(--ink); }
+  .gl-card p { margin: 0; font-size: 13px; color: var(--muted); line-height: 1.55; }
+
+  /* ── The term page ─────────────────────────────────────────────────────── */
+  .gl-pill { display: inline-block; font-size: 11px; font-family: var(--font-mono); letter-spacing: 0.06em; text-transform: uppercase; padding: 4px 12px; border-radius: var(--radius-pill); border: 1px solid var(--accent); background: var(--accent-soft); color: var(--accent); }
   .gl-def p { font-size: 16px; line-height: 1.65; color: var(--ink-soft); margin: 0 0 16px; }
+  .gl-def p:last-child { margin-bottom: 0; }
   .gl-def strong { color: var(--ink); font-weight: 600; }
   .gl-related { margin-top: 32px; }
-  .gl-related h2 { font-size: 18px; margin: 0 0 12px; }
+  .gl-related h2 { font-size: 18px; margin: 0 0 12px; text-align: left; }
   .gl-chips { display: flex; gap: 8px; flex-wrap: wrap; }
-  .gl-chip { font-size: 13px; font-family: var(--font-mono); letter-spacing: 0.02em; padding: 8px 14px; border-radius: 999px; border: 1px solid var(--border); background: var(--surface); color: var(--ink-soft); text-decoration: none; white-space: nowrap; }
+  .gl-chip { font-size: 13px; font-family: var(--font-mono); letter-spacing: 0.02em; padding: 8px 14px; border-radius: var(--radius-pill); border: 1px solid var(--border); background: var(--surface); color: var(--ink-soft); text-decoration: none; white-space: nowrap; }
   .gl-chip:hover { border-color: var(--accent); color: var(--accent); }
-  .gl-cta { margin-top: 32px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 26px; text-align: center; }
-  .gl-cta h2 { font-size: 20px; margin: 0 0 8px; }
-  .gl-cta p { color: var(--muted); margin: 0 auto 18px; max-width: 480px; line-height: 1.55; }
-  .gl-cta .row { display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; }
-  .gl-toc { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 18px; }
-  .gl-toc a { font-size: 12px; font-family: var(--font-mono); letter-spacing: 0.04em; padding: 6px 12px; border-radius: 999px; border: 1px solid var(--border); background: var(--surface); color: var(--ink-soft); text-decoration: none; }
-  .gl-toc a:hover { border-color: var(--accent); color: var(--accent); }
-  @media (max-width: 640px) {
-    .gl-hero h1 { font-size: 30px; }
-    .gl-shell, .gl-hero { padding-left: 18px; padding-right: 18px; }
-    .gl-grid { grid-template-columns: 1fr; }
+  /* LEFT, never centred — it was 'text-align: center' with a centred button
+     row, the one centred block on an otherwise left-aligned page. */
+  .gl-cta { margin-top: 32px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 24px; text-align: left; }
+  .gl-cta h2 { font-size: 20px; margin: 0 0 8px; text-align: left; }
+  .gl-cta p { color: var(--muted); margin: 0 0 16px; max-width: 560px; line-height: 1.55; }
+  .gl-cta .row { display: flex; gap: 12px; flex-wrap: wrap; justify-content: flex-start; }
+
+  /* Same guards the tool template ships, for the term page's bare shell. */
+  @media (prefers-reduced-motion: reduce) {
+    .gl-page *, .gl-page *::before, .gl-page *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+  .gl-page main a:focus-visible,
+  .gl-page main summary:focus-visible,
+  .gl-page main button:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+    border-radius: var(--radius-btn);
+  }
+
+  @media (max-width: 980px) {
+    .gl-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  }
+  @media (max-width: 760px) {
+    .gl-grid { grid-template-columns: minmax(0, 1fr); }
     .gl-def p { font-size: 15px; }
   }
 `;
-
-interface LayoutOpts {
-  title: string;
-  description: string;
-  canonicalPath: string;
-  bodyHtml: string;
-  jsonLd?: object[];
-}
-
-/**
- * Page shell — the CANONICAL site chrome (FULL_SITE_HEADER + the shared mobile
- * drawer + PREMIUM_FOOTER from siteChrome.ts), plus an optional JSON-LD block.
- *
- * This page used to hand-roll a THIRD navigation: a flat `.topnav` reading
- * "Directory · Importers · Compliance · Glossary" with its own burger menu, its
- * own link list and its own footer. A visitor arriving here from search saw a
- * different site map than the one every other page shows — the single worst
- * kind of IA inconsistency, because it makes the whole site feel like two sites.
- * It now renders exactly the same header, drawer and footer as /pricing,
- * /directory and the homepage. /nav-unify.css carries their styling.
- */
-function layout({ title, description, canonicalPath, bodyHtml, jsonLd }: LayoutOpts): string {
-  const jsonLdTags = (jsonLd ?? [])
-    .map((obj) => `<script type="application/ld+json">${JSON.stringify(obj)}</script>`)
-    .join('\n  ');
-  return `<!doctype html>
-<html lang="en">
-<head>
-  <meta charset="utf-8">
-  <script>(function(){try{var t=localStorage.getItem('qf-theme');if(t==='dark'||(!t&&window.matchMedia&&matchMedia('(prefers-color-scheme:dark)').matches))document.documentElement.setAttribute('data-theme','dark');else document.documentElement.setAttribute('data-theme','light');}catch(e){document.documentElement.setAttribute('data-theme','light');}})();</script>
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>${esc(title)}</title>
-  <meta name="description" content="${esc(description)}">
-  <link rel="canonical" href="${SITE}${esc(canonicalPath)}">
-  <link rel="stylesheet" href="/style.css">
-  <link rel="stylesheet" href="/nav-unify.css">
-  <style>${GLOSSARY_CSS}</style>
-  <link rel="icon" href="/favicon.ico" sizes="any">
-  <link rel="icon" type="image/png" sizes="32x32" href="/brand/favicon-32.png">
-  <link rel="icon" type="image/png" sizes="16x16" href="/brand/favicon-16.png">
-  <link rel="apple-touch-icon" sizes="180x180" href="/brand/apple-touch-icon-180.png">
-  <link rel="manifest" href="/site.webmanifest">
-  <meta name="theme-color" content="#F6F8FA">
-  <meta property="og:title" content="${esc(title)}">
-  <meta property="og:description" content="${esc(description)}">
-  <meta property="og:image" content="${SITE}/brand/og-image-1200x630.png">
-  <meta name="twitter:card" content="summary_large_image">
-  <meta name="twitter:image" content="${SITE}/brand/og-image-1200x630.png">
-  ${jsonLdTags}
-</head>
-<body>
-  ${FULL_SITE_HEADER}
-  ${bodyHtml}
-  ${PREMIUM_FOOTER}
-  ${HEADER_SCRIPTS}
-  <script src="/marketing-chat.js" defer></script>
-  <script src="/theme-toggle.js" defer></script>
-</body>
-</html>`;
-}
 
 // ─── Index page ────────────────────────────────────────────────────────────
 export function renderGlossaryIndex(): string {
@@ -661,13 +620,15 @@ export function renderGlossaryIndex(): string {
     const cards = terms
       .map(
         (t) => `<a class="gl-card" href="/glossary/${esc(t.slug)}">
-        <h3>${esc(t.term)}</h3>
+        <h4>${esc(t.term)}</h4>
         <p>${esc(t.summary)}</p>
       </a>`,
       )
       .join('\n');
+    // h3/h4, not h2/h3: on the shared template the only h2 on this page is the
+    // block's own section header, so a category sits a level below it.
     return `<section class="gl-cat-block" id="${esc(anchor)}">
-      <div class="gl-cat-h"><h2>${esc(cat)}</h2><span class="cnt">${terms.length} term${terms.length === 1 ? '' : 's'}</span></div>
+      <div class="gl-cat-h"><h3>${esc(cat)}</h3><span class="cnt">${terms.length} term${terms.length === 1 ? '' : 's'}</span></div>
       <div class="gl-grid">${cards}</div>
     </section>`;
   }).join('\n');
@@ -701,32 +662,98 @@ export function renderGlossaryIndex(): string {
     ],
   };
 
-  const body = `
-  <section class="hero gl-hero">
-    <div class="container-narrow">
-      <div class="eyebrow" style="color: var(--accent); font-family: var(--font-mono); font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 10px;">Freight knowledge base</div>
-      <h1>Drayage &amp; Freight Glossary</h1>
-      <p class="lead">Plain-English definitions of the drayage, intermodal, and freight-compliance terms that shape a container move — written by QuoteFleet. ${GLOSSARY_TERMS.length} terms across ${GLOSSARY_CATEGORIES.length} categories.</p>
-      <div class="gl-toc">${toc}</div>
-    </div>
-  </section>
-  <main class="gl-shell">
-    ${catBlocks}
-    <div class="gl-cta">
-      <h2>Ready to move a container?</h2>
-      <p>Browse FMCSA-verified drayage and intermodal carriers, or get an instant freight quote in minutes.</p>
-      <div class="row">
-        <a class="btn btn-primary" href="/directory?intermodal=1">Find drayage carriers <span class="arr">→</span></a>
-        <a class="btn btn-secondary" href="/w/demo">Get an instant quote</a>
-      </div>
-    </div>
-  </main>`;
+  const usedCategories = GLOSSARY_CATEGORIES.filter((cat) =>
+    GLOSSARY_TERMS.some((t) => t.category === cat),
+  ).length;
 
-  return layout({
+  /**
+   * THREE OF THE EIGHT BLOCKS ARE DELIBERATELY ABSENT, and the reason is the
+   * same one each time: this is a 37-term reference index, not a calculator.
+   *
+   *   4 "how it works", 3-up — there is no process. "Pick a category, click a
+   *     term, read it" is a numbered description of a hyperlink.
+   *   5 two alternating rows — the content IS the word list. Two 50/50
+   *     explainer rows under 37 cards add scroll and no information, and the
+   *     one genuinely useful thing they could carry (a term leading to the tool
+   *     that computes it) is exactly what block 6 already does.
+   *   7 FAQ — no question here is asked often enough to be a question, and
+   *     'FAQPage' schema over invented Q&A is a promise to a search engine we
+   *     would not be keeping. The index already ships ItemList + BreadcrumbList,
+   *     which is the correct schema for a term index.
+   *
+   * Block 3 IS kept, and is not padding: "these are plain-English industry
+   * definitions, not the legal or contractual ones" is a real boundary that a
+   * reader making a compliance decision off a glossary entry needs, and the
+   * page states it nowhere else.
+   */
+  return toolPage({
     title: `Drayage & Freight Glossary — ${GLOSSARY_TERMS.length} Terms Defined | QuoteFleet`,
     description: `Clear definitions of ${GLOSSARY_TERMS.length} drayage, intermodal and freight-compliance terms — from demurrage and chassis splits to UIIA, TWIC and TEU. A free QuoteFleet reference.`,
-    canonicalPath: '/glossary',
-    bodyHtml: body,
+    path: '/glossary',
+
+    // ── 1 ──
+    crumbs: [{ name: 'Glossary' }],
+    eyebrow: 'Freight knowledge base',
+    h1: 'Drayage & freight glossary',
+    lead: `Plain-English definitions of the drayage, intermodal, and freight-compliance terms that shape a container move — written by QuoteFleet. ${GLOSSARY_TERMS.length} terms across ${usedCategories} categories.`,
+    embed: { href: '/pricing', label: 'Embed this glossary' },
+
+    // ── 2 ── The index IS the tool: the jump list, then every term.
+    toolHtml: `<div class="gl-toc">${toc}</div>${catBlocks}`,
+
+    // ── 3 ── Two facts, so the strip is two full columns.
+    limits: {
+      head: {
+        eyebrow: 'Scope',
+        heading: 'What these definitions are, and are not',
+      },
+      facts: [
+        {
+          label: 'What it covers',
+          bodyHtml: `<strong>${GLOSSARY_TERMS.length} terms</strong> across ${usedCategories} categories — drayage and intermodal, ports and container fees, equipment, carrier compliance, and oversize/overweight. Every definition is original QuoteFleet copy, written for a dispatcher rather than lifted from a regulation.`,
+        },
+        {
+          label: 'What it is not',
+          bodyHtml:
+            'These are the terms as the industry uses them, <strong>not legal or contractual definitions</strong>. Where a word also appears in a tariff, a rate confirmation, an interchange agreement or a federal regulation, that document controls and its wording can be narrower than this one. Do not settle a charge dispute from a glossary entry.',
+        },
+      ],
+    },
+
+    // ── 6 ── Where a term touches something we compute, the tool is one click
+    // away. This is the block that replaces the centred "Ready to move a
+    // container?" panel the page used to end on.
+    related: {
+      head: {
+        eyebrow: 'Next',
+        heading: 'From the word to the number',
+        sub: 'Several of these terms name something we will work out for you.',
+      },
+      items: [
+        {
+          href: '/compliance',
+          title: 'Compliance lookup',
+          blurb: "Check a carrier's authority, insurance and safety status live from FMCSA.",
+        },
+        {
+          href: '/directory?intermodal=1',
+          title: 'Drayage carriers',
+          blurb: 'FMCSA-registered drayage and intermodal carriers, filterable by capability.',
+        },
+        {
+          href: '/tools/axle-weights',
+          title: 'Axle weight checker',
+          blurb: "Bridge formula, tandem span and a state's own cited limits on one rig.",
+        },
+        {
+          href: '/tools/seasonal-weight-restrictions',
+          title: 'Seasonal restrictions',
+          blurb: "What each state publishes on spring thaw, and when we last read it.",
+        },
+      ],
+    },
+
+    extraCss: GLOSSARY_CSS,
     jsonLd: [itemList, breadcrumb],
   });
 }
@@ -746,16 +773,6 @@ export function renderGlossaryTerm(term: GlossaryTerm): string {
     : '';
 
   const body = `
-  <section class="hero gl-hero">
-    <div class="container-narrow">
-      <nav class="gl-crumbs" aria-label="Breadcrumb">
-        <a href="/">Home</a><span class="sep">/</span><a href="/glossary">Glossary</a><span class="sep">/</span>${esc(term.term)}
-      </nav>
-      <span class="gl-pill">${esc(term.category)}</span>
-      <h1 style="margin-top: 12px;">${esc(term.titleQuestion)}</h1>
-    </div>
-  </section>
-  <main class="gl-shell">
     <div class="gl-def">${term.definitionHtml}</div>
     ${relatedHtml}
     <div class="gl-cta">
@@ -766,8 +783,7 @@ export function renderGlossaryTerm(term: GlossaryTerm): string {
         <a class="btn btn-secondary" href="/w/demo">Get an instant quote</a>
       </div>
     </div>
-    <p style="text-align: center; margin-top: 24px;"><a class="muted-small" href="/glossary">← Back to the full glossary</a></p>
-  </main>`;
+    <p style="margin-top: 24px;"><a class="muted-small" href="/glossary">← Back to the full glossary</a></p>`;
 
   // Strip HTML tags from the definition for the DefinedTerm/Article text + meta.
   const plain = term.definitionHtml.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
@@ -804,11 +820,29 @@ export function renderGlossaryTerm(term: GlossaryTerm): string {
     ],
   };
 
-  return layout({
+  /**
+   * A TERM PAGE IS NOT A TOOL PAGE — no calculator, no limits to state beyond
+   * the index's, no three steps. It gets the SHARED SHELL instead, which is
+   * what removes this file's hand-rolled '<!doctype html>': the index, the 37
+   * term pages and the rest of the site now render one head, one header, one
+   * footer and one theme boot.
+   *
+   * URL, title, description, canonical and all three JSON-LD objects are
+   * carried across UNCHANGED — these pages are in the sitemap and carry the
+   * glossary's search weight, so nothing an indexer reads is allowed to move.
+   */
+  return hubPage({
     title: `${term.titleQuestion} — Drayage Glossary | QuoteFleet`,
     description: `${term.summary} Part of QuoteFleet's free drayage & freight glossary.`,
-    canonicalPath: `/glossary/${term.slug}`,
+    path: `/glossary/${term.slug}`,
+    crumbs: [{ name: 'Glossary', path: '/glossary' }, { name: term.term }],
+    eyebrow: term.category,
+    h1: term.titleQuestion,
+    lead: esc(term.summary),
+    bandHtml: `<p><span class="gl-pill">${esc(term.category)}</span></p>`,
+    bodyClass: 'gl-page',
     bodyHtml: body,
+    extraCss: GLOSSARY_CSS,
     jsonLd: [definedTerm, article, breadcrumb],
   });
 }

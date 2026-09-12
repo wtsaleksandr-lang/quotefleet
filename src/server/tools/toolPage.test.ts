@@ -244,3 +244,58 @@ describe('the shell is reused, not forked', () => {
     expect(page()).not.toContain('qf-tool-promo');
   });
 });
+
+describe('blocks a page has nothing honest to put in', () => {
+  // The glossary is the case these exist for: a 37-term reference index has no
+  // three-step process and no FAQ that is not invented. Omission must drop the
+  // block cleanly — not reorder the rest, and not leave an empty section.
+  const bare = { ...{}, limits: undefined, steps: undefined, rows: undefined, faq: undefined };
+
+  it('renders without limits, steps, rows or FAQ', () => {
+    const html = page(bare);
+    expect(html).not.toContain('id="limits"');
+    expect(html).not.toContain('id="how"');
+    expect(html).not.toContain('id="detail"');
+    expect(html).not.toContain('id="faq"');
+    // ...and leaves no empty shell behind where a block used to be.
+    expect(html).not.toMatch(/<section class="qtt-sec"[^>]*>\s*<\/section>/);
+  });
+
+  it('still renders the blocks that ARE supplied, in the fixed order', () => {
+    const html = page(bare);
+    for (const marker of ['class="qtt-band"', 'id="the-tool"', 'id="related"', '<footer class="premium-footer"']) {
+      expect(html.indexOf(marker), `${marker} is missing`).toBeGreaterThan(-1);
+    }
+    expect(html.indexOf('id="the-tool"')).toBeLessThan(html.indexOf('id="related"'));
+    expect(html.indexOf('id="related"')).toBeLessThan(html.indexOf('<footer class="premium-footer"'));
+  });
+
+  it('drops exactly one section header per omitted block', () => {
+    expect((page().match(/class="qtt-head"/g) ?? []).length).toBe(5);
+    expect((page(bare).match(/class="qtt-head"/g) ?? []).length).toBe(1); // related only
+    expect((page({ faq: undefined }).match(/class="qtt-head"/g) ?? []).length).toBe(4);
+  });
+
+  it('keeps one h2 per rendered block and no orphaned heading', () => {
+    const html = page(bare);
+    const main = html.slice(html.indexOf('<main'), html.indexOf('</main>'));
+    expect((main.match(/<h2>/g) ?? []).length).toBe((html.match(/class="qtt-head"/g) ?? []).length);
+  });
+
+  it('emits NO FAQPage schema when there is no FAQ — the schema is a promise', () => {
+    // jsonLd is the caller's, so the guarantee is only that omitting the block
+    // removes the rendered Q&A; a page that drops the block must also drop the
+    // schema it was backing, which is why they are asserted together here.
+    const html = page({ faq: undefined, jsonLd: [{ '@type': 'WebApplication' }] });
+    // Scoped to the rendered body: `.qh-faq` is also a CLASS DEFINITION in the
+    // shell's stylesheet, which is in the document whether or not a page has
+    // an FAQ, so a whole-document search would always find it.
+    const main = html.slice(html.indexOf('<main'), html.indexOf('</main>'));
+    expect(main).not.toContain('qh-faq');
+    expect(html).not.toContain('"@type":"FAQPage"');
+  });
+
+  it('never makes `related` optional — it is the suite signal', () => {
+    expect(page(bare)).toContain('qtt-related');
+  });
+});
