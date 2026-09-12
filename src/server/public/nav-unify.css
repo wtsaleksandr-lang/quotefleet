@@ -1243,8 +1243,26 @@ body:has(#site-burger[aria-expanded="true"]) .qf-mc-fab { display: none; }
   .premium-footer-inner { gap: var(--space-1-5) var(--space-2); }
   .premium-footer .footer-brand { gap: var(--space-1); }
   .premium-footer .footer-brand .qf-footer-logo { height: 28px; }
-  /* A collapsed column is a control, so give it a real target to tap. */
-  .premium-footer .qf-fdisc-sum { min-height: 40px; padding: var(--space-1) 0; }
+  /* A collapsed column is a control, so give it a real target to tap. 44px is
+     the target check-spacing.mjs measures against; 40 was four short. */
+  .premium-footer .qf-fdisc-sum { min-height: 44px; padding: var(--space-1) 0; }
+  /* AND SO IS EVERY LINK INSIDE AN OPENED COLUMN — they measured 28.14px
+     (13px on 1.55 leading + 4px either side), a good reading row and a poor
+     thumb target.
+
+     SCOPED TO THE PHONE STEP, and the reason is arithmetic rather than
+     laziness. Above 640px these columns never collapse, so their links are
+     permanently rendered and 38 x 15.86px would add ~602px to a 613px footer —
+     most of the ~60% cut PRs #565-567 bought, handed straight back. At this
+     step the columns ship CLOSED, so the taller rows live inside a panel the
+     browser does not render until the reader opens it: the collapsed footer
+     measures the same to the pixel, and the opened panel is taller only while
+     a thumb is already on its way to it. Measured both ways before shipping. */
+  .premium-footer .qf-fdisc-body a {
+    display: flex;
+    align-items: center;
+    min-height: 44px;
+  }
   /* THE SPANNED LAST COLUMN PAGINATES ITS LINKS, NOT ITS DISCLOSURE.
      `.footer-col:last-child` is pinned `1 / -1` at this step and carried
      `columns: 2` so its links filled the full-bleed row instead of running
