@@ -470,8 +470,8 @@ src/server/public/landing-final-cta.css:61	spacing	margin: 38px 0 0
 src/server/public/landing-final-cta.css:67	spacing	gap: 10px
 src/server/public/landing-final-cta.css:85	spacing	gap: 9px
 src/server/public/landing-final-cta.css:86	spacing	padding: 11px 12px
-src/server/public/landing-footer-polish.css:169	radius	border-radius: 999px
-src/server/public/landing-footer-polish.css:194	radius	border-radius: 14px
+src/server/public/landing-footer-polish.css:170	radius	border-radius: 999px
+src/server/public/landing-footer-polish.css:195	radius	border-radius: 14px
 src/server/public/landing-hero-fixes-v2.css:142	radius	border-radius: 2px
 src/server/public/landing-home-fixes.css:106	spacing	gap: 14px
 src/server/public/landing-home-fixes.css:125	spacing	padding: 9px 18px
@@ -672,13 +672,13 @@ src/server/public/nav-unify.css:28	spacing	gap: 20px
 src/server/public/nav-unify.css:287	spacing	padding: 12px 14px
 src/server/public/nav-unify.css:29	radius	border-radius: 14px
 src/server/public/nav-unify.css:348	spacing	padding: 54px 24px 34px
-src/server/public/nav-unify.css:406	spacing	padding: 5px 0
+src/server/public/nav-unify.css:408	spacing	padding: 5px 0
 src/server/public/nav-unify.css:42	spacing	gap: 9px
-src/server/public/nav-unify.css:439	spacing	margin: 34px auto 0
-src/server/public/nav-unify.css:441	spacing	padding-top: 18px
-src/server/public/nav-unify.css:444	spacing	gap: 18px
-src/server/public/nav-unify.css:461	spacing	padding: 42px 18px 28px
-src/server/public/nav-unify.css:512	radius	border-radius: 14px
+src/server/public/nav-unify.css:441	spacing	margin: 34px auto 0
+src/server/public/nav-unify.css:443	spacing	padding-top: 18px
+src/server/public/nav-unify.css:446	spacing	gap: 18px
+src/server/public/nav-unify.css:463	spacing	padding: 42px 18px 28px
+src/server/public/nav-unify.css:514	radius	border-radius: 14px
 src/server/public/onboarding-wizard.css:810	radius	border-radius: 14px
 src/server/public/premium-saas-polish.css:10	spacing	padding: 18px
 src/server/public/premium-saas-polish.css:115	spacing	margin-top: 14px

@@ -35,12 +35,13 @@ body.qf-wft .premium-footer .qf-footer-brandtext {
   min-width: 0;
 }
 body.qf-wft .premium-footer .qf-footer-wordmark {
+  /* font-size stays — the baked-SVG wordmark sizes in `em` off it. Weight and
+     tracking left with the text node; both are baked into the outline. */
   font-size: 19px;
-  font-weight: 850;
-  letter-spacing: -0.02em;
   /* !important: the global `a { color: var(--accent) }` (and a JS-injected
      cleanup sheet that loads after this static link) otherwise tint the
-     wordmark blue; keep it white to match the nav brand. */
+     wordmark blue; keep it white to match the nav brand. It reaches the
+     outline through `fill: currentColor`. */
   color: var(--ink) !important;
   text-decoration: none;
 }

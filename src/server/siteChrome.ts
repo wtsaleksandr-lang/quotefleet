@@ -899,7 +899,50 @@ export function footerBottomHtml(opts: {
  * on the element so nothing reflows. If the footer band is ever themed, delete
  * the attribute and the existing swap does the right thing again.
  */
-export const PREMIUM_FOOTER = `<footer class="premium-footer"><div class="premium-footer-inner" data-cols="${FOOTER_LADDER.columns}"${FOOTER_LADDER.phoneSpansLast ? ' data-cols-odd' : ''}><div class="footer-brand"><a href="/" class="qf-footer-brand" aria-label="QuoteFleet home"><img class="qf-footer-logo" src="/brand/logo-full-ondark.png" data-logo-fixed alt="QuoteFleet — freight rate calculator" width="168" height="113" decoding="async"></a><div class="qf-footer-brandtext"><a href="/" class="qf-footer-wordmark">QuoteFleet</a><p class="qf-footer-tagline">Branded rate calculator pages, PDF quotes, and optional AI chat for trucking service providers.</p></div></div>${FOOTER_COLUMNS_HTML}</div>${footerBottomHtml({ marksNote: true })}</footer>`;
+/**
+ * THE FOOTER WORDMARK IS A BAKED OUTLINE, NOT TYPE.
+ *
+ * It used to be a text node in Inter Variable at weight 850 — Inter Black. At
+ * 15px that weight closes the counters and reads as a heavy UI label rather
+ * than a mark, and Inter is the most-used UI face on the web, so it carried no
+ * distinction. Alex reviewed rendered candidates and chose Instrument Sans 600
+ * at -0.02em tracking.
+ *
+ * WHY OUTLINES AND NOT A WEBFONT. The string is ten characters. An Instrument
+ * Sans 600 latin-subset woff2 is ~17 KB plus a request to fonts.gstatic.com
+ * plus a swap flash, on a site where Core Web Vitals have already cost us
+ * work. These paths are ~1.0 KB brotli, inline, zero requests, no FOUT.
+ * Nothing else on the site uses the face, so a webfont would buy one word.
+ *
+ * THE TRACKING AND THE KERNING ARE BAKED IN — never add letter-spacing back.
+ * Each glyph is drawn at x=0 and placed by an SVG transform, and those x
+ * positions came from the BROWSER's own layout of the live webfont, not from
+ * opentype.js's advance maths: Instrument Sans ships GPOS kerning and NO
+ * legacy 'kern' table, so opentype.js's getKerningValue() returns 0 for every
+ * pair and the first cut of this asset was unkerned — it drifted -0.63% across
+ * the string, 19.8% of ink pixels off against the live face at 100px. The
+ * shipped paths differ from the webfont only in anti-aliasing (2.5% of ink,
+ * edge hairlines only).
+ *
+ * IT MUST STAY INLINE. An `<img src>` would cut currentColor, and this mark
+ * recolours with the footer's ink token in all three theme states. It is sized
+ * in `em` off the anchor's font-size, which is why that font-size rule
+ * survived the cleanup in nav-unify.css even though font-weight and
+ * letter-spacing did not.
+ *
+ * THE ACCESSIBLE NAME LIVES ON THE ANCHOR. The graphic is aria-hidden and the
+ * <a> carries aria-label="QuoteFleet", so the link has exactly one accessible
+ * name and no <title> tooltip that the text node it replaced never had. Keep
+ * the two halves together — aria-hidden art with no label on the link would
+ * leave the link nameless.
+ *
+ * Design size is 1em = 100 units: viewBox `0 -97 517.3 122` is the face's own
+ * ascender/descender box, so 1.22em tall is exactly the content box a 15px
+ * text run in Instrument Sans would have occupied.
+ */
+export const FOOTER_WORDMARK_SVG = `<svg class="qf-footer-wordmark-svg" viewBox="0 -97 517.3 122" width="5.173em" height="1.22em" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg"><g fill="currentColor"><path transform="translate(0,0)" d="M52.90-5L40.30 1Q29.40 1 21.15-3.75Q12.90-8.50 8.30-16.90Q3.70-25.30 3.70-36.30Q3.70-47.20 8.30-55.45Q12.90-63.70 21.05-68.35Q29.20-73 39.60-73Q50.20-73 58.35-68.35Q66.50-63.70 71.10-55.40Q75.70-47.10 75.70-36.20Q75.70-28.90 73.30-22.45Q70.90-16 65.90-11.50Q60.90-7 52.90-5M39.60-9.10Q46.40-9.10 51.55-12.45Q56.70-15.80 59.60-22Q62.50-28.20 62.50-36.40Q62.50-44.20 59.65-50.05Q56.80-55.90 51.65-59.15Q46.50-62.40 39.60-62.40Q32.80-62.40 27.65-59.15Q22.50-55.90 19.70-50.10Q16.90-44.30 16.90-36.40Q16.90-28.10 19.75-21.95Q22.60-15.80 27.75-12.45Q32.90-9.10 39.60-9.10M40.30 1L39.70-8L79.10-10.30L79.10 0Q72.80 0 68.05 0.15Q63.30 0.30 59.15 0.50Q55 0.70 50.50 0.85Q46 1 40.30 1"/><path transform="translate(78.8,0)" d="M23.20 1Q17.90 1 14.05-1.25Q10.20-3.50 8.15-7.40Q6.10-11.30 6.10-16.20L6.10-51L18.70-51L18.70-18.80Q18.70-14.10 21.05-11.70Q23.40-9.30 27.70-9.30Q31.60-9.30 34.55-11.10Q37.50-12.90 39.25-16.15Q41-19.40 41-23.50L42.30-11.30Q39.80-5.70 34.85-2.35Q29.90 1 23.20 1M53.70 0L41.40 0L41.40-12L41-12L41-51L53.70-51"/><path transform="translate(136.9,0)" d="M29.90 1Q21.80 1 15.65-2.40Q9.50-5.80 6.10-11.85Q2.70-17.90 2.70-25.70Q2.70-33.50 6.10-39.40Q9.50-45.30 15.65-48.65Q21.80-52 29.90-52Q38.10-52 44.20-48.65Q50.30-45.30 53.70-39.40Q57.10-33.50 57.10-25.70Q57.10-17.90 53.65-11.85Q50.20-5.80 44.10-2.40Q38 1 29.90 1M29.90-9.10Q33.90-9.10 37.10-11.15Q40.30-13.20 42.10-16.95Q43.90-20.70 43.90-25.80Q43.90-33.30 39.95-37.60Q36-41.90 29.90-41.90Q23.80-41.90 19.80-37.60Q15.80-33.30 15.80-25.80Q15.80-20.70 17.65-16.95Q19.50-13.20 22.65-11.15Q25.80-9.10 29.90-9.10"/><path transform="translate(193.4,0)" d="M29.60 1Q20.20 1 15.75-3.45Q11.30-7.90 11.30-16.80L11.30-62.60L24-67.30L24-16.50Q24-12.80 26-11Q28-9.20 32.30-9.20Q34-9.20 35.35-9.45Q36.70-9.70 37.90-10.10L37.90-0.30Q36.70 0.30 34.50 0.65Q32.30 1 29.60 1M37.90-41.10L1.50-41.10L1.50-51L37.90-51"/><path transform="translate(230.4,0)" d="M29.60 1Q21.50 1 15.45-2.40Q9.40-5.80 6.05-11.80Q2.70-17.80 2.70-25.60Q2.70-33.40 6.05-39.35Q9.40-45.30 15.40-48.65Q21.40-52 29.40-52Q37-52 42.60-48.85Q48.20-45.70 51.30-40Q54.40-34.30 54.40-26.70Q54.40-25.30 54.30-24.10Q54.20-22.90 54-21.70L10.50-21.70L10.50-30.50L44.30-30.50L41.70-28.10Q41.70-35.30 38.40-38.90Q35.10-42.50 29.20-42.50Q22.80-42.50 19.05-38.10Q15.30-33.70 15.30-25.40Q15.30-17.20 19.05-12.85Q22.80-8.50 29.70-8.50Q33.70-8.50 36.70-10Q39.70-11.50 41.10-14.60L53-14.60Q50.50-7.40 44.55-3.20Q38.60 1 29.60 1"/><path transform="translate(285.5,0)" d="M19.20 0L6.20 0L6.20-72L19.20-72L19.20 0M52.90-28.90L12.40-28.90L12.40-39.20L52.90-39.20L52.90-28.90M55.30-61.70L12.40-61.70L12.40-72L55.30-72"/><path transform="translate(342.9,0)" d="M19.30 0L6.70 0L6.70-72L19.30-72"/><path transform="translate(366.9,0)" d="M29.60 1Q21.50 1 15.45-2.40Q9.40-5.80 6.05-11.80Q2.70-17.80 2.70-25.60Q2.70-33.40 6.05-39.35Q9.40-45.30 15.40-48.65Q21.40-52 29.40-52Q37-52 42.60-48.85Q48.20-45.70 51.30-40Q54.40-34.30 54.40-26.70Q54.40-25.30 54.30-24.10Q54.20-22.90 54-21.70L10.50-21.70L10.50-30.50L44.30-30.50L41.70-28.10Q41.70-35.30 38.40-38.90Q35.10-42.50 29.20-42.50Q22.80-42.50 19.05-38.10Q15.30-33.70 15.30-25.40Q15.30-17.20 19.05-12.85Q22.80-8.50 29.70-8.50Q33.70-8.50 36.70-10Q39.70-11.50 41.10-14.60L53-14.60Q50.50-7.40 44.55-3.20Q38.60 1 29.60 1"/><path transform="translate(422.7,0)" d="M29.60 1Q21.50 1 15.45-2.40Q9.40-5.80 6.05-11.80Q2.70-17.80 2.70-25.60Q2.70-33.40 6.05-39.35Q9.40-45.30 15.40-48.65Q21.40-52 29.40-52Q37-52 42.60-48.85Q48.20-45.70 51.30-40Q54.40-34.30 54.40-26.70Q54.40-25.30 54.30-24.10Q54.20-22.90 54-21.70L10.50-21.70L10.50-30.50L44.30-30.50L41.70-28.10Q41.70-35.30 38.40-38.90Q35.10-42.50 29.20-42.50Q22.80-42.50 19.05-38.10Q15.30-33.70 15.30-25.40Q15.30-17.20 19.05-12.85Q22.80-8.50 29.70-8.50Q33.70-8.50 36.70-10Q39.70-11.50 41.10-14.60L53-14.60Q50.50-7.40 44.55-3.20Q38.60 1 29.60 1"/><path transform="translate(476.7,0)" d="M29.60 1Q20.20 1 15.75-3.45Q11.30-7.90 11.30-16.80L11.30-62.60L24-67.30L24-16.50Q24-12.80 26-11Q28-9.20 32.30-9.20Q34-9.20 35.35-9.45Q36.70-9.70 37.90-10.10L37.90-0.30Q36.70 0.30 34.50 0.65Q32.30 1 29.60 1M37.90-41.10L1.50-41.10L1.50-51L37.90-51"/></g></svg>`;
+
+export const PREMIUM_FOOTER = `<footer class="premium-footer"><div class="premium-footer-inner" data-cols="${FOOTER_LADDER.columns}"${FOOTER_LADDER.phoneSpansLast ? ' data-cols-odd' : ''}><div class="footer-brand"><a href="/" class="qf-footer-brand" aria-label="QuoteFleet home"><img class="qf-footer-logo" src="/brand/logo-full-ondark.png" data-logo-fixed alt="QuoteFleet — freight rate calculator" width="168" height="113" decoding="async"></a><div class="qf-footer-brandtext"><a href="/" class="qf-footer-wordmark" aria-label="QuoteFleet">${FOOTER_WORDMARK_SVG}</a><p class="qf-footer-tagline">Branded rate calculator pages, PDF quotes, and optional AI chat for trucking service providers.</p></div></div>${FOOTER_COLUMNS_HTML}</div>${footerBottomHtml({ marksNote: true })}</footer>`;
 
 // Burger + Solutions-dropdown behaviour, mirrored from landing.html so the
 // injected header is interactive. Idempotent #year setter included.

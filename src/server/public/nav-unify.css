@@ -380,9 +380,11 @@ html[data-theme="light"] .nav-dd-panel {
   min-width: 0;
 }
 .premium-footer .qf-footer-wordmark {
+  /* font-size is LOAD-BEARING: the wordmark is a baked SVG outline sized in
+     `em` off this value (final-pass block at EOF). font-weight and
+     letter-spacing left with the text node — the weight is the outline and
+     the -0.02em tracking is baked into the path positions. */
   font-size: 19px;
-  font-weight: 850;
-  letter-spacing: -0.02em;
   color: var(--ink);
   text-decoration: none;
 }
@@ -1317,4 +1319,52 @@ body:has(#site-burger[aria-expanded="true"]) .qf-mc-fab { display: none; }
 }
 @media (max-width: 900px) {
   .premium-footer { padding-bottom: calc(80px + env(safe-area-inset-bottom, 0px)); }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   FOOTER WORDMARK — BAKED OUTLINE, NOT TYPE
+   Asset + rationale: FOOTER_WORDMARK_SVG in siteChrome.ts.
+   Appended at EOF on purpose: the spacing and colour guards baseline this file
+   by FILE:LINE, so a mid-file insert renumbers ~1000 baseline entries.
+
+   HOLD THE LINE BOX. The anchor used to wrap a 15px/1.55 text node, so its box
+   was exactly one line box tall — 23.25px — and the brand block (58.03px), and
+   therefore every page's footer, was measured against that. `1lh` IS that line
+   box; the em value in front of it is the same number for engines without the
+   unit (1.55 is the inherited line-height).
+
+   SIZE IN `em`, NOT px. The mark then tracks the font-size rule above instead
+   of pinning a second magic number somewhere else: 5.173em x 1.22em resolves
+   to 77.59 x 18.30px at the shipping 15px. BOTH axes are declared so the box
+   is known before the paths parse — this footer is on every page, and a shift
+   here is a Core Web Vitals regression, not a cosmetic one.
+
+   SHRINK-WRAP. Stretched, the anchor ran the full column (454px at 1440) and
+   the focus ring drew a rectangle around mostly empty space.
+   ═══════════════════════════════════════════════════════════════════════════ */
+.premium-footer .qf-footer-wordmark {
+  display: flex;
+  align-items: center;
+  width: fit-content;
+  min-height: 1.55em;
+  min-height: 1lh;
+}
+.premium-footer .qf-footer-wordmark .qf-footer-wordmark-svg {
+  display: block;
+  width: 5.173em;
+  height: 1.22em;
+}
+/* The focus indicator was the UA default. It IS visible — Chrome's `auto` ring
+   auto-contrasts, so it painted light on this near-black band, and the
+   computed `outline-color: rgb(16,16,16)` is misleading about what actually
+   gets drawn. What was wrong is that it wrapped the STRETCHED anchor: a 454px
+   rectangle around a 78px mark. Shrink-wrapped above, it now hugs the mark, in
+   the footer's own accent (--accent is re-pointed to --footer-accent on
+   .premium-footer, 7.78:1 on this ground). Hover stays opacity and never draws
+   a ring, so the two states cannot be mistaken for each other. */
+.premium-footer .qf-footer-wordmark:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 6px;
+  opacity: 1;
 }

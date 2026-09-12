@@ -597,9 +597,9 @@ body.qf-wft .footer-brand .qf-footer-brand {
   max-width: 100%;
 }
 .footer-brand .qf-footer-wordmark {
+  /* Overridden to 15px by the final-pass rules, but kept: the baked-SVG
+     wordmark sizes in `em` off font-size. Weight/tracking are in the paths. */
   font-size: 20px;
-  font-weight: 850;
-  letter-spacing: -0.02em;
 }
 @media (max-width: 720px) {
   .footer-brand .qf-footer-logo { width: 148px; }
