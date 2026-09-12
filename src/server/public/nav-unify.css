@@ -1716,7 +1716,20 @@ html[data-qf-menu="open"] body {
    Three spans, not two swapped glyphs: the bars are the SAME three bars
    before and after, so the change is a rotation the eye can follow rather
    than a substitution it can only notice. Laid out with space-between so the
-   only numbers involved are the transforms. */
+   only numbers involved are the transforms.
+
+   AND THE CONTROL ITSELF WAS UNDER THE FLOOR. Every sheet that shows the
+   burger sizes it 40x40 — nav-unify at the collapse point, nav-ia at (0,3,2)
+   with !important, landing-home-fixes at 640 — and the house rule, Apple's
+   44pt and Material's 48dp all put the minimum at 44. It is the one control
+   this whole round is about, so it goes to 44 rather than staying 4px short.
+   min-* rather than width/height, so no other sheet has to be edited and the
+   box cannot shrink back; measured at 320px the header still fits with 0
+   horizontal overflow. */
+#site-burger {
+  min-width: var(--tap-target);
+  min-height: var(--tap-target);
+}
 #site-burger .qf-burger-box {
   display: flex;
   flex-direction: column;
