@@ -81,9 +81,20 @@ html body.qf-wft h2.qf-marquee-head {
   letter-spacing: -1.28px;
   color: var(--ink);
   text-align: left;
+  /* Same no-orphan rule, same one-line answer, as the card titles and the hero
+     h1. Measured: at 375 and 320 this heading broke to "Built for drivers,
+     brokers and / importers", stranding the last word. It has enough words to
+     balance cleanly, and above 414 it is a single line where the property is
+     inert. */
+  text-wrap: balance;
 }
 html body.qf-wft .qf-marquee-head .qf-marquee-head__lead { color: var(--ink); }
-html body.qf-wft .qf-marquee-head .qf-marquee-head__soft { color: var(--muted-soft); }
+/* `--muted`, NOT `--muted-soft`, for the same reason and by the same
+   measurement as `.qf-toolgrid-head__soft` (landing-home-grid.css §5): the soft
+   step is 2.51:1 on `--bg` in light and 3.96:1 in dark, and this half drops to
+   22px at ≤560 where the requirement is 4.5:1. `--muted` is 7.35:1 / 7.17:1.
+   The three two-tone headings on this band now share one soft token. */
+html body.qf-wft .qf-marquee-head .qf-marquee-head__soft { color: var(--muted); }
 
 /* The viewport. `overflow: clip` rather than `hidden` — `hidden` makes this an
    ancestor scroll container, which breaks `position: sticky` on the page's

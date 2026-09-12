@@ -121,12 +121,19 @@
 
 /* Audience segmented control sits at the top of the card. `.hero-grid` on the
    row is kept (navInformationArchitecture pins that markup) but its two-column
-   hero layout is neutralised here — inside the card the row is just a centred
-   flex line. Specificity (0,3,2) + !important beats the injected sheets. */
+   hero layout is neutralised here — inside the card the row is just a flex line.
+   Specificity (0,3,2) + !important beats the injected sheets.
+
+   IT IS THE EYEBROW, SO IT IS TOP-LEFT. This control is what the two audience
+   panels dropped their `.eyebrow` label FOR (see the note in §2), which makes it
+   the first thing in the header block and puts it under the same rule: eyebrows
+   top-left. It was the last centred item in the hero after the h1, the lead and
+   the CTA row moved left, and one centred control floating above a left-aligned
+   stack reads as a mistake rather than as a choice. */
 html body.qf-wft .qf-hhero .qf-aud-togglerow {
   display: flex !important;
   grid-template-columns: none !important;
-  justify-content: center !important;
+  justify-content: flex-start !important;
   align-items: center !important;
   gap: 0 !important;
   width: 100% !important;
@@ -135,20 +142,35 @@ html body.qf-wft .qf-hhero .qf-aud-togglerow {
   padding: 0 !important;
 }
 html body.qf-wft .qf-hhero .qf-aud-togglerow > .qf-aud-toggle {
-  justify-self: center !important;
+  justify-self: start !important;
   margin: 0 !important;
 }
 
 /* ── 2 · Headline block ──────────────────────────────────────────────────── */
 
+/* LEFT-ALIGNED AT EVERY WIDTH. The house rule is that page and card headers are
+   never centred — eyebrows top-left, titles left — and every other page already
+   overrides the shared `.hero`'s default centring to get there (directory,
+   glossary, compliance, profile). This hero did not, and the result was also
+   internally inconsistent: ≥701 computed `center` while the ≤640 branch below
+   computed `left`, so the same heading obeyed the rule on a phone and broke it
+   on a laptop. The ≤640 branch is now the behaviour at all widths and its
+   duplicate declarations have been removed rather than left to shadow these.
+
+   `margin: 0`, NOT `0 auto`, IS HALF THE FIX. Text-align alone would leave a
+   left-ragged 780px block still centred inside the 1280px content column — the
+   h1 would start 250px in from the card's left edge (measured) rather than on
+   the same vertical as everything below it. Zeroing the auto margin is what
+   puts the title on the content column's left edge. Same for `.qf-hhero__action`
+   below, which carried the matching `margin: 12px auto 0`. */
 .qf-hhero__head {
   max-width: 780px;
-  margin: 0 auto;
+  margin: 0;
   display: flex;
   flex-direction: column;
-  align-items: center;
+  align-items: flex-start;
   gap: 12px;
-  text-align: center;
+  text-align: left;
 }
 
 /* NO EYEBROW RULES HERE ANY MORE. Both audience panels dropped their eyebrow
@@ -166,7 +188,7 @@ html body.qf-wft .qf-hhero__head h1 {
   line-height: 1.2;
   letter-spacing: -2.16px;
   color: var(--hero-wash-ink);
-  text-align: center;
+  text-align: left;
   text-wrap: balance;
 }
 
@@ -180,7 +202,7 @@ html body.qf-wft .qf-hhero__lead {
   line-height: 1.4;
   letter-spacing: -0.18px;
   color: var(--hero-wash-ink);
-  text-align: center;
+  text-align: left;
 }
 
 /* ── 3 · The conversion hook: company-name finder ────────────────────────── */
@@ -192,10 +214,10 @@ html body.qf-wft .qf-hhero__lead {
 .qf-hhero__action {
   width: 100%;
   max-width: 520px;
-  margin: 12px auto 0;
+  margin: 12px 0 0;
   display: flex;
   flex-direction: column;
-  align-items: center;
+  align-items: stretch;
   gap: 12px;
 }
 /* The legacy hero stacked these three in a flex column and hand-ordered them
@@ -248,9 +270,12 @@ html body.qf-wft .qf-hhero .qf-finder__input:focus {
    public FMCSA records." and "Set up in ~5 minutes · sourced from FMCSA public
    data.") are gone from the markup, so their rules are gone from here. */
 
+/* `flex-start`, not `center` — the CTA row is part of the header block and
+   follows it left, at every width. It used to be centred above 640 and
+   flex-start below it, which is the same split the h1 and lead had. */
 html body.qf-wft .qf-hhero .hero-cta {
   display: flex !important;
-  justify-content: center !important;
+  justify-content: flex-start !important;
   margin: 0 !important;
   padding: 0;
 }
@@ -327,9 +352,29 @@ html body.qf-wft .qf-toolgrid-head h2 {
   letter-spacing: -1.28px;
   color: var(--ink);
   text-align: left;
+  /* Carried for the same no-orphan reason as its two siblings on this band,
+     though this heading is the one that does NOT currently strand a word at any
+     width — it breaks 2+3 at 375 and 4+5 at 320. It is here so the four
+     headings on the page balance identically and a copy edit cannot quietly
+     reintroduce the orphan the other three were fixed for. */
+  text-wrap: balance;
 }
-/* The category noun is de-emphasised so the sentence, not the label, leads. */
-html body.qf-wft .qf-toolgrid-head h2 .qf-toolgrid-head__soft { color: var(--muted-soft); }
+/* The category noun is de-emphasised so the sentence, not the label, leads.
+
+   `--muted`, NOT `--muted-soft` — the soft step was simply the wrong token for
+   a heading and it failed AA at every width this half ships at. Measured off
+   the rendered page: `--muted-soft` is #90A1B9 on `--bg` #F8FAFC = 2.51:1 in
+   light, under even the 3:1 large-text floor at 32/28px; in dark it is #64748B
+   on #0C111D = 3.96:1, which clears 3:1 but not the 4.5:1 this half needs once
+   the ≤640 breakpoint takes it to 22px and it stops being "large text".
+   `--muted` measures 7.35:1 light / 7.17:1 dark on the same ground.
+
+   That this is a token slip and not a deliberate choice is settled by the
+   sibling: `.qf-partner-title__soft` runs the identical two-tone idiom one
+   section down and has always used `--muted` (6.97:1 on the partner card's
+   own ground). The de-emphasis is unharmed — `--ink` is 18.02:1 here, so
+   `--muted` is still an unmistakable step down from the lead phrase. */
+html body.qf-wft .qf-toolgrid-head h2 .qf-toolgrid-head__soft { color: var(--muted); }
 
 .qf-toolgrid-head__all {
   flex: 0 0 auto;
@@ -343,7 +388,9 @@ html body.qf-wft .qf-toolgrid-head h2 .qf-toolgrid-head__soft { color: var(--mut
   color: var(--accent);
   text-decoration: none;
   white-space: nowrap;
-  transition: var(--motion);
+  /* `.2s`, and only the property that actually moves — see `.qf-toolbtn` §6. */
+  transition: var(--motion-state);
+  transition-property: color;
 }
 html body.qf-wft .qf-toolgrid-head__all { color: var(--ink) !important; }
 html body.qf-wft .qf-toolgrid-head__all:hover { color: var(--accent) !important; }
@@ -470,6 +517,33 @@ html body.qf-wft .qf-toolgrid-head__all:hover { color: var(--accent) !important;
 .qf-toolcard__body {
   display: contents;
 }
+/* `text-wrap: balance` — NO ORPHANS IN A CARD TITLE.
+   These titles wrap in the narrow columns, which is fine; what is not fine is
+   the shape the default greedy algorithm leaves behind. Measured across
+   320/701/720/940/1440, ten of the twelve wrap instances stranded exactly one
+   word on the last line ("permits", "weights", "restrictions", "page",
+   "carrier", "calculators"), which the global no-orphan rule forbids.
+   `balance` re-fills the lines to even widths instead of filling greedily:
+   "Oversize & overweight / permits" becomes "Oversize & / overweight permits",
+   "Bridge formula & axle / weights" becomes "Bridge formula / & axle weights".
+   Seven of the ten clear. The titles are all 2-3 lines, well inside the 6-line
+   cap Chromium puts on balancing, and the h1 above already uses it. Where a
+   title is short enough not to wrap the property is inert.
+
+   THREE DO NOT CLEAR, AND NO WRAPPING RULE CAN CLEAR THEM. They are
+   "Free freight calculators" (hero 3-up, ~701-890) and "Seasonal weight
+   restrictions" (bento, ≤~330): THREE-WORD titles breaking to two lines, where
+   one line necessarily holds one word whichever way the break falls. It is
+   arithmetic, not an algorithm choice, and the numbers say there is no width to
+   win back either — at 701 the hero card's title track is 107.7px against the
+   171px the phrase needs on one line, and the word "calculators" is 78px of
+   that track by itself; the whole card's content box is 167.7px, so even
+   deleting the icon tile would not fit it. At 320 "Seasonal weight
+   restrictions" needs 210px against a 194px track. What `balance` does buy on
+   these three is the better of the two bad breaks: near-equal lines ("Free
+   freight" 93px / "calculators" 78px) instead of a long line and a stub. The
+   honest fix for them is copy, not CSS — a two-word title or a shorter last
+   word — and that is a content decision, not a presentation one. */
 html body.qf-wft .qf-toolcard__body h3 {
   grid-column: 2;
   grid-row: 1;
@@ -482,6 +556,7 @@ html body.qf-wft .qf-toolcard__body h3 {
   line-height: 1.2;
   color: var(--ink);
   text-align: left;
+  text-wrap: balance;
 }
 html body.qf-wft .qf-toolcard__sub {
   grid-column: 1 / -1;
@@ -542,14 +617,31 @@ html body.qf-wft .qf-toolcard__sub {
   text-decoration: none;
   white-space: nowrap;
   cursor: pointer;
-  transition: var(--motion);
+  /* ONE DURATION FOR EVERY BUTTON ON THIS PAGE, AND IT IS `.2s`.
+     These buttons ran `var(--motion)` — `all .3s ease` — against a page where
+     145 of the 171 non-zero transitions measured `.2s`. That is a third
+     duration on a surface the design law allows two, and the .3s side was the
+     minority. `--motion-state` is the site's existing `.2s ease` token, so this
+     is a re-point, not a new value: no literal duration is introduced here.
+
+     THE LONGHAND IS THE SECOND HALF. `--motion-state` expands to `all`, and
+     `all` on a button means the browser also watches width, padding and
+     transform for changes it will then animate — which is exactly how a hover
+     turns into a reflow nobody asked for. The hover rules below repaint the
+     fill, the hairline and the label and nothing else, so the property list
+     says so. `transition-property` after the shorthand wins, and the token
+     still supplies both the duration and the easing. */
+  transition: var(--motion-state);
+  transition-property: background-color, border-color, color;
 }
 /* The trailing chevron slides on hover — the one bit of movement the reference
-   gives its buttons, and the only motion on this page. `.2s` state duration so
-   it lands before the `.3s` colour settle rather than trailing it. */
+   gives its buttons, and the only motion on this page. Same `.2s` as the colour
+   settle it rides with now that the button is no longer `.3s`, so the two land
+   together instead of the arrow waiting on the fill. */
 .qf-toolbtn__arr {
   font-size: 16px;
   transition: var(--motion-state);
+  transition-property: transform;
 }
 
 /* !important on the label colours only: the landing bundle repaints every <a>
@@ -618,12 +710,19 @@ html body.qf-wft .qf-toolbtn--secondary:hover {
    and the ground react, the ink does not. `--ink` on the tinted ground
    measures 15.9:1 light / 15.2:1 dark, where an accent label would be 4.01:1
    on the light wash — under AA for 16px, so the label stays ink in both. */
+/* `.2s` and a named property list, for the reason given on `.qf-toolbtn` above.
+   This one matters slightly more: the legacy `.btn` skin animates a transform
+   on hover elsewhere on the site, and the hover rule below has to pass
+   `transform: none !important` to stop it. With `all` that "none" was itself a
+   transition; naming the three painted properties makes it instant. */
 html body.qf-wft .qf-hhero .hero-cta .btn {
-  transition: var(--motion);
+  transition: var(--motion-state);
+  transition-property: background-color, border-color, color;
 }
 html body.qf-wft .qf-hhero .hero-cta .btn .arr {
   display: inline-block;
   transition: var(--motion-state);
+  transition-property: transform;
 }
 html body.qf-wft .qf-hhero .qf-aud-panel .qf-hhero__action .hero-cta .btn:hover {
   border-color: var(--accent-legible) !important;
@@ -715,13 +814,13 @@ html[data-theme="light"] body.qf-wft a.qf-toolgrid-head__all:not(.btn):not(.nav-
 @media (max-width: 640px) {
   .qf-hhero__card { padding: 32px 0; }
   .qf-hhero__inner { padding: 0 16px; }
-  .qf-hhero__head { align-items: flex-start; text-align: left; }
-  html body.qf-wft .qf-hhero__head h1,
-  html body.qf-wft .qf-hhero__lead { text-align: left; }
+  /* The alignment half of this breakpoint is GONE — `align-items: flex-start`,
+     `text-align: left`, the action block's `margin: 12px 0 0` and the CTA row's
+     `justify-content: flex-start` are now the base behaviour at every width, so
+     repeating them here would only have shadowed identical values. What is left
+     is what genuinely belongs to a 640px viewport: the type steps down. */
   html body.qf-wft .qf-hhero__head h1 { font-size: 36px; letter-spacing: -1.44px; }
   html body.qf-wft .qf-hhero__lead { font-size: 16px; }
-  .qf-hhero__action { align-items: stretch; margin: 12px 0 0 0; }
-  html body.qf-wft .qf-hhero .hero-cta { justify-content: flex-start; }
   .qf-hhero__cards { margin: 32px 0 0 0; }
   html body.qf-wft.landing-v2 .qf-toolgrid-section { padding: 48px 0 32px !important; }
   html body.qf-wft .qf-toolgrid-head h2 { font-size: 28px; letter-spacing: -1.12px; }
