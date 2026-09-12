@@ -575,40 +575,85 @@ html body.qf-wft .qf-aud-panel[data-aud-panel="carriers"] .hero-cta .btn-seconda
    ═══════════════════════════════════════════════════════════════════════════ */
 
 /* ═══════════════════════════════════════════════════════════════════════════
-   AUDIENCE TOGGLE — SINGLE consolidated definition (A1). Replaces the three
-   fighting blocks that used to live in this file. landing-glass.css is injected
-   at RUNTIME by landing-motion.js (AFTER every static <link>, this file
-   included) and paints BOTH the track `.qf-aud-toggle` AND the active segment
-   `.qf-aud-seg.is-active` with the same translucent `--glass-thin-bg`, so the
-   selected side lost all fill contrast and read as a bare floating blue ring.
+   AUDIENCE TOGGLE — SINGLE consolidated definition (A1), REBUILT AS TWO
+   OUTLINED RECTANGLES (owner, 2026-09: "let's make it minimal, without white
+   fill color. Just wrap them into a square shaped 2 rectangular buttons with
+   rounded corners and thin subtle outline").
 
-   The active rule below adds the `.qf-aud-toggle` ancestor + `body.landing-v2`
-   (specificity 0,5,2) so it out-specifies landing-glass's active rule (0,3,2)
-   and restores a SOLID raised chip: selected reads via FILL (design-system §4:
-   selected = fill + subtle 1px border), NOT a bright ring. The blue
-   :focus-visible ring (base sheet) stays distinct from this resting fill.
-   Compact segmented pill: ~44px track, ~36px chip, pill radius, both themes.
+   WHAT THIS REPLACES, AND WHY IT WAS WRONG BEFORE THE OWNER SAID SO. The
+   previous version of this block called a white `--surface` flood "design-
+   system §4: selected = fill + subtle 1px border". §4 says the opposite —
+   "Selected/focused row visual = subtle outline, NEVER a bright fill" — so the
+   white pill was a straight violation that had been written up as compliance.
+   Measured, the selected segment was #FFFFFF at 9999px radius with a 0px
+   border and a near-black label; this is a correction, not a preference.
+
+   THE BORDER IS 2px IN BOTH STATES AND ONLY ITS COLOUR CHANGES. That is the
+   hard rule (border always 2px, selection is a colour swap) and it is also
+   what stops the row twitching: with a 0px/1px border on one side the two
+   segments change box size as you switch, and the whole hero copy block below
+   them shifts. Verified live — the same segment's border-box is identical
+   selected vs unselected at 1440/768/375/320 in both themes.
+
+   SELECTION = RIM + TINT, HOVER = RIM ONLY. Both labels are `--hero-wash-ink`
+   in both states, so the toggle never swaps ink colour (that was the other
+   half of the white pill: a near-black label appearing and disappearing over
+   a blue band). The selected segment is the one with the 10% tint; hover
+   brightens the rim alone, so it is an affordance rather than a second
+   selected-looking state.
+
+   THE TINT CEILING IS MEASURED, NOT CHOSEN. See the Wave 10 block at the foot
+   of style.css: 14% (`--hero-wash-wipe`) takes the selected ground to 4.26:1
+   for the white label — an AA failure — and 10% lands at 4.61:1.
+
+   CASCADE. landing-glass.css is injected at RUNTIME by landing-motion.js
+   (AFTER every static <link>, this file included) and paints both the track
+   (0,2,2) and the active segment (0,3,2) with a translucent `--glass-thin-bg`
+   plus a backdrop blur. These rules stay at (0,3,2)/(0,4,2)/(0,5,2) with
+   !important so they still win, and they explicitly zero the track's
+   background, border, radius and padding — the track is no longer a container,
+   it is just the flex row that spaces the two buttons.
    ═══════════════════════════════════════════════════════════════════════════ */
 html body.landing-v2.qf-wft .qf-aud-toggle {
-  border-radius: var(--radius-pill) !important;
-  gap: 4px !important;
-  padding: 4px !important;
+  display: inline-flex !important;
+  gap: 8px !important;
+  padding: 0 !important;
+  background: none !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
 }
 html body.landing-v2.qf-wft .qf-aud-toggle .qf-aud-seg {
-  border-radius: var(--radius-pill) !important;
+  border: 2px solid var(--hero-toggle-rim) !important;
+  border-radius: var(--radius-btn) !important;
+  background: none !important;
+  color: var(--hero-wash-ink) !important;
   font-size: 14px !important;
   padding: 8px 16px !important;
-  min-height: 36px !important;
+  min-height: 44px !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
 }
-/* Active = SOLID raised chip — beats landing-glass's translucent active seg and
-   its backdrop-filter blur, so "selected" is obvious by fill, not the ring. */
+/* Selected: the SAME 2px box, a brighter rim, and the tint. */
 html body.landing-v2.qf-wft .qf-aud-toggle .qf-aud-seg.is-active {
-  color: var(--ink) !important;
-  background: var(--surface) !important;
-  box-shadow: var(--qf-shadow-sm), inset 0 0 0 1px var(--border) !important;
+  border-color: var(--hero-toggle-rim-on) !important;
+  background: var(--hero-toggle-tint) !important;
+  color: var(--hero-wash-ink) !important;
+  box-shadow: none !important;
 }
+html body.landing-v2.qf-wft .qf-aud-toggle .qf-aud-seg:hover,
 html body.landing-v2.qf-wft .qf-aud-toggle .qf-aud-seg.is-active:hover {
-  color: var(--ink) !important;
+  border-color: var(--hero-toggle-rim-on) !important;
+  color: var(--hero-wash-ink) !important;
+}
+/* The base sheet rings focus in `--accent`, an indigo that measures ~1:1 on
+   this band — the same blind spot #570 found on the CTA's fill. Hero ink. */
+html body.landing-v2.qf-wft .qf-aud-toggle .qf-aud-seg:focus-visible {
+  outline: 2px solid var(--hero-wash-ink) !important;
+  outline-offset: 2px !important;
 }
 @media (min-width: 981px) {
   html body.landing-v2.qf-wft .qf-aud-toggle {

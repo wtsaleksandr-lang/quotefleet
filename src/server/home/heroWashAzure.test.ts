@@ -235,3 +235,218 @@ describe('the card puts its icon on the title\'s line', () => {
     expect(GRID).toContain('flex-wrap: nowrap');
   });
 });
+
+/**
+ * THE HERO'S PRIMARY CTA IS THE BAND TOO (Wave 10).
+ *
+ * #570 painted it `--accent-fill` — the brand indigo, hue 229, on a hue-198
+ * band — and the owner reported the same mismatch he had reported for the card
+ * icons. Measured live off the rendered page (button hidden, band pixel-
+ * sampled, four widths, both themes) the indigo was also only 1.02:1 against
+ * the darkest band pixel behind it, so the fill was carrying no boundary at
+ * all; the rim was the whole control.
+ *
+ * These tests pin the REPLACEMENT to the generator's anchors the same way the
+ * icon tests above do, so a future re-tune of the wash cannot leave the CTA
+ * behind — and they encode the two things that are easy to get wrong here:
+ *
+ *   1. THE STEP FLIPS DIRECTION WITH THE THEME. Light's band is a mid azure,
+ *      so the CTA steps DOWN from it; dark's band is teal-navy near-black,
+ *      where 3:1 below is off the bottom of the gamut, so it steps UP. A
+ *      change that makes both themes step the same way has broken one of them.
+ *   2. HOVER MOVES FURTHER FROM THE BAND, NEVER TOWARDS IT. That is what keeps
+ *      the label's contrast rising on hover instead of collapsing — the exact
+ *      failure `--accent-strong` caused (#2440C4 in light, a PALE LAVENDER
+ *      #B4C2FC in dark, and the lavender in both on `.landing-v2`).
+ */
+describe('the hero CTA is the band, stepped away from itself', () => {
+  const DARK_BAND = generatorAnchors('hero-wash-dark');
+
+  /** Every `--token: #hex;` declaration, in source order. */
+  const hexes = (css: string, name: string): RGB[] =>
+    [...css.matchAll(new RegExp(`--${name}:\\s*(#[0-9A-Fa-f]{6})\\s*;`, 'g'))].map((m) => hexToRgb(m[1]));
+
+  const CTA_FILL = hexes(STYLE, 'hero-cta-fill');
+  const CTA_HOVER = hexes(STYLE, 'hero-cta-fill-hover');
+  /* [light, dark, light] — the third is the prefers-color-scheme: light
+     fallback, which has to agree with the first or the two light paths drift. */
+  const [LIGHT_FILL, DARK_FILL, LIGHT_FILL_FALLBACK] = CTA_FILL;
+  const [LIGHT_HOVER, DARK_HOVER, LIGHT_HOVER_FALLBACK] = CTA_HOVER;
+
+  it('declares one light value and one dark value, and the light fallback agrees', () => {
+    expect(CTA_FILL).toHaveLength(3);
+    expect(LIGHT_FILL).toEqual(LIGHT_FILL_FALLBACK);
+    expect(CTA_HOVER).toHaveLength(3);
+    expect(LIGHT_HOVER).toEqual(LIGHT_HOVER_FALLBACK);
+  });
+
+  it('is the WASH hue in both themes, not the accent’s', () => {
+    for (const rgb of [LIGHT_FILL, DARK_FILL, LIGHT_HOVER, DARK_HOVER]) {
+      expect(hue(rgb)).toBeGreaterThan(197);
+      expect(hue(rgb)).toBeLessThan(199);
+    }
+    // The mismatch this change exists to close.
+    expect(hue(hexToRgb('#3356EE'))).toBeGreaterThan(225);
+  });
+
+  it('steps DOWN from the light band and UP from the dark one', () => {
+    expect(luminance(LIGHT_FILL)).toBeLessThan(luminance(LIGHT_BAND.base));
+    expect(luminance(DARK_FILL)).toBeGreaterThan(luminance(DARK_BAND.base));
+  });
+
+  /**
+   * WCAG 1.4.11 asks for 3:1 on whatever VISUALLY IDENTIFIES the component,
+   * not on its fill. Which part of this button that is differs by theme, and
+   * getting it backwards is how the first pass at this shipped a near-black
+   * button: requiring 3:1 of the FILL against a band pinned as "the lightest
+   * azure white body copy can sit on" forces the fill to #001F2C, which
+   * measured 1.11:1 against the sixteen `--cta-bg` tool buttons under it.
+   */
+  it('puts 3:1 on whatever identifies the control — the rim in light, the fill in dark', () => {
+    // DARK: the fill does it unaided. `sky` sits bluer than the straight line
+    // from `base` to `pale`, so it — not `base` — is the worst case for a fill
+    // that has stepped UP.
+    expect(contrast(DARK_FILL, DARK_BAND.base)).toBeGreaterThanOrEqual(3);
+    expect(contrast(DARK_FILL, DARK_BAND.sky)).toBeGreaterThanOrEqual(3);
+
+    // LIGHT: the fill deliberately does NOT, and that is the point — this
+    // assertion is what stops someone "fixing" it back to near-black.
+    expect(contrast(LIGHT_FILL, LIGHT_BAND.base)).toBeLessThan(3);
+    // ...so the 2px rim carries it, on BOTH sides.
+    const RIM_LIGHT = hexToRgb('#FFFFFF'); // --hero-cta-rim -> --hero-wash-ink -> --accent-ink
+    expect(contrast(RIM_LIGHT, LIGHT_FILL)).toBeGreaterThanOrEqual(3);
+    expect(contrast(RIM_LIGHT, LIGHT_BAND.base)).toBeGreaterThanOrEqual(3);
+    expect(GRID).toContain('border: 2px solid var(--hero-cta-rim) !important;');
+    expect(STYLE).toContain('--hero-cta-rim:        var(--hero-wash-ink);');
+    // Dark's rim is decorative BECAUSE its fill is not — keep them from being
+    // "unified" by a later cleanup that does not know why they differ.
+    expect(STYLE).toContain('--hero-cta-rim:        var(--hero-wash-line);');
+  });
+
+  it('stays distinguishable from the sixteen neutral tool-card buttons', () => {
+    // The whole point of one primary among sixteen neutrals. #001F2C — the
+    // fill a 3:1-on-the-fill rule produces — measured 1.11:1 here and read as
+    // just another dark button.
+    expect(contrast(LIGHT_FILL, hexToRgb('#0C111D'))).toBeGreaterThan(1.5);
+  });
+
+  it('is AA for its label, which is the site’s own theme-inverting CTA ink', () => {
+    // `--hero-cta-ink: var(--cta-text)` — #FFFFFF in light, #0C111D in dark.
+    expect(STYLE).toContain('--hero-cta-ink:        var(--cta-text);');
+    expect(contrast(hexToRgb('#FFFFFF'), LIGHT_FILL)).toBeGreaterThanOrEqual(4.5);
+    expect(contrast(hexToRgb('#0C111D'), DARK_FILL)).toBeGreaterThanOrEqual(4.5);
+    // `--accent-ink` would have been white in BOTH, i.e. white on a bright
+    // azure in dark. This is the reason the ink is not that token.
+    expect(contrast(hexToRgb('#FFFFFF'), DARK_FILL)).toBeLessThan(4.5);
+  });
+
+  it('hovers AWAY from the band, so the label gets MORE contrast, never less', () => {
+    expect(luminance(LIGHT_HOVER)).toBeLessThan(luminance(LIGHT_FILL));
+    expect(luminance(DARK_HOVER)).toBeGreaterThan(luminance(DARK_FILL));
+    expect(contrast(hexToRgb('#FFFFFF'), LIGHT_HOVER))
+      .toBeGreaterThan(contrast(hexToRgb('#FFFFFF'), LIGHT_FILL));
+    expect(contrast(hexToRgb('#0C111D'), DARK_HOVER))
+      .toBeGreaterThan(contrast(hexToRgb('#0C111D'), DARK_FILL));
+    // ...and each hover moves FURTHER from its own band than the resting fill
+    // is. (Light's fill is not required to clear 3:1 — see the rim test above;
+    // dark's is, and still does on hover.)
+    expect(contrast(LIGHT_HOVER, LIGHT_BAND.base))
+      .toBeGreaterThan(contrast(LIGHT_FILL, LIGHT_BAND.base));
+    expect(contrast(DARK_HOVER, DARK_BAND.sky)).toBeGreaterThanOrEqual(3);
+  });
+
+  it('is what the button actually paints with — no `--accent-fill` left on the CTA', () => {
+    expect(GRID).toContain('background: var(--hero-cta-fill) !important;');
+    expect(GRID).toContain('background: var(--hero-cta-fill-hover) !important;');
+    expect(GRID).toContain('color: var(--hero-cta-ink) !important;');
+    /* EVERY rule body whose selector reaches `.hero-cta .btn`, and only those.
+       An earlier version of this sliced from the first CTA rule to EOF, which
+       made it fail the moment an unrelated rule was appended below — the
+       `.qf-dir-submit:hover` fix at the foot of the sheet, which is CORRECTLY
+       `--accent-fill` because that button is still the indigo one. Scoping to
+       the rule bodies is what makes this assertion mean what it says. */
+    const bodies = [...GRID.matchAll(/([^{}]*\.hero-cta \.btn[^{}]*)\{([^}]*)\}/g)];
+    expect(bodies.length).toBeGreaterThanOrEqual(2); // the rest rule and its hover
+    for (const [, selector, body] of bodies) {
+      expect(`${selector} => ${body}`).not.toContain('var(--accent-fill)');
+      expect(`${selector} => ${body}`).not.toContain('var(--accent-ink)');
+    }
+  });
+
+  it('left the brand accent where it was — hero-scoped, not a palette change', () => {
+    // A global accent change would ripple through every link, focus ring and
+    // selection on the product. The indigo tokens keep their values.
+    expect(STYLE).toContain('--accent:        #3356EE;');
+    expect(STYLE).toContain('--accent-fill:   #3356EE;');
+    expect(STYLE).toContain('--accent-legible: var(--accent-fill)');
+  });
+});
+
+/**
+ * THE AUDIENCE TOGGLE IS TWO OUTLINED RECTANGLES (Wave 10).
+ *
+ * It was a white pill: 9999px radius, a #FFFFFF flood on the selected side, a
+ * 0px border and a near-black label — and the block that built it cited
+ * design-system §4 as its justification while doing the exact thing §4
+ * forbids ("Selected/focused row visual = subtle outline, NEVER a bright
+ * fill"). The owner asked for it to go; these tests stop it coming back.
+ */
+describe('the audience toggle selects with a rim and a tint, never a fill', () => {
+  const V2 = read('src/server/public/landing-hero-fixes-v2.css');
+  const rule = (sel: string) => {
+    const at = V2.indexOf(sel);
+    if (at < 0) throw new Error(`no rule for ${sel}`);
+    return V2.slice(at, V2.indexOf('}', at));
+  };
+  const SEG = 'html body.landing-v2.qf-wft .qf-aud-toggle .qf-aud-seg {';
+  const SEG_ON = 'html body.landing-v2.qf-wft .qf-aud-toggle .qf-aud-seg.is-active {';
+  const TRACK = 'html body.landing-v2.qf-wft .qf-aud-toggle {';
+
+  it('keeps the border at 2px in BOTH states so switching cannot reflow', () => {
+    expect(rule(SEG)).toContain('border: 2px solid var(--hero-toggle-rim) !important;');
+    // The selected rule swaps the COLOUR only — it must not restate `border`.
+    expect(rule(SEG_ON)).toContain('border-color: var(--hero-toggle-rim-on) !important;');
+    expect(rule(SEG_ON)).not.toMatch(/border:\s/);
+  });
+
+  it('is a rectangle on the radius ramp, not a pill', () => {
+    expect(rule(SEG)).toContain('border-radius: var(--radius-btn) !important;');
+    expect(rule(SEG)).not.toContain('--radius-pill');
+    expect(STYLE).toContain('--radius-btn: 8px;');
+  });
+
+  it('never floods the selected side — tint only, and the tint is capped', () => {
+    expect(rule(SEG_ON)).toContain('background: var(--hero-toggle-tint) !important;');
+    expect(rule(SEG_ON)).not.toContain('var(--surface)');
+    expect(STYLE).toContain('--hero-toggle-tint:    rgba(var(--hero-wash-ink-rgb), 0.10);');
+    // 14% (`--hero-wash-wipe`) takes the white label under AA on this band;
+    // 10% is the measured ceiling. If someone raises it, this fails.
+    const tint = Number(
+      STYLE.match(/--hero-toggle-tint:\s*rgba\(var\(--hero-wash-ink-rgb\),\s*([\d.]+)\)/)![1],
+    );
+    expect(tint).toBeLessThanOrEqual(0.10);
+  });
+
+  it('keeps the track out of the way — no glass, no pill, no padding', () => {
+    expect(rule(TRACK)).toContain('background: none !important;');
+    expect(rule(TRACK)).toContain('border: 0 !important;');
+    expect(rule(TRACK)).toContain('padding: 0 !important;');
+  });
+
+  it('keeps both labels on the hero ink, so selection never swaps ink colour', () => {
+    expect(rule(SEG)).toContain('color: var(--hero-wash-ink) !important;');
+    expect(rule(SEG_ON)).toContain('color: var(--hero-wash-ink) !important;');
+  });
+
+  it('is still a real tablist with a 44px tap target', () => {
+    const landing = read('src/server/public/landing.html');
+    expect(landing).toContain('<div class="qf-aud-toggle" role="tablist"');
+    expect(landing).toContain('role="tab" data-aud="carriers"');
+    expect(landing).toContain('role="tab" data-aud="shippers"');
+    expect(landing).toContain('aria-selected="true"');
+    // Roving tabindex — the arrow-key behaviour in landing-audience-toggle.js
+    // depends on exactly one segment being tabbable.
+    expect(landing).toContain('aria-selected="false" tabindex="-1"');
+    expect(rule(SEG)).toContain('min-height: 44px !important;');
+  });
+});
