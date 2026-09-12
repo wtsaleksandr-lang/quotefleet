@@ -330,6 +330,41 @@ export function authSiteHeader(link: AuthChromeLink): string {
  * partnership or certification, and it is plain text in the same monochrome
  * treatment: no Stripe wordmark, no brand colour, no external asset.
  *
+ * THIS STRIP IS NOW THE FOOTER'S ONLY TRUST BAND (2026-09, "the footer looks
+ * too heavy and big"). The footer used to stack THREE bands: a four-item
+ * `.qf-footer-trustbar`, then `.footer-bottom`, then this row — and the first
+ * two of the trust bar's claims were already being made right here. "Payments
+ * secured by Stripe" sat directly above "Powered by Stripe" AND "Card details
+ * never touch our servers": one fact, three sentences, two strips. So the
+ * duplicate was DELETED (not restyled) and the trust bar's remaining
+ * non-overlapping claims moved into this strip, which is now the single place
+ * a trust claim may live.
+ *
+ * THE PER-CLAIM ICONS WENT WITH IT. Six 15px glyphs bought nothing a reader
+ * could not get from the words, and each one forced its claim to be an
+ * inline-flex BLOCK that wrapped as a unit — which is what made three claims
+ * need their own stacked line on phones. As plain list items with a CSS `·`
+ * separator the claims reflow as ordinary text, so no claim can be orphaned
+ * onto a line alone. NOTHING WAS ADDED: every claim below was already rendered
+ * somewhere in the old footer, and each remains backed by the repo evidence
+ * catalogued above.
+ *
+ * "SSL/TLS ENCRYPTED" WAS DROPPED (Alex, 2026-09). It was true, but transport
+ * encryption is table stakes in 2026 — every site the reader has ever opened
+ * has it — so it spent a line of the strip saying nothing that distinguishes
+ * us. It is the only claim removed for weakness rather than duplication.
+ *
+ * TWO SHORT RUNS, NOT ONE LONG ONE. Five claims joined by middots read as an
+ * undifferentiated crawl: the reader has to parse the whole line to find the
+ * one fact they wanted. They are two DIFFERENT KINDS of promise, so they are
+ * two lists:
+ *   • `.qf-payrow-trust` — what happens when you pay. It belongs beside the
+ *     marks and "Powered by Stripe" because it is the same subject.
+ *   • `.qf-payrow-platform` — what the product does with your data once you
+ *     are in. Nothing to do with checkout, so it sits apart.
+ * Two runs of three and two scan in one glance at 375px; one run of five did
+ * not. No claim was reworded to fit the grouping.
+ *
  * STYLING — monochrome by design: the marks inherit `currentColor` from
  * `--ink`, which is near-white on the dark theme and deep navy on light, so
  * they invert with the theme from ONE token. No brand colours, no hardcoded
@@ -366,9 +401,13 @@ export const FOOTER_PAY_ROW = `<div class="qf-footer-payrow">`
   + `<span class="qf-payrow-proc">Powered by Stripe</span>`
   + `</div>`
   + `<ul class="qf-payrow-trust" role="list">`
-  + `<li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3 4.5 6v6c0 4.4 3.2 7.4 7.5 8.9 4.3-1.5 7.5-4.5 7.5-8.9V6z"/><rect x="9.2" y="10.6" width="5.6" height="4.6" rx="1"/><path d="M10.4 10.6V9.5a1.6 1.6 0 0 1 3.2 0v1.1"/></svg>Card details never touch our servers</li>`
-  + `<li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2.5" y="5" width="19" height="14" rx="2.5"/><path d="M2.5 9.5h19"/><line x1="4" y1="20" x2="20" y2="4"/></svg>No credit card to start</li>`
-  + `<li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="2.5 5 2.5 10.5 8 10.5"/><path d="M4.6 15.3a8.5 8.5 0 1 0 1.5-8.4L2.5 10.5"/></svg>Cancel anytime — no contracts</li>`
+  + `<li>Card details never touch our servers</li>`
+  + `<li>No credit card to start</li>`
+  + `<li>Cancel anytime — no contracts</li>`
+  + `</ul>`
+  + `<ul class="qf-payrow-platform" role="list">`
+  + `<li>GDPR &amp; CCPA-ready</li>`
+  + `<li>Per-tenant data isolation</li>`
   + `</ul></div>`;
 
 /**
@@ -599,14 +638,33 @@ export interface FooterTrackLadder {
  * Each band therefore takes the WIDEST legal track count it can afford:
  *   • wide  — one row, so T = N (N mod N is 0 for every N ≥ 1).
  *   • mid   — at most three tracks, stepping down until `N mod T !== 1`.
- *   • phone — two tracks (Alex, 2026-09: "make 2 columns"), which for an ODD N
- *             is only legal with the last column spanning both, leaving an even
- *             number to wrap.
+ *   • phone — two tracks ONLY IF TWO DIVIDE THE COLUMNS EVENLY; an odd count
+ *             stacks instead.
  *
- * For today's N = 5 that yields 5 → 3 → 2-with-span, which is exactly what the
- * stylesheets declare. Change `FOOTER_COLUMNS` and this function immediately
- * reports different numbers; siteChromeSingleSource.test.ts then fails naming
- * the sheets that still declare the old ones.
+ * THE PHONE STEP CHANGED IN 2026-09, AND THE OLD ONE IS WHY. It used to be two
+ * tracks unconditionally, and an odd N paid for that by pinning its LAST column
+ * `grid-column: 1 / -1`. The arithmetic was sound — four columns wrapping into
+ * two tracks leaves no remainder — but the RESULT was a footer that read 2 / 2
+ * / 1, with the fifth heading sitting alone on a full-width final row. The rule
+ * blesses a full-bleed row as "a row that holds one column because it was told
+ * to", and against five open link LISTS that was fair: the spanned column was
+ * visibly a two-up block of links, not a stranded item. Against five COLLAPSED
+ * disclosures it is one lone summary bar under two tidy rows of two, which is
+ * exactly the shape the no-orphan rule exists to prevent.
+ *
+ * So an odd count now takes T = 1, which the law above already blesses without
+ * qualification — a deliberate full stack, never a wrap remainder. On a phone
+ * that is also the better control: every <summary> becomes a full-width tap
+ * target instead of a half-width one.
+ *
+ * ONE RULE, BOTH FOOTERS. This is arithmetic, not a special case for the
+ * marketing footer: N=5 yields 5 → 3 → 1 (stack) and the directory's N=4 yields
+ * 4 → 2 → 2, because four genuinely does divide into two tracks with nothing
+ * left over. Neither footer needs a hand-written exception.
+ *
+ * Change `FOOTER_COLUMNS` and this function immediately reports different
+ * numbers; siteChromeSingleSource.test.ts then fails naming the sheets that
+ * still declare the old ones.
  */
 export function footerTrackLadder(columns: number): FooterTrackLadder {
   const widest = (max: number): number => {
@@ -617,8 +675,10 @@ export function footerTrackLadder(columns: number): FooterTrackLadder {
     columns,
     wide: widest(columns),
     mid: widest(3),
-    phone: 2,
-    phoneSpansLast: columns % 2 === 1,
+    phone: columns % 2 === 0 ? 2 : 1,
+    // Nothing spans any more: two tracks are used only when they divide the
+    // count evenly, so there is never a leftover column to pin full-bleed.
+    phoneSpansLast: false,
   };
 }
 
@@ -651,13 +711,108 @@ export const CARRIER_MARKS_NOTE =
 
 const FOOTER_LADDER = footerTrackLadder(FOOTER_COLUMNS.length);
 
+/**
+ * EVERY FOOTER LINK COLUMN IS A NATIVE DISCLOSURE — one renderer, both footers.
+ *
+ * Alex, 2026-09: the footer "looks too heavy and big". On a phone the honest
+ * cause was arithmetic, not styling — PREMIUM_FOOTER stacks 42 links and the
+ * directory footer 32, and at 375px that wall measured 1622px and 1248px of
+ * footer under every page on the site.
+ *
+ * WHY `<details>`/`<summary>` AND NOT A JS ACCORDION:
+ *   • The links STAY IN THE DOM when collapsed. These are internal SEO links
+ *     into /tools, /directory, /guides and the audience pages; an accordion
+ *     that built its panel on click would have removed ~40 internal links from
+ *     every page on the site, which is a ranking change dressed up as a style
+ *     change. A closed <details> is still parsed, still crawled, still found by
+ *     in-page search — it is not rendered, which is a different thing.
+ *   • Keyboard and AT behaviour is the browser's, not ours: <summary> is
+ *     focusable, Enter/Space toggle it, and the expanded state is exposed
+ *     without a single aria-* attribute for us to get wrong.
+ *
+ * OPEN BY DEFAULT IN THE MARKUP, closed on phones by the one-line sync in
+ * HEADER_SCRIPTS. That direction is deliberate: with JS unavailable every
+ * column renders exactly as it does today (open, all links visible), so the
+ * no-JS floor is the CURRENT behaviour and the disclosure is pure enhancement.
+ * Shipping them closed and opening with CSS would have inverted that — a
+ * no-JS desktop visitor would meet five collapsed columns, and hiding
+ * navigation behind a click on a wide screen is the thing we are told not to do.
+ */
+export const FDISC_CHEVRON = `<svg class="qf-fdisc-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg>`;
+
+export function footerDisclosureColumn(opts: {
+  colClass: string;
+  headTag: 'h2' | 'h4';
+  headClass?: string;
+  heading: string;
+  linksHtml: string;
+}): string {
+  const head = `<${opts.headTag}${opts.headClass ? ` class="${opts.headClass}"` : ''}>`
+    + `${opts.heading}</${opts.headTag}>`;
+  return `<div class="${opts.colClass}"><details class="qf-fdisc" open>`
+    + `<summary class="qf-fdisc-sum">${head}${FDISC_CHEVRON}</summary>`
+    + `<div class="qf-fdisc-body">${opts.linksHtml}</div>`
+    + `</details></div>`;
+}
+
 const FOOTER_COLUMNS_HTML = FOOTER_COLUMNS.map(
-  (col) => `<div class="footer-col"><h4>${col.heading}</h4>`
-    + col.links.map((l) => `<a href="${l.href}">${l.label}</a>`).join('')
-    + `</div>`,
+  (col) => footerDisclosureColumn({
+    colClass: 'footer-col',
+    headTag: 'h4',
+    heading: col.heading,
+    linksHtml: col.links.map((l) => `<a href="${l.href}">${l.label}</a>`).join(''),
+  }),
 ).join('');
 
-export const PREMIUM_FOOTER = `<footer class="premium-footer"><div class="premium-footer-inner" data-cols="${FOOTER_LADDER.columns}"${FOOTER_LADDER.phoneSpansLast ? ' data-cols-odd' : ''}><div class="footer-brand"><a href="/" class="qf-footer-brand" aria-label="QuoteFleet home"><img class="qf-footer-logo" src="/brand/logo-full-ondark.png" alt="QuoteFleet — freight rate calculator" width="168" height="113" decoding="async"></a><div class="qf-footer-brandtext"><a href="/" class="qf-footer-wordmark">QuoteFleet</a><p class="qf-footer-tagline">Branded rate calculator pages, PDF quotes, and optional AI chat for trucking service providers.</p></div></div>${FOOTER_COLUMNS_HTML}</div><ul class="qf-footer-trustbar" role="list"><li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="11" width="18" height="10" rx="2"/><path d="M7 11V7.5a5 5 0 0 1 10 0V11"/></svg>Payments secured by Stripe</li><li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3 4.5 6v6c0 4.4 3.2 7.4 7.5 8.9 4.3-1.5 7.5-4.5 7.5-8.9V6z"/><path d="m9 12 2 2 4-4"/></svg>SSL/TLS encrypted</li><li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2.5 4 5.5v6c0 4.6 3.3 7.7 8 9.5 4.7-1.8 8-4.9 8-9.5v-6z"/><circle cx="12" cy="11" r="2.4"/><path d="M12 13.4V16"/></svg>GDPR &amp; CCPA-ready</li><li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M4 10h16M10 4v16"/></svg>Per-tenant data isolation</li></ul><div class="footer-bottom"><span>© <span id="year"></span> QuoteFleet. All rights reserved.</span><span class="qf-foot-operator">QuoteFleet is a product of MR Holdings &amp; Trade LLC.</span><span class="qf-foot-operator">${CARRIER_MARKS_NOTE}</span>${FOOTER_OOG_CTA}</div>${FOOTER_PAY_ROW}</footer>`;
+/**
+ * THE BOTTOM HALF OF BOTH FOOTERS — one implementation, two consumers.
+ *
+ * PREMIUM_FOOTER and the directory subsite's `.dirfoot` are separate markup
+ * (their COLUMN sets legitimately differ: the marketing footer carries a Legal
+ * column and the audience pages, the directory one does not). Their bottom
+ * halves did not differ for any such reason — they had simply been transcribed
+ * twice and then drifted, which is the same trap that once cost landing.html
+ * six destinations. Both now call this.
+ *
+ * WHAT IS ALWAYS VISIBLE, AND WHY IT IS NOT A DISCLOSURE. Everything this
+ * function emits is compliance or attribution text: the copyright, the
+ * operator attribution, the carrier names-and-marks note, the FMCSA
+ * non-affiliation + self-declared labelling, and the payment facts. A
+ * compliance statement that a reader has to click to reveal has not been made,
+ * so none of it is wrapped in <details> and none of it is display:none at any
+ * width. It is set smaller and tighter than it was — that is a type decision,
+ * and both themes are measured at =>4.5:1 against the footer ground.
+ *
+ * TWO FLAGS, BOTH CONTENT DECISIONS THAT PREDATE THIS FUNCTION:
+ *   • `marksNote` — the carrier names/marks line carries a mailto: removal
+ *     address, and the directory chrome must contain NO mailto: anywhere
+ *     (carrierProfileContact.test.ts asserts a contact-hidden carrier profile
+ *     has none, on all ~334k profiles). So it stays on the marketing footer
+ *     exactly where it already was, rather than the merge quietly planting a
+ *     mailto on every directory page.
+ *   • `legalLinks` — the directory footer's only route to /terms and /privacy
+ *     is this line, because it has no Legal column. PREMIUM_FOOTER does have
+ *     one, and repeating them here would be the duplicate-destination defect
+ *     the footer was regrouped to remove.
+ */
+export function footerBottomHtml(opts: {
+  marksNote?: boolean;
+  legalLinks?: boolean;
+  dataSources?: boolean;
+} = {}): string {
+  return `<div class="footer-bottom">`
+    + `<p class="qf-foot-line"><span class="qf-foot-copy">© <span id="year"></span> QuoteFleet.</span> `
+    + `<span class="qf-foot-operator">A product of MR Holdings &amp; Trade LLC.</span>`
+    + (opts.legalLinks ? ` <span class="qf-foot-links"><a href="/">Home</a><a href="/terms">Terms</a><a href="/privacy">Privacy</a></span>` : '')
+    + `</p>`
+    + (opts.marksNote ? `<p class="qf-foot-line qf-foot-operator">${CARRIER_MARKS_NOTE}</p>` : '')
+    + `${FOOTER_OOG_CTA}`
+    + `</div>`
+    + (opts.dataSources ? DIRECTORY_DATA_SOURCES : '')
+    + FOOTER_PAY_ROW;
+}
+
+export const PREMIUM_FOOTER = `<footer class="premium-footer"><div class="premium-footer-inner" data-cols="${FOOTER_LADDER.columns}"${FOOTER_LADDER.phoneSpansLast ? ' data-cols-odd' : ''}><div class="footer-brand"><a href="/" class="qf-footer-brand" aria-label="QuoteFleet home"><img class="qf-footer-logo" src="/brand/logo-full-ondark.png" alt="QuoteFleet — freight rate calculator" width="168" height="113" decoding="async"></a><div class="qf-footer-brandtext"><a href="/" class="qf-footer-wordmark">QuoteFleet</a><p class="qf-footer-tagline">Branded rate calculator pages, PDF quotes, and optional AI chat for trucking service providers.</p></div></div>${FOOTER_COLUMNS_HTML}</div>${footerBottomHtml({ marksNote: true })}</footer>`;
 
 // Burger + Solutions-dropdown behaviour, mirrored from landing.html so the
 // injected header is interactive. Idempotent #year setter included.
@@ -678,6 +833,34 @@ export const PREMIUM_FOOTER = `<footer class="premium-footer"><div class="premiu
 // The value is resolved once at module load. Restarting the process (which is
 // what changing a Replit Secret does) re-reads it, so the ANALYTICS_DISABLED
 // kill switch still needs no deploy.
+//
+// ── FOOTER_DISCLOSURE_SYNC ──────────────────────────────────────────────────
+// The last IIFE in the script below collapses the footer's link columns on
+// phones, and only there.
+//
+// DIRECTION MATTERS. The columns ship `open` in the markup
+// (footerDisclosureColumn), so a visitor with no JS gets exactly the footer the
+// site has always had — every column expanded, every internal link visible.
+// The script closes them below the 640px step, where the stacked link wall was
+// measuring taller than the viewport (1686px of footer at 375px on a marketing
+// page), and re-opens them on the way back up.
+//
+// ONLY UNTOUCHED COLUMNS ARE SYNCED. Once a visitor has opened or closed a
+// column themselves, `data-qf-user` pins it and a resize stops overruling them:
+// rotating a phone must not slam shut the column someone just opened.
+//
+// THE OVERRIDE IS DETECTED BY COMPARISON, NOT BY A FLAG. `toggle` fires for our
+// OWN writes as well, and asynchronously — a "we are syncing" boolean would
+// already be false by the time the event arrived. So a state that DIFFERS from
+// the breakpoint default is an override and a state that MATCHES it is not,
+// which also means closing and reopening a column hands control back.
+//
+// THE RATIONALE LIVES HERE, NOT IN THE SCRIPT. This constant is interpolated
+// into every full-chrome page on the site, so a comment inside the template
+// literal ships on every request — and a carrier profile asserts its tenant id
+// never appears anywhere in the page, which an explanatory number in a shipped
+// comment can trip by coincidence. It did: "42-link stack" against
+// claimed_tenant_id 42 (carrierProfileCard.test.ts).
 export const HEADER_SCRIPTS = `<script>
   (function () {
     var y = document.getElementById('year'); if (y) y.textContent = new Date().getFullYear();
@@ -721,6 +904,27 @@ export const HEADER_SCRIPTS = `<script>
       });
       function closeOthers(except) { controllers.forEach(function (c) { if (c.dd !== except) c.close(); }); }
     }
+  })();
+  /* Footer disclosures — see FOOTER_DISCLOSURE_SYNC note in siteChrome.ts. */
+  (function () {
+    var cols = Array.prototype.slice.call(document.querySelectorAll('.qf-fdisc'));
+    if (!cols.length) return;
+    var phone = window.matchMedia('(max-width: 640px)');
+    cols.forEach(function (d) {
+      d.addEventListener('toggle', function () {
+        if (d.open === !phone.matches) d.removeAttribute('data-qf-user');
+        else d.setAttribute('data-qf-user', '1');
+      });
+    });
+    function sync() {
+      cols.forEach(function (d) {
+        if (d.hasAttribute('data-qf-user')) return;
+        d.open = !phone.matches;
+      });
+    }
+    sync();
+    if (phone.addEventListener) phone.addEventListener('change', sync);
+    else if (phone.addListener) phone.addListener(sync);
   })();
 </script>
 <script src="/nav-auth.js" defer></script>${analyticsTags()}`;

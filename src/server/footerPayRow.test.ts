@@ -46,12 +46,20 @@ describe('footer accepted-payment + trust strip', () => {
     const landing = renderStaticPage('landing.html');
     expect(landing).toContain(FOOTER_PAY_ROW);
 
-    // The directory footer interpolates the constant rather than copying it, so
-    // assert the wiring instead of the bytes — a copy-paste there would be the
-    // regression, and this catches its removal.
+    // The directory footer no longer interpolates the strip DIRECTLY: as of the
+    // 2026-09 "lighter footer" wave both footers take their whole bottom half
+    // — legal line, optional FMCSA attribution, this strip — from the one
+    // shared builder siteChrome.ts#footerBottomHtml, which is a stronger
+    // version of the same anti-drift contract this assertion always encoded.
+    // So assert the SHARED CALL rather than the old interpolation, and keep
+    // the bytes pinned on the RENDERED directory page below (line ~235), which
+    // is what a copy-paste regression would actually have to defeat.
     const dir = await readFile(resolve(srcDir, 'directory/pages.ts'), 'utf8');
-    expect(dir).toContain('FOOTER_PAY_ROW');
-    expect(dir).toContain('${FOOTER_PAY_ROW}');
+    expect(dir).toContain('footerBottomHtml');
+    expect(dir).toContain('${footerBottomHtml(');
+    // And the strip must NOT be re-typed here: no literal payment markup.
+    expect(dir).not.toContain('qf-payrow-methods');
+    expect(dir).not.toContain('Powered by Stripe');
   });
 
   it('shows exactly the six payment methods a customer can genuinely use', () => {
@@ -197,7 +205,11 @@ describe('directory data-source attribution strip', () => {
     // so an FMCSA attribution there would be false.
     const dir = await readFile(resolve(srcDir, 'directory/pages.ts'), 'utf8');
     expect(dir).toContain('rendersCarrierData');
-    expect(dir).toContain('DIRECTORY_DATA_SOURCES');
+    // The strip now reaches the page through the shared bottom-matter builder
+    // (footerBottomHtml's `dataSources` flag) instead of being interpolated
+    // here, so the GATE is what this file can assert in the source — and the
+    // gate is the thing that must not be lost.
+    expect(dir).toContain('dataSources: rendersCarrierData(');
     const { rendersCarrierDataForTest } = await import('./directory/pages.js');
     for (const p of ['/directory', '/directory/california', '/compliance', '/drayage-rates', '/services/reefer', '/guides']) {
       expect(rendersCarrierDataForTest(p)).toBe(true);

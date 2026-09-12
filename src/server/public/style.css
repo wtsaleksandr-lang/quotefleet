@@ -2194,3 +2194,172 @@ html[data-theme="dark"],
     --icon-tile-azure-bg: rgba(var(--hero-azure-rgb), 0.10);
   }
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   WAVE 5 — THE FOOTER, LIGHTER AND SMALLER (Alex, 2026-09: "looks too heavy
+   and big"). SHARED MECHANICS ONLY — both footers load this sheet, so the
+   disclosure behaviour, the consolidated trust strip and the bottom legal
+   block are declared ONCE here and merely toned per-surface in nav-unify.css
+   (marketing), nav-ia.css (homepage) and DIRECTORY_CSS (directory subsite).
+
+   APPENDED AT EOF, like every other wave in this file: check-spacing.mjs and
+   check-hardcoded-colors.mjs baseline by FILE:LINE and this sheet carries
+   tolerated entries, so a mid-file insert would renumber them all.
+
+   NOTE FOR THE NEXT CLEANUP WAVE: `.qf-footer-trustbar` rules still sit at
+   nav-unify.css:415-437/671-676 and nav-ia.css:287/506-510. The ELEMENT is
+   gone (its one non-duplicate claim set moved into .qf-payrow-trust below), so
+   those rules are dead. They are deliberately NOT deleted here because removing
+   them renumbers 71 line-keyed guard-baseline entries across these sheets; drop
+   them in the next wave that regenerates baselines anyway.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ── The link columns as native disclosures ─────────────────────────────────
+   <details>/<summary>: the browser owns the toggle, Enter/Space work for free,
+   and the links STAY IN THE DOM when closed so every internal SEO link is
+   still crawled. Markup ships `open`; HEADER_SCRIPTS closes them at <=640px.
+   With JS off nothing collapses and the footer renders as it always has. */
+.qf-fdisc { min-width: 0; }
+.qf-fdisc-sum {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-1);
+  cursor: pointer;
+  list-style: none;
+  border-radius: 6px;
+}
+.qf-fdisc-sum::-webkit-details-marker { display: none; }
+.qf-fdisc-sum::marker { content: ""; }
+/* A focus ring that is unmistakably NOT the hover state: hover only lifts the
+   heading to --footer-ink, focus draws a real 2px offset outline. */
+.qf-fdisc-sum:focus-visible {
+  outline: 2px solid var(--footer-accent, var(--accent));
+  outline-offset: 2px;
+}
+.qf-fdisc-chev {
+  width: 14px;
+  height: 14px;
+  flex: 0 0 auto;
+  opacity: .7;
+  transition: transform .2s ease;
+}
+.qf-fdisc[open] > .qf-fdisc-sum .qf-fdisc-chev { transform: rotate(180deg); }
+@media (prefers-reduced-motion: reduce) {
+  .qf-fdisc-chev { transition: none; }
+}
+.qf-fdisc-body { display: flex; flex-direction: column; min-width: 0; }
+/* DESKTOP KEEPS ITS NAVIGATION VISIBLE. Above the phone step the columns are
+   open and the affordance stands down entirely — no chevron, no pointer, no
+   toggle — so a wide screen never hides links behind a click. */
+@media (min-width: 641px) {
+  .qf-fdisc-sum { cursor: default; }
+  .qf-fdisc-chev { display: none; }
+}
+
+/* ── ONE consolidated sub-bar, not three stacked bands ──────────────────────
+   The claims are ordinary list items separated by a typographic middot, so six
+   of them reflow as a sentence does. No per-claim icon, no inline-flex block
+   that can wrap as a unit, and therefore no claim can be stranded on a line of
+   its own — the no-orphan rule is satisfied by construction, not by a track
+   count that has to be re-derived every time a claim is added. */
+.qf-payrow-trust {
+  display: block;
+  font-size: 11.5px;
+  line-height: 1.5;
+}
+.qf-payrow-trust li { display: inline; }
+.qf-payrow-trust li + li::before {
+  content: "·";
+  margin: 0 var(--space-0-5);
+}
+.qf-footer-payrow {
+  margin: var(--space-2) auto 0;
+  padding: var(--space-1-5) 0 0;
+  gap: var(--space-1) var(--space-3);
+}
+.qf-payrow-methods { gap: var(--space-1); }
+.qf-paymark { width: 34px; height: 22px; }
+.qf-paymark .qf-pm { width: 28px; height: 14px; }
+
+/* ── The always-visible legal block ─────────────────────────────────────────
+   Copyright, operator attribution, the carrier names/marks note and the OOG
+   line. NONE of it is a disclosure and none of it is display:none at any
+   width — a compliance statement a reader must click to reveal has not been
+   made. Smaller and tighter, yes; hidden, never. */
+.footer-bottom {
+  margin: var(--space-3) auto 0;
+  padding: var(--space-2) 0 0;
+  font-size: 11.5px;
+  line-height: 1.5;
+}
+.footer-bottom .qf-foot-line { margin: 0; }
+.footer-bottom .qf-foot-line + .qf-foot-line { margin-top: var(--space-0-5); }
+.footer-bottom .qf-foot-links a { margin-left: var(--space-1); }
+.qf-foot-marks { max-width: 96ch; }
+
+/* ── The FMCSA attribution, tightened ──────────────────────────────────────
+   Same claims, same five sources, same non-affiliation sentence — this only
+   pulls the band in. The 5/3/1 track ladder above is untouched: it is what
+   keeps the fifth source off a line of its own. */
+.qf-datasources {
+  margin: var(--space-2) auto 0;
+  padding: var(--space-1-5) 0 0;
+}
+.qf-ds-label { margin-bottom: var(--space-1); font-size: 11px; }
+.qf-datasources .qf-ds-list li { font-size: 11.5px; line-height: 1.45; }
+.qf-ds-list svg { width: 13px; height: 16.675px; }
+.qf-datasources .qf-ds-note { margin: var(--space-1) 0 0; font-size: 11px; }
+
+/* ═══ WAVE 5b — TWO GROUPED CLAIM RUNS, AND LAUNCHER CLEARANCE ═══════════════
+   `.qf-payrow-platform` is the second of the strip's two claim lists. It takes
+   the same inline-with-a-middot treatment as `.qf-payrow-trust` — the styling
+   is deliberately identical, because the two runs are peers, not a heading and
+   a subheading. What separates them is the gap, not a rule, a bullet or a
+   weight change: five claims joined end to end read as one crawl, three plus
+   two read as two facts.
+   ═══════════════════════════════════════════════════════════════════════════ */
+.qf-payrow-platform {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: block;
+  font-size: 11.5px;
+  line-height: 1.5;
+}
+.qf-footer-payrow .qf-payrow-platform li { color: var(--muted) !important; }
+.qf-payrow-platform li { display: inline; }
+.qf-payrow-platform li + li::before {
+  content: "·";
+  margin: 0 var(--space-0-5);
+}
+
+/* THE DIRECTORY FOOTER CLEARS THE CHAT LAUNCHER TOO. Same reasoning as the
+   marketing copy in nav-unify.css: `.qf-mc-fab` is fixed 56x56 at right/bottom
+   12px, so 12 + 56 + 12 = 80px of clearance keeps the sub-bar's last line out
+   from under it. The launcher does not move — its geometry is settled. */
+@media (max-width: 900px) {
+  .site-footer { padding-bottom: calc(80px + env(safe-area-inset-bottom, 0px)); }
+}
+
+/* ── ABOVE THE PHONE BAND, THE SUB-BAR GIVES UP WIDTH INSTEAD OF HEIGHT ──────
+   Clearing a fixed 56x56 launcher anchored to the bottom-right corner can be
+   bought two ways, and the right currency depends on what the viewport has
+   spare.
+
+   <=900px it is bought VERTICALLY (padding-bottom, in nav-unify.css /
+   nav-ia.css / DIRECTORY_CSS): a phone has no horizontal room to give — a 68px
+   right gutter at 375px would cut the claim run from 343px to 275px and wrap
+   it further — but it can afford 56px of scroll.
+
+   >900px it is bought HORIZONTALLY, here. The strip is a flex row with
+   `justify-content: space-between`, so its LAST run hugs the right edge of a
+   container that reaches past the launcher: measured at 1440 the platform run
+   ended at 1384 against a launcher starting at 1372, and at 1024 the overlap
+   was 44px of "Per-tenant data isolation". A right gutter of 12 + 56 + 12 =
+   80px — the launcher's own footprint plus the gap it keeps — stops the run
+   before the corner and costs ZERO height, which is the whole point of this
+   wave. Desktop has the width to spare; it does not have height to spare. */
+@media (min-width: 901px) {
+  .qf-footer-payrow { padding-right: 80px; }
+}

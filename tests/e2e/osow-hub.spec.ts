@@ -286,14 +286,23 @@ function contrast(fg: string, layers: string[]): number {
   return (hi + 0.05) / (lo + 0.05);
 }
 
+/**
+ * `tracks` is the count the ladder REQUIRES of each variant at 375px, not one
+ * number for all three. footerTrackLadder() takes two phone tracks only when
+ * two divide the column count evenly: the marketing footer's five columns
+ * stack (T=1) and the directory's four go 2×2. Five in two tracks used to be
+ * legal by pinning the fifth `1 / -1`, but as a collapsed <details> that
+ * full-bleed row read as one lone summary bar under two rows of two — the
+ * orphan shape, reached by a legal route.
+ */
 const FOOTER_VARIANTS = [
-  { name: 'PREMIUM_FOOTER (server-rendered chrome)', path: '/oversize', inner: '.premium-footer-inner', col: '.footer-col' },
-  { name: 'landing.html inlined copy', path: '/', inner: '.premium-footer-inner', col: '.footer-col' },
-  { name: 'directory subsite (.dirfoot)', path: '/directory', inner: '.dirfoot', col: '.dirfoot-col' },
+  { name: 'PREMIUM_FOOTER (server-rendered chrome)', path: '/oversize', inner: '.premium-footer-inner', col: '.footer-col', tracks: 1 },
+  { name: 'landing.html inlined copy', path: '/', inner: '.premium-footer-inner', col: '.footer-col', tracks: 1 },
+  { name: 'directory subsite (.dirfoot)', path: '/directory', inner: '.dirfoot', col: '.dirfoot-col', tracks: 2 },
 ];
 
 for (const v of FOOTER_VARIANTS) {
-  test(`footer: ${v.name} is TWO columns at 375px with no orphaned row`, async ({ page }) => {
+  test(`footer: ${v.name} holds no orphaned row at 375px`, async ({ page }) => {
     /* The homepage and the directory index are the two heaviest documents on
        the site and both do database work before the first byte; a cold local
        server can take most of the default budget just to answer. Tripled, so a
@@ -326,17 +335,27 @@ for (const v of FOOTER_VARIANTS) {
     }, [v.inner, v.col] as const);
 
     expect(measured, `${v.inner} not found on ${v.path}`).not.toBeNull();
-    expect(measured!.tracks, `${v.name}: rendered track count at 375px`).toBe(2);
+    expect(measured!.tracks, `${v.name}: rendered track count at 375px`).toBe(v.tracks);
     expect(measured!.columns, `${v.name}: link columns`).toBeGreaterThan(2);
 
-    /* A row of one is only legal when that one column deliberately spans the
-       full width — the full-bleed case, not a wrap remainder. */
+    /* NO ROW HOLDS A SINGLE NARROW COLUMN — in a stack every row is full-bleed
+       by construction, and in a two-track grid the count must divide. */
     const orphans = measured!.rows
       .filter((r) => r.length === 1 && !r[0].full)
       .map((r) => r[0].name);
     expect(orphans, `${v.name}: rows holding a single narrow column`).toEqual([]);
-    /* And two-up means two-up: at least one row must actually hold two. */
-    expect(measured!.rows.some((r) => r.length === 2), `${v.name}: no row holds two columns`).toBe(true);
+
+    if (v.tracks === 2) {
+      /* Two-up means two-up: every row must actually hold two, or the count
+         did not divide and something is stranded. */
+      expect(measured!.rows.every((r) => r.length === 2), `${v.name}: a row does not hold two`).toBe(true);
+    } else {
+      /* A stack means every column owns a full-width row of its own — which is
+         also what makes each <summary> a full-width tap target. */
+      expect(measured!.rows.every((r) => r.length === 1 && r[0].full),
+        `${v.name}: stacked rows must each hold one full-width column`).toBe(true);
+      expect(measured!.rows.length, `${v.name}: one row per column`).toBe(measured!.columns);
+    }
   });
 }
 

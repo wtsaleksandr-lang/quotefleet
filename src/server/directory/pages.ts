@@ -92,10 +92,9 @@ import {
   THEME_TOGGLE_BTN,
   SITE_BURGER_BTN,
   HEADER_OOG_CTA,
-  FOOTER_OOG_CTA,
   HEADER_SCRIPTS,
-  FOOTER_PAY_ROW,
-  DIRECTORY_DATA_SOURCES,
+  FDISC_CHEVRON,
+  footerBottomHtml,
 } from '../siteChrome.js';
 
 const SITE = 'https://quotefleet.net';
@@ -2425,6 +2424,85 @@ export const DIRECTORY_CSS = `
     .cp-hbadge { white-space: normal; text-align: center; }
     .cp-hbadges .cp-hbadge:first-child:nth-last-child(odd) { grid-column: 1 / -1; }
   }
+
+  /* ═══ WAVE 5 — THE DIRECTORY FOOTER, LIGHTER AND SMALLER ══════════════════
+     Alex, 2026-09: the footer "looks too heavy and big". Measured on /directory
+     before this block: 784px at 1440, 1248px at 375, 1451px at 320.
+
+     THE SINGLE BIGGEST NUMBER WAS DEAD SPACE, not content. The base
+     .site-footer (style.css:1149) runs "margin-top: 72px" and
+     "padding: 44px 28px 104px" — 104px of nothing under the last line, plus a
+     72px gap above the border. That 104px was already being fought once, in
+     the <=900px block above, which is the tell that it was never a considered
+     number. It comes to 24px here for EVERY directory surface, not just the
+     carrier profile, and stays a real floor: a sub-bar sitting on the last
+     pixel of the document reads as a truncation bug.
+
+     HAND-AUDITED, BECAUSE THE GUARDS CANNOT SEE THIS FILE. check-spacing.mjs
+     and check-hardcoded-colors.mjs walk src/server/public only, so every
+     value below was checked by hand against the same rules they enforce: all
+     spacing on the 8px ramp {0,4,8,12,16,24,32}, no raw hex or rgb literal,
+     no gradient, no shadow, no radius off {0,6,8,12}, the one transition on
+     the house .2s, and colour from --ink / --muted / --accent / --border only.
+     directoryCssTokens.test.ts re-checks all of that on every run.
+
+     THE LINK COLUMNS FOLD — mechanics are shared and live in style.css
+     (.qf-fdisc*), consumed identically by this footer and PREMIUM_FOOTER.
+     Only the tone is set here. */
+  .site-footer { margin-top: 32px; padding: 24px 24px 24px; }
+  .site-footer .dirfoot { gap: 16px 24px; }
+  /* The heading is the <summary> now, so its 8px bottom margin would double
+     against the disclosure's own padding. */
+  .site-footer .dirfoot-head { margin: 0; }
+  .site-footer .qf-fdisc-sum { padding: 4px 0; }
+  .site-footer .qf-fdisc-sum:hover .dirfoot-head { color: var(--accent); }
+  .site-footer .qf-fdisc-chev { color: var(--muted); }
+  .site-footer .dirfoot-col a { padding: 4px 0; font-size: 13px; }
+  /* LEFT, like every other header and legal line on the site — the base
+     .site-footer centres its text, which is what made the old one-line
+     .dirfoot-legal a centred row under a left-aligned site map. */
+  .site-footer .footer-bottom {
+    max-width: 1120px;
+    margin: 24px auto 0;
+    padding-top: 16px;
+    border-top: 1px solid var(--border);
+    text-align: left;
+  }
+  /* A PLAIN BLOCK, not inline-flex/flex: inline-flex indented it 8px out of
+     the content edge and welded the trailing arrow to "quote", and flex made
+     the arrow its own item so at 375px it stranded on line one while the text
+     wrapped beneath it. Normal inline flow makes the arrow the last word. */
+  .site-footer .footer-bottom .qf-foot-oog { display: block; width: fit-content; margin-top: 8px; }
+  /* .dirfoot-col is a flex column with align-items:flex-start, which shrinks
+     its children to CONTENT width — so the disclosure row was only as wide as
+     its label and the chevron sat beside the text instead of at the track's
+     right edge. Stretch it back to the track. */
+  .site-footer .dirfoot-col > .qf-fdisc { align-self: stretch; width: 100%; }
+  .site-footer .footer-bottom .qf-foot-links a { margin-left: 8px; }
+  /* THE FOOTER CLEARS THE CHAT LAUNCHER. .qf-mc-fab (marketing-chat.js) is
+     position:fixed, 56x56 at right/bottom 12px, z-index 2147483000 in the
+     ROOT stacking context — so where the sub-bar's claims run the full width
+     the last line rendered UNDERNEATH it. 12 + 56 + 12 = 80px is the button's
+     own footprint plus the gap it already keeps, and the safe-area inset adds
+     the iOS home indicator (0 everywhere else).
+
+     THE FOOTER MOVES, NOT THE BUTTON: a bottom lift was removed from the
+     launcher after four content collisions, and PR #555 proved it was not the
+     cause of the directory-listing overlap. Declared HERE rather than in
+     style.css because this sheet loads last and the <=900px block above sets
+     padding-bottom: 32px, which would otherwise win. */
+  @media (max-width: 900px) {
+    .site-footer { padding-bottom: calc(80px + env(safe-area-inset-bottom, 0px)); }
+  }
+  @media (max-width: 640px) {
+    .site-footer {
+      margin-top: 16px;
+      padding: 24px 16px calc(80px + env(safe-area-inset-bottom, 0px));
+    }
+    .site-footer .dirfoot { gap: 12px 16px; }
+    /* A collapsed column is a control — give it a real target to tap. */
+    .site-footer .qf-fdisc-sum { min-height: 40px; padding: 8px 0; }
+  }
 `;
 
 /**
@@ -2748,15 +2826,12 @@ export function layout({ title, description, canonicalPath, bodyHtml, jsonLd, re
   ${bodyHtml}
   <footer class="site-footer">
     <nav class="dirfoot" aria-label="Footer">
-      <div class="dirfoot-col"><h2 class="dirfoot-head">For Carriers &amp; Brokers</h2><a href="/w/demo">See a Live Demo</a><a href="/compare">Why QuoteFleet</a><a href="/pricing">Pricing</a><a href="/signup">Start Free</a><a href="/claim">Claim your listing — free</a><a href="/importers">Importers Directory</a></div>
-      <div class="dirfoot-col"><h2 class="dirfoot-head">For Shippers</h2><a href="/directory">Carrier Directory</a><a href="/guides">Carrier Market Guides</a><a href="/compliance">Compliance Tools</a><a href="/services">Carriers by Capability</a><a href="/directory/join">Directory Pro</a><a href="/directory/rfq?sort=featured">Request Freight Quotes</a><a href="/drayage-rates">Port Drayage Rates</a><a href="/manifest-privacy">Manifest Privacy</a></div>
-      <div class="dirfoot-col"><h2 class="dirfoot-head">Free Tools</h2><a href="/tools">Freight Rate Calculator</a><a href="/tools/oversize-permits">Oversize Permit Calculator</a><a href="/tools/bridge-formula">Bridge Formula Calculator</a><a href="/tools/axle-weights">Axle Weight Checker</a><a href="/tools/heavy-haul-quote">Heavy-Haul Quote Tool</a><a href="/tools/seasonal-weight-restrictions">Frost Law Restrictions</a><a href="/oversize">Oversize Permit Guide</a><a href="/pilot-cars">Pilot Car &amp; Escort Directory</a><a href="/glossary">Freight Glossary</a></div>
-      <div class="dirfoot-col"><h2 class="dirfoot-head">Company</h2><a href="/partners">Partners &amp; Affiliates</a><a href="/support">Support</a><a href="/pricing#faq">FAQ</a><a href="/security">Security</a><a href="/login">Sign In</a></div>
+      <div class="dirfoot-col"><details class="qf-fdisc" open><summary class="qf-fdisc-sum"><h2 class="dirfoot-head">For Carriers &amp; Brokers</h2>${FDISC_CHEVRON}</summary><div class="qf-fdisc-body"><a href="/w/demo">See a Live Demo</a><a href="/compare">Why QuoteFleet</a><a href="/pricing">Pricing</a><a href="/signup">Start Free</a><a href="/claim">Claim your listing — free</a><a href="/importers">Importers Directory</a></div></details></div>
+      <div class="dirfoot-col"><details class="qf-fdisc" open><summary class="qf-fdisc-sum"><h2 class="dirfoot-head">For Shippers</h2>${FDISC_CHEVRON}</summary><div class="qf-fdisc-body"><a href="/directory">Carrier Directory</a><a href="/guides">Carrier Market Guides</a><a href="/compliance">Compliance Tools</a><a href="/services">Carriers by Capability</a><a href="/directory/join">Directory Pro</a><a href="/directory/rfq?sort=featured">Request Freight Quotes</a><a href="/drayage-rates">Port Drayage Rates</a><a href="/manifest-privacy">Manifest Privacy</a></div></details></div>
+      <div class="dirfoot-col"><details class="qf-fdisc" open><summary class="qf-fdisc-sum"><h2 class="dirfoot-head">Free Tools</h2>${FDISC_CHEVRON}</summary><div class="qf-fdisc-body"><a href="/tools">Freight Rate Calculator</a><a href="/tools/oversize-permits">Oversize Permit Calculator</a><a href="/tools/bridge-formula">Bridge Formula Calculator</a><a href="/tools/axle-weights">Axle Weight Checker</a><a href="/tools/heavy-haul-quote">Heavy-Haul Quote Tool</a><a href="/tools/seasonal-weight-restrictions">Frost Law Restrictions</a><a href="/oversize">Oversize Permit Guide</a><a href="/pilot-cars">Pilot Car &amp; Escort Directory</a><a href="/glossary">Freight Glossary</a></div></details></div>
+      <div class="dirfoot-col"><details class="qf-fdisc" open><summary class="qf-fdisc-sum"><h2 class="dirfoot-head">Company</h2>${FDISC_CHEVRON}</summary><div class="qf-fdisc-body"><a href="/partners">Partners &amp; Affiliates</a><a href="/support">Support</a><a href="/pricing#faq">FAQ</a><a href="/security">Security</a><a href="/login">Sign In</a></div></details></div>
     </nav>
-    <p class="dirfoot-legal">© <span id="year"></span> QuoteFleet · <a href="/">Home</a> · <a href="/terms">Terms</a> · <a href="/privacy">Privacy</a></p>
-    <p class="dirfoot-oog">${FOOTER_OOG_CTA}</p>
-    ${rendersCarrierData(canonicalPath) ? DIRECTORY_DATA_SOURCES : ''}
-    ${FOOTER_PAY_ROW}
+    ${footerBottomHtml({ legalLinks: true, dataSources: rendersCarrierData(canonicalPath) })}
   </footer>
   ${HEADER_SCRIPTS}
   <script src="/marketing-chat.js" defer></script>

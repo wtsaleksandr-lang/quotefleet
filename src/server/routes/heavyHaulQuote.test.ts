@@ -41,6 +41,7 @@ import {
   HEADER_OOG_CTA,
   FOOTER_OOG_CTA,
   OOG_QUOTE_HREF,
+  footerBottomHtml,
   renderStaticPage,
 } from '../siteChrome.js';
 
@@ -589,7 +590,15 @@ describe('the page', () => {
     expect(landing).toContain('class="site-oog"');
     expect(landing).toContain('class="qf-foot-oog"');
     expect(directory).toContain('HEADER_OOG_CTA');
-    expect(directory).toContain('FOOTER_OOG_CTA');
+    // The FOOTER copy no longer reaches the directory by importing the
+    // constant: since the 2026-09 "lighter footer" wave both footers take
+    // their whole bottom half from the one shared builder
+    // siteChrome.ts#footerBottomHtml, which is what emits this link. Assert
+    // the BUILDER'S OUTPUT rather than a source-text grep — that proves every
+    // caller ships the CTA instead of proving one file mentions a symbol.
+    expect(directory).toContain('footerBottomHtml');
+    expect(footerBottomHtml()).toContain(FOOTER_OOG_CTA);
+    expect(footerBottomHtml({ legalLinks: true })).toContain(FOOTER_OOG_CTA);
     // Styling: nav-unify is the canonical chrome sheet and the homepage loads
     // it too now; landing-conversion keeps its own copy of the rule because the
     // homepage bundle still outranks nav-unify on `body.qf-wft` selectors.
