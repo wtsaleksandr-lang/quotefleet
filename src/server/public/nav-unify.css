@@ -199,7 +199,10 @@ html[data-theme="light"] .nav-dd-panel {
   background: transparent;
   border: 1px solid var(--border-strong);
   color: var(--ink);
-  border-radius: 10px;
+  /* 8px, not 10: the radius scale is 6 / 8 / 12 and this is a button, so it
+     takes --radius-btn — the same value its neighbours in the cluster (the
+     theme toggle and "Sign in") already compute to. */
+  border-radius: var(--radius-btn);
   padding: 9px 18px;
   font-size: 13px;
   font-weight: 600;
