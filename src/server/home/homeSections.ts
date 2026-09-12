@@ -34,6 +34,7 @@ import { readFileSync } from 'node:fs';
 import { resolve as resolvePath } from 'node:path';
 import { esc, monogramInitials } from '../directory/pages.js';
 import { CURATED_CARRIER_LOGOS, carrierLogoPaths } from '../directory/carrierLogos.js';
+import { injectBeforeClosingTag, liveInSectionProblem } from '../htmlInject.js';
 
 // ─── 1 · The hidden legacy sections ───────────────────────────────────────
 
@@ -288,7 +289,10 @@ export function applyHomeSections(
   // The marquee's stylesheet rides with the marquee. Linking it unconditionally
   // would be a render-blocking download for a section that is not on the page.
   if (marquee) {
-    out = out.replace('</head>', () => `  <link rel="stylesheet" href="${MARQUEE_STYLESHEET}">\n</head>`);
+    out = injectBeforeClosingTag(
+      out, 'head', `  <link rel="stylesheet" href="${MARQUEE_STYLESHEET}">\n`,
+      { label: 'home logo marquee stylesheet', expect: MARQUEE_STYLESHEET },
+    );
   }
   return out;
 }
@@ -309,4 +313,21 @@ export function verifyHomeSectionSlots(publicDir: string): void {
     }
   }
   if (HOME_LEGACY_SECTIONS_ENABLED) legacySectionsHtml(); // throws now, not on a request
+
+  // AND AUDIT THE STYLESHEET INJECTION ITSELF, which slot presence says nothing
+  // about. The marquee's <link> is spliced in before landing.html's real
+  // </head>; when that aim was wrong the link landed inside one of the page's
+  // head comments, the homepage rendered unstyled, and this function — the one
+  // whose entire job is catching a silently-broken homepage at boot — passed.
+  //
+  // A PROBE LIST rather than HOME_PARTNER_LOGOS: the injection only runs when
+  // the marquee is non-empty, and auditing a code path only while a data-driven
+  // feature happens to be populated is how it rots. This exercises it either
+  // way. Pure string work on a copy — nothing is served from here.
+  const probed = applyHomeSections(html, {
+    legacyEnabled: HOME_LEGACY_SECTIONS_ENABLED,
+    logos: [{ name: 'Boot Audit Probe' }],
+  });
+  const bad = liveInSectionProblem(probed, MARQUEE_STYLESHEET, 'head', 'landing.html');
+  if (bad) throw new HomeSectionSlotError(bad);
 }

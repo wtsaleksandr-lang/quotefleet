@@ -132,6 +132,11 @@
 import { readFileSync } from 'node:fs';
 import { resolve as resolvePath } from 'node:path';
 import { analyticsTags } from './analytics.js';
+import {
+  countLiveOccurrences,
+  injectBeforeClosingTag,
+  liveInSectionProblem,
+} from './htmlInject.js';
 
 export const OOG_QUOTE_HREF = '/tools/heavy-haul-quote';
 export const HEADER_OOG_CTA = `<a class="site-oog" href="${OOG_QUOTE_HREF}">OOG quote</a>`;
@@ -223,6 +228,10 @@ export const SITE_MOBILE_MENU_HTML = `<div class="site-mobile-menu" id="site-mob
  */
 export const SITE_HEADER_SLOT = '<!--qf:site-header-->';
 export const SITE_FOOTER_SLOT = '<!--qf:site-footer-->';
+
+/** The chrome's own stylesheet, injected into <head> by `applySiteChrome`.
+ *  Named because both the injector and the boot audit assert on it. */
+export const NAV_UNIFY_CSS = '/nav-unify.css';
 
 /** Raised when a page's chrome slots do not match what the variant requires. */
 export class SiteChromeError extends Error {
@@ -790,14 +799,23 @@ export function applySiteChrome(html: string, opts: SiteChromeOptions = {}): str
 
   // Function replacers: the chrome contains `$` sequences in no version today,
   // but a `$&` slipping into a label would silently splice the match back in.
+  // (The slots are counted exactly above, so these two are already aimed.)
   let out = html.replace(SITE_HEADER_SLOT, () => header);
   if (wantsFooter) out = out.replace(SITE_FOOTER_SLOT, () => PREMIUM_FOOTER);
 
   if (variant === 'full') {
-    if (!out.includes('/nav-unify.css')) {
-      out = out.replace('</head>', () => '  <link rel="stylesheet" href="/nav-unify.css">\n</head>');
+    // `countLiveOccurrences`, not `.includes`: a nav-unify.css mentioned inside
+    // one of these pages' long explanatory head comments is not a loaded
+    // stylesheet, and treating it as one would skip the injection and ship the
+    // page unstyled. Same reason `injectBeforeClosingTag` replaces the old
+    // `.replace('</head>', …)` — see htmlInject.ts for the measured defect.
+    if (countLiveOccurrences(out, NAV_UNIFY_CSS) === 0) {
+      out = injectBeforeClosingTag(
+        out, 'head', `  <link rel="stylesheet" href="${NAV_UNIFY_CSS}">\n`,
+        { label, expect: NAV_UNIFY_CSS },
+      );
     }
-    out = out.replace('</body>', () => `${HEADER_SCRIPTS}\n</body>`);
+    out = injectBeforeClosingTag(out, 'body', `${HEADER_SCRIPTS}\n`, { label });
   } else {
     // The 'auth' variant (/login, /signup, /reset-password) deliberately takes
     // no HEADER_SCRIPTS — its compact bar has no burger and no dropdowns to
@@ -808,7 +826,7 @@ export function applySiteChrome(html: string, opts: SiteChromeOptions = {}): str
     // the full variant gets them inside HEADER_SCRIPTS, this variant gets them
     // on their own, and neither path runs for the other.
     const tags = analyticsTags();
-    if (tags) out = out.replace('</body>', () => `${tags}\n</body>`);
+    if (tags) out = injectBeforeClosingTag(out, 'body', `${tags}\n`, { label });
   }
   return out;
 }
@@ -867,14 +885,29 @@ export function verifySiteChromeSlots(publicDir: string, pages: ChromedPageSpec[
       problems.push(`${page.file}: registered for site chrome but missing from ${publicDir}`);
       continue;
     }
+    let rendered: string;
     try {
-      applySiteChrome(html, {
+      rendered = applySiteChrome(html, {
         variant: page.variant,
         label: page.file,
         authLink: { href: '/login', label: 'Sign in' },
       });
     } catch (err) {
       problems.push(err instanceof Error ? err.message : String(err));
+      continue;
+    }
+    // POST-CONDITION, not just "it did not throw".
+    //
+    // This audit used to call applySiteChrome and check nothing about what came
+    // back, which is how both of the page's stylesheets went missing without a
+    // single failure: the injection had landed inside an HTML comment, so the
+    // document still CONTAINED the link and a `.includes` check would have
+    // passed too. `liveInSectionProblem` asks the two questions that matter —
+    // is it real markup, and is it in the right section — over the artifact a
+    // visitor actually receives. See htmlInject.ts for the full defect.
+    if (page.variant === 'full') {
+      const bad = liveInSectionProblem(rendered, NAV_UNIFY_CSS, 'head', page.file);
+      if (bad) problems.push(bad);
     }
   }
   if (problems.length) {
