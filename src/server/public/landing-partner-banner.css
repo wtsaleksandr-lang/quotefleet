@@ -12,14 +12,14 @@
    renumber every entry below it. It also keeps this band clear of the seven
    sheets that re-declare `.hero`/`.section` with !important.
 
-   THE WASH IS NOT A GRADIENT.  The design law forbids CSS gradients, so this
-   card uses the SAME technique as the hero card (landing-home-grid.css §1): a
-   flat `--surface-hero` base with the two generated rasters over it —
-   `--surface-hero-grain` tiled at its natural 192px size, and the wash itself
-   over that (cropped differently — see the card rule). Both are decorative, so
-   a failed image leaves the card on the flat tint rather than white. See the
-   Wave 5 block at the foot of style.css for how the rasters are made
-   (scripts/make-hero-wash.mjs).
+   THE TEXTURE IS NOT A GRADIENT.  The design law forbids CSS gradients, so
+   this card uses the same technique as the hero card (landing-home-grid.css
+   §1): a flat `--surface-hero` base with generated rasters over it — here just
+   the matched grain PAIR, `--surface-hero-grain` (white) and
+   `--surface-hero-grain-ink` (black), both tiled at their natural 256px size.
+   They are decorative, so a failed image leaves the card on the flat tint
+   rather than white. See the Wave 5 block at the foot of style.css for how the
+   rasters are made (scripts/make-hero-wash.mjs).
 
    DESIGN LAW.  Tokens only; zero gradients, zero backdrop-filter, zero
    keyframes here; radii 6/8/12; spacing on {0,4,8,12,16,24,32,48,60,80,120};
@@ -53,44 +53,34 @@ html body.landing-v2.qf-wft main > section.qf-marquee-section::after {
 
 /* The card.
 
-   THE CROP IS NOT `cover`, AND THAT IS A CONTRAST DECISION, NOT A TASTE ONE.
-   The wash is a centre-lit vignette: a light column down the middle, with the
-   tone falling away to deep left and right rails. Those rails are allowed to be
-   deep precisely because on the hero card they are STRUCTURALLY TEXT-FREE —
-   its copy is capped at 780px inside a card up to 2509px wide. This card is the
-   opposite shape: short, wide, and at 375 its headline spans nearly the whole
-   width. `background-size: cover` scales the 2560×1100 field to the card WIDTH,
-   which puts the rails and the deep bottom of the vertical ramp directly under
-   the text. Measured off the rendered page, over exactly the box the headline
-   and the CTA occupy, `--muted` against that ground came out:
+   IT NO LONGER CARRIES THE WASH RASTER AT ALL — flat `--surface-hero` plus the
+   two grain tiles, and nothing else.
 
-       light  3.19:1 @1440   2.68:1 @1024   3.59:1 @375
-       dark   4.32:1 @1440   4.12:1 @1024   4.80:1 @375
+   It used to. The wash was a centre-lit vignette and this card cropped it to
+   300% of its width at `50% 0%`, which showed only the light column down the
+   middle; the whole apparatus existed because `cover` had put the vignette's
+   deep rails directly under the headline (`--muted` measured 2.68:1 at 1024
+   against a 4.5:1 requirement) and 300% was the crop that dodged them.
 
-   — below AA in five of six, and the dark ground peaked at luminance 0.0468
-   against the 0.0386 ceiling its own generator is capped to.
+   The wash is now a pixel-pinned VERTICAL fade — saturated brand blue for its
+   first 475 rows, near-white from 585 on — so every crop argument above is
+   void. There is no slice of it this card can take that is both pale enough
+   for dark ink and honest about what the raster is: the top is blue, and this
+   card is only ~260px tall. Anchoring at the bottom would work, but it would
+   mean painting a 1240px raster to show a flat region that is, by
+   construction, EXACTLY `--surface-hero` — the generator holds the tail at the
+   token value precisely so the two can meet without a seam. So the card just
+   uses the token, and the result is pixel-identical to sampling the tail.
 
-   So the field is painted at 300% of the card width instead: it spans three
-   card-widths, `50% 0%` shows the middle third and the top band, and the only
-   slice that ever reaches this card is the light column the contrast floor was
-   built for. Re-measured the same way:
+   What it keeps is the TEXTURE. The grain pair is tiled 1:1 and is what stops
+   the band reading as a flat printed rectangle; it is also the layer that now
+   ties this card visually to the hero card above it, which is the job the
+   shared wash used to do. Dark ink on the composited ground re-measured off
+   the rendered page: `--muted` 5.42:1 light / 5.28:1 dark at 1440.
 
-       light  5.90:1 @1440   5.80:1 @1024   5.21:1 @375
-       dark   5.36:1 @1440   5.36:1 @1024   5.32:1 @375
-
-   BOTH SETS ARE AGAINST THE #545 WASH, re-measured after that PR darkened the
-   field and swapped the grain tile for white streaks — the `cover` crop got
-   WORSE under the new envelope (2.68:1 at 1024), and the light-column crop
-   held. Re-measure both if the generator is tuned again.
-
-   Nothing is left uncovered: 300% of the width is ~129% of it in height
-   (1100/2560 × 3), always taller than this card, and `--surface-hero` sits
-   behind it regardless.
-
-   THE HAIRLINE IS THEN LOAD-BEARING. With the rails cropped out, the card's
-   edge is no longer drawn by the wash at all, so the 1px `--border-strong` rim
-   is what makes the 12px radius read as an edge against `--bg`. Same rim, same
-   reason, as the hero card at 375. */
+   THE HAIRLINE IS THEN LOAD-BEARING. With no wash to draw an edge, the 1px
+   `--border-strong` rim is what makes the 12px radius read against `--bg`.
+   Same rim, same reason, as the hero card's bottom half. */
 .qf-partner-card {
   display: flex;
   flex-direction: column;
@@ -99,10 +89,10 @@ html body.landing-v2.qf-wft main > section.qf-marquee-section::after {
   width: 100%;
   padding: 80px 24px;
   background-color: var(--surface-hero);
-  background-image: var(--surface-hero-grain), var(--surface-hero-image);
-  background-repeat: repeat, no-repeat;
-  background-position: 0 0, 50% 0%;
-  background-size: auto, 300% auto;
+  background-image: var(--surface-hero-grain), var(--surface-hero-grain-ink);
+  background-repeat: repeat, repeat;
+  background-position: 0 0, 0 0;
+  background-size: auto, auto;
   border: 1px solid var(--border-strong);
   border-radius: var(--radius);
   text-align: center;

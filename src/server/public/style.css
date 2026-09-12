@@ -1847,7 +1847,7 @@ html[data-theme="light"] .site-footer strong { color: var(--ink); }
    ───────────────────────────────────────────────────────────────────────── */
 :root {
   /* Surfaces the legacy set had no name for. */
-  --surface-hero:  #EFF6FF;   /* the one blue wash, for hero bands only */
+  --surface-hero:  #EDF5F9;   /* = the hero wash raster's ENCODED pale tail */
   --surface-dark:  #0C111D;   /* the dark surface (CTA fills, dark bands) */
 
   /* Focus. 2px is reserved for selection + focus; everything else is 1px. */
@@ -1879,7 +1879,7 @@ html[data-theme="dark"],
   --surface-hero: #131A28;    /* the blue wash has no legible dark twin */
 }
 @media (prefers-color-scheme: light) {
-  :root:not([data-theme="dark"]) { --surface-hero: #EFF6FF; }
+  :root:not([data-theme="dark"]) { --surface-hero: #EDF5F9; }
 }
 
 /* Container — the measured 1328/24/1280 geometry. Declared here rather than
@@ -1943,61 +1943,71 @@ html[data-theme="dark"],
 }
 
 /* ── Wave 5: THE HERO BACKDROP ────────────────────────────────────────────
-   The hero card's wash is a soft multi-stop blue, not a flat tint. Our design
-   law forbids CSS gradients, so the wash is a DECORATIVE RASTER laid over the
-   flat `--surface-hero` base — the same way the reference does it. If the
-   image 404s or WebP is unsupported, the card falls back to the flat tint it
-   has today; nothing renders white.
+   The hero card's wash is a saturated-AZURE-to-near-white VERTICAL FADE. Our
+   design law forbids CSS gradients, so it is a DECORATIVE RASTER laid over the
+   flat `--surface-hero` base. If the image 404s or WebP is unsupported the card
+   falls back to that flat tint; nothing renders white.
 
    The assets are generated, not licensed: scripts/make-hero-wash.mjs computes
-   the field per-pixel in float from these same tokens, adds a low-frequency
-   value-noise mesh so it is never a pure ramp, and applies ±1 LSB triangular
-   dither — which is what keeps a 2560px-wide wash from banding at 8 bits.
-   2560×1100, 18.1 KB light / 12.8 KB dark.
+   the field per-pixel in float, adds a low-frequency mesh so it is never a pure
+   ramp, and applies ±1 LSB triangular dither, which is what keeps a long ramp
+   from banding at 8 bits. 1440×1240, 12.6 KB light / 11.6 KB dark.
 
-   THE FIELD IS A CENTRE-LIT VIGNETTE, and the first cut was not. It deepened
-   toward the bottom-left and lifted to NEAR-WHITE at the opposite corner, and
-   near-white is the one thing it could not be: `--bg` is #F8FAFC at luminance
-   0.9536 and the lift reached 0.948, a 1.01:1 step. A 1.01:1 step is not an
-   edge — the card had no visible corners and the wash read as a flat white
-   field. `cover` made it worse, cropping a 2560px-wide field to its middle 66%
-   at 1440 and its middle 10% at 375, so whatever range the corners carried was
-   not on screen at the widths people actually use.
+   THE FADE IS PINNED IN PIXELS, NOT IN PERCENT, and the card paints it
+   `100% 1240px` at `0 0` rather than with `cover`. Both of those are forced.
+   `cover` crops the surplus axis, so at 2560 (card 2509×839) a 2560-wide field
+   anchored at `50% 100%` showed only its bottom 65% — a saturated top would
+   not have been on screen at all. And percentages do not work either: measured
+   at 375/1024/1440/2560 in both audience panels, the card's height ranges
+   727→1200px while the copy's ABSOLUTE offsets barely move (the headline
+   starts at 111px at every width), so a proportional fade has no solution and
+   a pixel-pinned one has an easy one. Stops: saturated 0→475px, smoothstep
+   475→585px, flat `--surface-hero` from 585 to 1240.
 
-   So: the light column runs down the MIDDLE, where every crop lands, and the
-   tone falls away to the left and right rails and toward the bottom. The rails
-   are structurally text-free (copy is capped at 780px inside a card up to
-   2509px wide), so they carry the range — and they sit exactly where the card
-   meets the page. The blue was then DEEPENED a step at the owner's request.
-   Measured on the regenerated field: 0.3152 → 0.7651 full range (was
-   0.418 → 0.786), so the palest pixel is 0.765 against the 0.954 page ground
-   (1.22:1) and the rails now bottom out at 0.3152 — a 2.58:1 page-to-rail step
-   where the old field managed 1.89:1. Re-measured on the RENDERED page with
-   the glyphs blanked, worst case not mean, across 375 / 1024 / 1440 / 2560:
-   H1 13.77:1 and the lead paragraph 5.25:1 at its very worst (2560, light).
-   Nothing regressed — the old floor was 5.07:1 — because the texture layer
-   that replaced the grain only ever lightens.
+   THE BAND IS AZURE, NOT OUR BRAND BLUE. The owner's hero reference samples
+   #0179AD at hue 198 with saturation 0.99; `--accent` is #3356EE at hue 229.
+   That is 32 degrees apart — a different colour, not a near-duplicate — and
+   the hero panel is the surface he is judging, so the raster follows it. The
+   raster introduces no token and trips no guard, but the hero card no longer
+   matches the accent the buttons and icon tiles inside it use. Whether the
+   site's accent should follow is raised in the PR rather than decided here.
 
-   --surface-hero-grain is the TEXTURE: fine WHITE STREAKS, not dots. It is a
-   second, tiled layer rather than part of the wash for a mechanical reason:
-   `cover` downscales the wash, and downscaling averages per-pixel texture out
-   of existence. Tiled 1:1 at its natural 256×256 it renders identically at
-   every card width. Every pixel in it is WHITE and only the alpha varies, so
-   one 13.9 KB asset serves both themes, and the layer can only ever LIGHTEN
-   the ground — which is why deepening the wash cost the light theme's dark ink
-   nothing, and why the dark theme's light ink is the only contrast the texture
-   has to be bounded against. See scripts/make-hero-wash.mjs for the
-   row-strength field and the alpha ceiling.
+   THE INK ON THE BAND IS INVERTED — see the Wave 8 block below for the tokens
+   and landing-home-grid.css §8 for which elements and why those.
 
-   Split light/dark by the SAME cascade `--surface-hero` uses six lines up, so
-   one switch drives both the base colour and the image. The dark variant is a
-   real sibling (anchored on #131A28, same field, same accent) rather than a
-   suppression: a flat rectangle in dark next to a washed card in light reads
-   as the unfinished theme. Its envelope is bounded at the TOP instead of the
-   bottom — dark `--muted` #90A1B9 needs the ground under luminance 0.0386 —
-   so it runs 0.0111 → 0.0304 after the deepening (was 0.018 → 0.035), a
-   1.28:1 step off the #0C111D page ground. Rendered worst case with the white
-   streaks composited on top: H1 14.17:1, lead 5.36:1.
+   --surface-hero-grain / --surface-hero-grain-ink are the TEXTURE: a matched
+   PAIR of isotropic film-grain tiles, one white and one black, exactly one of
+   which is opaque at any pixel. They are a second, tiled layer rather than
+   part of the wash for a mechanical reason: the wash is resampled to the
+   card's width and resampling averages per-pixel texture out of existence,
+   while a 1:1 tile renders identically at every card width and carries on over
+   the flat base colour. Measured amplitude after encoding: sigma 5.14 8-bit
+   levels on the blue band, 3.84 on the pale tail, 5.60 on the dark band —
+   against the 4.6-6.0 sampled off the owner's reference. 18.8 KB + 17.2 KB.
+
+   WHY TWO FILES AND NOT ONE RGBA FIELD. Only because of the encoder: WebP
+   stores alpha losslessly and colour lossily, so a random black-and-white
+   colour plane is the most expensive thing it can be handed. The identical
+   field costs 67.3 KB as one tile and 36.0 KB as two constant-colour ones.
+
+   WHY BIDIRECTIONAL AT ALL. The previous tile was white-only, which can only
+   lighten — and over a near-white wash that is 0.7 of a level, i.e. nothing.
+   That, not the alpha, is why the old grain was invisible, and it is why
+   raising the alpha could never have fixed it. It also changes the contrast
+   argument: a white-only layer could not cost light-theme dark ink anything,
+   whereas this pair has a worst case at BOTH ends, so both are bounded in the
+   generator and both are measured on the rendered page.
+
+   Split light/dark by the SAME cascade `--surface-hero` uses further up, so
+   one switch drives the base colour and the image together. The dark variant
+   is a real sibling rather than a suppression — a flat rectangle in dark next
+   to a faded card in light reads as the unfinished theme — and it inverts the
+   idea rather than copying it: deep teal-navy #041D2D at the top to the dark
+   `--surface-hero` #131A28 at the bottom, i.e. azure to near-black, at the
+   SAME 198-degree hue as the light band. Its envelope is bounded at the TOP
+   instead of the bottom, because dark `--muted` #90A1B9 needs the ground under
+   luminance 0.0361; it runs 0.0093 → 0.0182 bare and 0.0312 under the
+   brightest grain pixel, which is 4.74:1.
 
    Appended at EOF for baseline-protocol.md rule 1 (the guards key file:line).
    ───────────────────────────────────────────────────────────────────────── */
@@ -2052,5 +2062,69 @@ html[data-theme="dark"],
   :root:not([data-theme="dark"]) {
     --accent-legible: var(--accent-fill);
     --icon-tile-bg:   rgba(51, 86, 238, 0.10);
+  }
+}
+
+/* ── Wave 8: THE HERO'S LIGHT INK, AND THE SECOND GRAIN TILE ──────────────
+   The hero wash stopped being a pale field and became a SATURATED AZURE one at
+   the top (scripts/make-hero-wash.mjs explains the fade and the two grain
+   tiles). Dark ink cannot sit on that, so the copy inside the blue band is
+   inverted — and the tokens below are what it inverts TO.
+
+   THE INK IS WHITE, AND THAT IS FROM THE REFERENCE'S OWN PIXELS RATHER THAN
+   FROM HABIT. The owner supplied three panels and they are two different
+   systems, which the sampling makes unarguable:
+
+     hero panel   ground #0179AD (hue 198, azure)  type #FFFFFE  <- pure white
+     palette panel ground #4660E9 (hue 230, periwinkle) type #EDEBE9
+     palette panel ground #F6F2E9 (warm cream)      type #17120E
+
+   So "their white is not #FFFFFF" is true of the PERIWINKLE panel and false of
+   the hero one. This card follows the hero panel, so the ink is white — and it
+   is `--accent-ink`, which is already #FFFFFF in both themes and is already
+   this codebase's name for "ink on a saturated accent ground". No new colour.
+
+   The warm cream #F6F2E9 is NOT adopted. It is genuinely warm where `--bg`
+   #F8FAFC, `--surface` #FFFFFF and `--surface-2` are cool, so taking it on
+   would be a site-wide identity change rather than a hero tweak — see the PR
+   body for the blast radius. It also belongs to their periwinkle system, not
+   to the azure hero this card is copying.
+
+   `--hero-wash-line` is the ghost button's outline on the band. 0.70 alpha is
+   not a taste call: it is where the line clears the 3:1 a UI boundary needs
+   (0.62 measures 3.05:1, 0.70 measures 3.50:1).
+
+   `--hero-wash-focus` replaces `--focus-ring` inside the card. The site ring is
+   `--accent-soft`, an 8%-opacity BLUE — nearly invisible on a saturated blue
+   ground, which would have made the hero the one place on the site where you
+   cannot see what you have tabbed to.
+
+   IN DARK THEME ALL OF THEM RESOLVE TO THE ORDINARY DARK-THEME VALUES, because
+   the dark hero needs no inversion: its ground runs deep teal-navy to
+   near-black and its ink was already light. One set of rules, two themes.
+
+   Appended at EOF for baseline-protocol.md rule 1 (the guards key file:line).
+   ───────────────────────────────────────────────────────────────────────── */
+:root {
+  --hero-wash-ink-rgb: 255, 255, 255;
+  --hero-wash-ink:   var(--accent-ink);
+  --hero-wash-line:  rgba(var(--hero-wash-ink-rgb), 0.70);
+  --hero-wash-wipe:  rgba(var(--hero-wash-ink-rgb), 0.14);
+  --hero-wash-focus: 0 0 0 2px rgba(var(--hero-wash-ink-rgb), 0.85);
+  --surface-hero-grain-ink: url("/brand/hero-grain-ink.webp");
+}
+html[data-theme="dark"],
+:root:not([data-theme="light"]) {
+  --hero-wash-ink:   var(--ink);
+  --hero-wash-line:  var(--border-strong);
+  --hero-wash-wipe:  var(--cta-sec-bg-hover);
+  --hero-wash-focus: var(--focus-ring);
+}
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]) {
+    --hero-wash-ink:   var(--accent-ink);
+    --hero-wash-line:  rgba(var(--hero-wash-ink-rgb), 0.70);
+    --hero-wash-wipe:  rgba(var(--hero-wash-ink-rgb), 0.14);
+    --hero-wash-focus: 0 0 0 2px rgba(var(--hero-wash-ink-rgb), 0.85);
   }
 }
