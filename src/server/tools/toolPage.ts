@@ -520,21 +520,45 @@ export interface ToolPageOpts {
   /** Block 2 — the tool. Rendered inside the elevated card. */
   toolHtml: string;
 
+  /**
+   * ── BLOCKS 3, 4, 5 AND 7 ARE OPTIONAL, AND THE BAR FOR OMITTING ONE IS HIGH
+   *
+   * The ORDER is still fixed and a supplied block still renders in its fixed
+   * slot — omitting one never reorders the rest. What is optional is whether
+   * the page has something true to put there.
+   *
+   * This exists because the suite is not eight calculators. The glossary is a
+   * 37-term reference index: it has no three-step process to number and no two
+   * explanatory rows that are not already the word list, and a compliance page
+   * has no genuine recurring question we can answer without stating somebody
+   * else's regulation. Forcing eight blocks onto those pages produces filler,
+   * and filler in a FAQ is worse than filler in a layout because it ships
+   * `FAQPage` schema over a question nobody asked.
+   *
+   * SO: omit a block ONLY when filling it would mean inventing content. Never
+   * to save effort — a tool page that skips its limits strip because writing
+   * one was awkward has hidden the boundary its reader most needs. A page that
+   * drops a block must be able to say WHY in one sentence.
+   *
+   * `related` has no opt-out on purpose: cross-tool navigation is the cheapest
+   * suite signal there is and every page can always name the next tool.
+   */
+
   /** Block 3 — 2 or 3 facts. Fewer than 2 reads as an afterthought; more than
    *  3 stops being a strip and becomes a list, which is what block 5 is for. */
-  limits: { head: SectionHeader; facts: Fact[] };
+  limits?: { head: SectionHeader; facts: Fact[] };
 
   /** Block 4 — exactly three. */
-  steps: { head: SectionHeader; items: [Step, Step, Step] };
+  steps?: { head: SectionHeader; items: [Step, Step, Step] };
 
   /** Block 5 — exactly two. */
-  rows: { head: SectionHeader; items: [AltRow, AltRow] };
+  rows?: { head: SectionHeader; items: [AltRow, AltRow] };
 
-  /** Block 6. */
+  /** Block 6. Always present — see the note above. */
   related: { head: SectionHeader; items: RelatedTool[] };
 
-  /** Block 7. */
-  faq: { head: SectionHeader; items: Array<{ q: string; a: string }> };
+  /** Block 7. Omit rather than manufacture questions; the schema is a promise. */
+  faq?: { head: SectionHeader; items: Array<{ q: string; a: string }> };
 
   /** Per-tool CSS and scripts, appended after the template's. */
   extraCss?: string;
@@ -579,39 +603,45 @@ export function toolPage(opts: ToolPageOpts): string {
 
   // ── 3 ── The column count is stated, never inferred, so 2 facts are 2 full
   // columns rather than 2 of 3 with a hole where the third would be.
-  const limits = block(
-    'limits',
-    opts.limits.head,
-    `<div class="qtt-strip" style="--qtt-strip-cols:${opts.limits.facts.length}">${opts.limits.facts
-      .map((f) => `<div><span class="qtt-strip-k">${esc(f.label)}</span><p class="qtt-strip-v">${f.bodyHtml}</p></div>`)
-      .join('')}</div>`,
-  );
+  const limits = opts.limits
+    ? block(
+        'limits',
+        opts.limits.head,
+        `<div class="qtt-strip" style="--qtt-strip-cols:${opts.limits.facts.length}">${opts.limits.facts
+          .map((f) => `<div><span class="qtt-strip-k">${esc(f.label)}</span><p class="qtt-strip-v">${f.bodyHtml}</p></div>`)
+          .join('')}</div>`,
+      )
+    : '';
 
   // ── 4 ──
-  const steps = block(
-    'how',
-    opts.steps.head,
-    `<div class="qtt-steps">${opts.steps.items
-      .map(
-        (s, i) =>
-          `<div class="qtt-step"><span class="qtt-step-n" aria-hidden="true">${i + 1}</span>`
-          + `<h3>${esc(s.title)}</h3><p>${s.bodyHtml}</p></div>`,
+  const steps = opts.steps
+    ? block(
+        'how',
+        opts.steps.head,
+        `<div class="qtt-steps">${opts.steps.items
+          .map(
+            (s, i) =>
+              `<div class="qtt-step"><span class="qtt-step-n" aria-hidden="true">${i + 1}</span>`
+              + `<h3>${esc(s.title)}</h3><p>${s.bodyHtml}</p></div>`,
+          )
+          .join('')}</div>`,
       )
-      .join('')}</div>`,
-  );
+    : '';
 
   // ── 5 ──
-  const rows = block(
-    'detail',
-    opts.rows.head,
-    `<div class="qtt-rows">${opts.rows.items
-      .map(
-        (r) =>
-          `<div class="qtt-row"><div class="qtt-row-copy"><h3>${esc(r.heading)}</h3>${r.bodyHtml}</div>`
-          + `<div class="qtt-row-fig">${r.figureHtml}</div></div>`,
+  const rows = opts.rows
+    ? block(
+        'detail',
+        opts.rows.head,
+        `<div class="qtt-rows">${opts.rows.items
+          .map(
+            (r) =>
+              `<div class="qtt-row"><div class="qtt-row-copy"><h3>${esc(r.heading)}</h3>${r.bodyHtml}</div>`
+              + `<div class="qtt-row-fig">${r.figureHtml}</div></div>`,
+          )
+          .join('')}</div>`,
       )
-      .join('')}</div>`,
-  );
+    : '';
 
   // ── 6 ──
   const related = block(
@@ -627,10 +657,12 @@ export function toolPage(opts: ToolPageOpts): string {
   );
 
   // ── 7 ── The shell's own fold, so the page has one disclosure pattern.
-  const faq = `<section class="qtt-sec" id="faq"><div class="qtt-faq">${sectionHeader(opts.faq.head)}`
-    + `<div class="qh-faq">${opts.faq.items
-      .map((f) => fold({ label: f.q, bodyHtml: `<p>${esc(f.a)}</p>` }))
-      .join('')}</div></div></section>`;
+  const faq = opts.faq
+    ? `<section class="qtt-sec" id="faq"><div class="qtt-faq">${sectionHeader(opts.faq.head)}`
+      + `<div class="qh-faq">${opts.faq.items
+        .map((f) => fold({ label: f.q, bodyHtml: `<p>${esc(f.a)}</p>` }))
+        .join('')}</div></div></section>`
+    : '';
 
   const shellOpts: HubPageOpts = {
     title: opts.title,

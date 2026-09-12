@@ -245,19 +245,43 @@ describe('chrome and house UI rules', () => {
   it('uses theme tokens only — no raw hex can break light or dark', async () => {
     loadSeasonalContext.mockResolvedValue(DB_DOWN);
     const { body } = await get(SEASONAL_TOOL_PATH);
-    const ourCss = /<style>([\s\S]*?)<\/style>/.exec(body)?.[1] ?? '';
-    expect(ourCss).toContain('.sr-shell');
+    // The page now renders through the shared shell, so the single <style>
+    // block is HUB_CSS + the tool template + THIS PAGE'S CSS concatenated.
+    // Slice from the first rule this file owns so the assertion still covers
+    // exactly what it always covered: our own declarations.
+    const style = /<style>([\s\S]*?)<\/style>/.exec(body)?.[1] ?? '';
+    // Comments are stripped first, for the same reason toolPage.test.ts strips
+    // them: a hex quoted in PROSE is documentation, not a call site. The pill
+    // comment records that `--success` resolves to #059669 in light theme and
+    // measured 3.77:1 as text — the measurement that justifies the rule under
+    // it — and failing on that would push the reasoning out of the file.
+    const ourCss = style.slice(style.indexOf('.sr-truth')).replace(/\/\*[\s\S]*?\*\//g, '');
+    expect(ourCss).toContain('.sr-cards');
     expect(ourCss).not.toMatch(/#[0-9a-fA-F]{3,8}\b/);
   });
 
   it('left-aligns the hero and puts the eyebrow above the H1', async () => {
     loadSeasonalContext.mockResolvedValue(DB_DOWN);
     const { body } = await get(SEASONAL_TOOL_PATH);
-    const ourCss = /<style>([\s\S]*?)<\/style>/.exec(body)?.[1] ?? '';
-    // The shared .hero centres; the page must override it.
-    expect(ourCss).toContain('.sr-hero { padding: 48px 24px 16px; text-align: left; }');
-    expect(ourCss).toContain('.sr-hero h1 { font-size: 40px');
-    expect(body.indexOf('class="sr-eyebrow"')).toBeLessThan(body.indexOf('<h1>'));
+    const style = /<style>([\s\S]*?)<\/style>/.exec(body)?.[1] ?? '';
+    // The hand-rolled `.sr-hero` is gone: the page sits on the shared tool-page
+    // template, whose header band is left-aligned by definition. Same rule,
+    // asserted against the thing that now implements it.
+    expect(style).toMatch(/\.qtt-band h1 \{[^}]*text-align: left/);
+    expect(style).toMatch(/\.qtt-eyebrow \{[^}]*text-align: left/);
+    expect(body.indexOf('class="qtt-eyebrow"')).toBeLessThan(body.indexOf('<h1>'));
+  });
+
+  it('gives the index a breadcrumb it never used to have', async () => {
+    loadSeasonalContext.mockResolvedValue(DB_DOWN);
+    const { body } = await get(SEASONAL_TOOL_PATH);
+    // Before the template migration this page carried NO breadcrumb at all.
+    expect(body).toContain('aria-label="Breadcrumb"');
+    expect(body).toContain('class="qtt-sep" aria-hidden="true"');
+    expect(body).toContain('<span aria-current="page">Seasonal restrictions</span>');
+    // ...and it sits ABOVE the band, on the page ground, where the muted step
+    // clears 4.5:1 — over the raster it measured 3.79:1.
+    expect(body.indexOf('qtt-crumbs')).toBeLessThan(body.indexOf('class="qtt-band"'));
   });
 
   it('has a 375px story — the grid collapses to one column and the dl stacks', async () => {

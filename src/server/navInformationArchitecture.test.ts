@@ -52,6 +52,7 @@ import { resolve } from 'node:path';
 import { runInNewContext } from 'node:vm';
 import { SITE_NAV_HTML, SITE_MOBILE_MENU_HTML, PREMIUM_FOOTER, FULL_SITE_HEADER, renderStaticPage } from './siteChrome.js';
 import { NAV_SHIPPER_SCRIPT } from './directory/pages.js';
+import { GLOSSARY_TERMS, renderGlossaryIndex, renderGlossaryTerm } from './directory/glossary.js';
 
 const read = (p: string) => readFileSync(resolve(process.cwd(), p), 'utf8');
 /* THE HOMEPAGE AS SERVED, not the file on disk. landing.html now declares
@@ -230,10 +231,19 @@ describe('no menu entry is a dead end', () => {
 
 describe('ONE site map — every surface ships the same chrome', () => {
   it('the glossary uses the canonical header/footer instead of its own topnav', () => {
-    expect(GLOSSARY_TS).toContain('FULL_SITE_HEADER');
-    expect(GLOSSARY_TS).toContain('PREMIUM_FOOTER');
-    expect(GLOSSARY_TS).not.toContain('topnav--mobile-menu');
-    expect(GLOSSARY_TS).toContain('/nav-unify.css');
+    // ASSERTED ON THE RENDERED PAGE, not on the source text. The glossary no
+    // longer names FULL_SITE_HEADER / PREMIUM_FOOTER itself because it no
+    // longer hand-rolls a document at all — it renders through the shared
+    // shell, which owns them. Checking the output is the stronger claim: it
+    // stays true however the page is composed, and it is what a visitor sees.
+    const index = renderGlossaryIndex();
+    const term = renderGlossaryTerm(GLOSSARY_TERMS[0]!);
+    for (const html of [index, term]) {
+      expect(html).toContain(FULL_SITE_HEADER);
+      expect(html).toContain(PREMIUM_FOOTER);
+      expect(html).toContain('/nav-unify.css');
+      expect(html).not.toContain('topnav--mobile-menu');
+    }
   });
 
   it('landing.html carries the shared constants VERBATIM', () => {
@@ -696,13 +706,25 @@ describe('/glossary content sits inside its own header card', () => {
     // header card started at x=130 and the page body at x=298 — the only page on
     // the site whose content overhung its header card. `margin: 0` on a 900px
     // box was the cause. Hero and body now share one centred column, so the
-    // heading stays left-ALIGNED but starts on the body's left edge (x=298 at
-    // 1440px, i.e. 168px inside the card).
-    expect(GLOSSARY_TS).toMatch(/\.gl-hero \.container-narrow \{[^}]*margin: 0 auto/);
-    expect(GLOSSARY_TS).not.toMatch(/\.gl-hero \.container-narrow \{[^}]*margin: 0;/);
-    // 844 = the .gl-shell 900px box minus its 2 × 28px padding.
-    expect(GLOSSARY_TS).toMatch(/\.gl-hero \.container-narrow \{[^}]*max-width: 844px/);
-    expect(GLOSSARY_TS).toMatch(/\.gl-hero \{[^}]*text-align: left/);
+    // heading stays left-ALIGNED but starts on the body's left edge.
+    //
+    // THE HAND-ROLLED `.gl-hero` IS GONE: /glossary renders on the shared
+    // tool-page template, whose header band is full-bleed with a CENTRED inner
+    // column of the same max-width as the shell below it. That is the same fix,
+    // generalised — so the assertion moves to the property that must hold
+    // (hero column and body column share one width and one centre) rather than
+    // to the private class name that used to implement it.
+    const html = renderGlossaryIndex();
+    const style = /<style>([\s\S]*?)<\/style>/.exec(html)?.[1] ?? '';
+    const bandCol = /\.qtt-band-in \{([^}]*)\}/.exec(style)?.[1] ?? '';
+    const shellCol = /\.qtt \.qh-shell \{([^}]*)\}/.exec(style)?.[1] ?? '';
+    const width = (s: string) => /max-width:\s*(\d+)px/.exec(s)?.[1];
+    expect(bandCol).toMatch(/margin:\s*0 auto/);
+    expect(width(bandCol)).toBeDefined();
+    expect(width(bandCol)).toBe(width(shellCol));
+    // ...and the band's own heading is left-aligned, never centred.
+    expect(style).toMatch(/\.qtt-band h1 \{[^}]*text-align: left/);
+    expect(html.indexOf('qtt-eyebrow')).toBeLessThan(html.indexOf('<h1>'));
   });
 });
 

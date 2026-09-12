@@ -62,7 +62,6 @@ import {
 import type { HubCell } from '../osow/hubData.js';
 import {
   esc,
-  hubPage,
   jsonLdBreadcrumb,
   jsonLdFaq,
   jsonLdWebApplication,
@@ -982,46 +981,135 @@ export function renderAxleToolPage(): string {
     },
   ];
 
-  const body = `<div class="qt-grid">
-      <div>${formHtml('axle')}</div>
-      <div id="qt-out"><p class="qt-empty">Loading the calculator&hellip;</p></div>
-    </div>
-    ${seedScript()}
-    <section class="qh-sec" id="how" style="margin-top:32px">
-      <h2>What the verdict lines mean</h2>
-      <p>Each state line compares one measurement from your rig against that state's published limit. The measurement is derived, not typed: the heaviest single axle is the heaviest one you entered, and the heaviest tandem group is the heaviest group spanning ${TANDEM_MAX_SPACING_FT} ft or less — the span that makes a group a tandem under federal law.</p>
-      <p>Every limit links to the document it came from and carries two dates: the revision date the document itself states, and the date we retrieved it. They are different facts and a single "last updated" stamp would hide the difference — a schedule downloaded this morning can still be five years old.</p>
-      <p><a href="${OSOW_HUB_PATH}/legal-limits">Compare legal limits across all states →</a></p>
-    </section>
-    <section class="qh-sec" id="next">
-      <h2>What comes next</h2>
-      <ul>
-        <li><a href="${OSOW_TOOL}">Price the permit across a multi-state lane</a></li>
-        <li><a href="${OSOW_HUB_PATH}/escort-requirements">Check whether it needs a pilot car</a></li>
-        <li><a href="${OSOW_HUB_PATH}/superloads">Check whether it is a superload</a> — above that line there is usually no published fee at all</li>
-      </ul>
-    </section>
-    <section class="qh-sec" id="faq"><h2>Questions</h2><div class="qh-faq">${faqs
-      .map((f) => `<details><summary>${esc(f.q)}</summary><p>${esc(f.a)}</p></details>`)
-      .join('')}</div></section>`;
-
-  return hubPage({
+  return toolPage({
     title: 'Axle Weight Calculator by State (Free, Cited) | QuoteFleet',
     description: `Check an axle layout against the federal bridge formula and a state's own single-axle, tandem and gross limits — with the statute and its revision date on every verdict line. ${HUB_COVERED_STATES.length} states, free, no account.`,
     path: AXLE_TOOL_PATH,
+
+    // ── 1 ──
     crumbs: [{ name: 'Free tools', path: '/tools' }, { name: 'Axle weight checker' }],
     eyebrow: 'Free calculator · no account needed',
     h1: 'Axle weight checker',
     lead: `The federal bridge formula on every axle group, plus a state's own axle and gross limits — each verdict line carrying the statute behind it and the date that document was revised.`,
-    rail: [
-      { id: 'how', label: 'What the lines mean' },
-      { id: 'next', label: 'What comes next' },
-      { id: 'faq', label: 'Questions' },
-    ],
-    bodyHtml: body,
+    embed: { href: EMBED_SURFACE, label: 'Embed this tool' },
+
+    // ── 2 ──
+    toolHtml: `<div class="qt-grid">
+      <div>${formHtml('axle')}</div>
+      <div id="qt-out"><p class="qt-empty">Loading the calculator&hellip;</p></div>
+    </div>`,
+    afterToolHtml: seedScript(),
+
+    // ── 3 ── The state coverage IS the boundary on this page: a reader who
+    // picks a state expects the answer to be about that state, and the honest
+    // limit is that we hold a jurisdiction file for some states and not others.
+    limits: {
+      head: {
+        eyebrow: 'Scope',
+        heading: 'What this answers, and where the answer stops',
+        sub: 'A weight verdict is not a route clearance. The three facts below are the whole boundary.',
+      },
+      facts: [
+        {
+          label: 'What it covers',
+          bodyHtml: `The federal bridge formula on every group of two or more consecutive axles, plus the flat federal ${FEDERAL_SINGLE_AXLE_LIMIT_LBS.toLocaleString('en-US')} lb single-axle, ${FEDERAL_TANDEM_AXLE_LIMIT_LBS.toLocaleString('en-US')} lb tandem and ${FEDERAL_GROSS_WEIGHT_LIMIT_LBS.toLocaleString('en-US')} lb gross limits — and, for the <strong>${HUB_COVERED_STATES.length} states with a jurisdiction file</strong>, that state's own published single-axle, tandem and gross figures with the document behind each one.`,
+        },
+        {
+          label: 'What it does not cover',
+          bodyHtml: `Seasonal (spring thaw) restrictions, which are posted road by road; local bridge postings; toll, bridge and city authorities that issue their own permit inside the same state; and permit fees. Any one of them can make a rig that passes here illegal on a specific route. A state with no jurisdiction file is checked against the federal limits only, and the result says so.`,
+        },
+        {
+          label: 'What it costs',
+          bodyHtml:
+            'Nothing, and no account. Every input is in the request and every limit is compiled in, so the page renders and the endpoint answers with the database unreachable, and neither calls anything billable.',
+        },
+      ],
+    },
+
+    // ── 4 ──
+    steps: {
+      head: { eyebrow: 'How it works', heading: 'Three checks, in order' },
+      items: [
+        {
+          title: 'Describe the rig',
+          bodyHtml: `Position is the distance in feet from the steer axle, measured centre to centre; weight is what that axle actually carries, not its rating. Start from one of ${AXLE_PRESETS.length} real configurations and edit from there.`,
+        },
+        {
+          title: 'Every group gets enumerated',
+          bodyHtml: `Each single axle, then every group of two or more consecutive axles against the bridge formula — all N(N−1)/2 of them, not the obvious three — then the whole vehicle against the federal gross limit. The count is returned so you can see it rather than take it on trust.`,
+        },
+        {
+          title: 'Add a state, and read the citations',
+          bodyHtml: `Pick a state and three more lines appear: heaviest single axle, heaviest tandem group and gross, each against that state's own published figure, each linking to the document and carrying that document's revision date.`,
+        },
+      ],
+    },
+
+    // ── 5 ── The two things a reader has to understand to trust a verdict
+    // line: where the measurement came from, and what the two dates mean.
+    rows: {
+      head: { eyebrow: 'Why this one', heading: 'What the verdict lines actually mean' },
+      items: [
+        {
+          heading: 'The measurement is derived, not typed',
+          bodyHtml: `<p>Each state line compares one measurement from your rig against that state's published limit, and the measurement is computed rather than asked for. The heaviest single axle is the heaviest one you entered; the heaviest tandem group is the heaviest group spanning ${TANDEM_MAX_SPACING_FT} ft or less — the span that makes a group a tandem under federal law.</p>
+            <p>The headroom column is the one to read. A pass/fail says nothing about whether shifting a thousand pounds of freight breaks the rig, and the group with the least headroom is the one that decides.</p>
+            <p><a href="${OSOW_HUB_PATH}/legal-limits">Compare legal limits across all states →</a></p>`,
+          figureHtml: factList([
+            { label: 'States with a jurisdiction file', value: String(HUB_COVERED_STATES.length) },
+            { label: 'State limits checked per rig', value: '3' },
+            { label: 'Tandem span, federal', value: String(TANDEM_MAX_SPACING_FT), unit: 'ft or less' },
+          ]),
+        },
+        {
+          heading: 'Two dates on every line, not one',
+          bodyHtml: `<p>Every limit links to the document it came from and carries two dates: the revision date the document itself states, and the date we retrieved it. They are different facts, and a single "last updated" stamp would hide the difference — a schedule downloaded this morning can still be five years old.</p>
+            <p>Where two of a state's own documents disagree, the line shows both readings with their citations and the verdict reads "cannot tell". That is the honest answer, and the one that sends the question to the permit office rather than to a coin toss.</p>`,
+          figureHtml: factList([
+            { label: 'Federal single axle', value: FEDERAL_SINGLE_AXLE_LIMIT_LBS.toLocaleString('en-US'), unit: 'lb' },
+            { label: 'Federal tandem axle', value: FEDERAL_TANDEM_AXLE_LIMIT_LBS.toLocaleString('en-US'), unit: 'lb' },
+            { label: 'Federal gross weight', value: FEDERAL_GROSS_WEIGHT_LIMIT_LBS.toLocaleString('en-US'), unit: 'lb' },
+          ]),
+        },
+      ],
+    },
+
+    // ── 6 ── Four cards, so the grid is 4 / 2x2 / 4x1 and never orphans one.
+    related: {
+      head: {
+        eyebrow: 'Next',
+        heading: 'Once you know the weight',
+        sub: 'A weight verdict is the first of four questions on an oversize move.',
+      },
+      items: [
+        {
+          href: BRIDGE_TOOL_PATH,
+          title: 'Bridge formula calculator',
+          blurb: 'The federal formula alone, with no state selected — pure geometry and weight.',
+        },
+        {
+          href: OSOW_TOOL,
+          title: 'Oversize permit calculator',
+          blurb: 'Price the permit across a multi-state lane, state by state.',
+        },
+        {
+          href: `${OSOW_HUB_PATH}/escort-requirements`,
+          title: 'Escort requirements',
+          blurb: 'Whether the move needs a pilot car — usually the larger number of the two.',
+        },
+        {
+          href: SEASONAL_TOOL,
+          title: 'Seasonal restrictions',
+          blurb: 'Spring-thaw limits that can make a compliant axle group illegal in March.',
+        },
+      ],
+    },
+
+    // ── 7 ──
+    faq: { head: { eyebrow: 'FAQ', heading: 'Questions' }, items: faqs },
+
     extraCss: TOOL_CSS,
     extraScripts: toolScript('axle'),
-    showPromoCta: true,
     jsonLd: [
       jsonLdBreadcrumb([
         { name: 'Free tools', path: '/tools' },
