@@ -324,7 +324,7 @@ html[data-theme="dark"] .qf-theme-btn .qf-ico-moon { display: none; }
  * codebase deliberately paints media wider than its container (no `100vw`
  * media rule exists), so there is nothing for it to break. */
 img, video, svg, canvas, iframe { max-width: 100%; }
-html, body { height: 100%; }
+html { height: 100%; } body { min-height: 100%; } /* NEVER `height: 100%` on body: it is the sticky header's containing block, so a one-viewport body unsticks the nav at scrollY = vh - 64 on every page. See THE ROOT HEIGHT RULE in nav-unify.css. */
 body {
   font-family: var(--font-sans);
   background: var(--bg);

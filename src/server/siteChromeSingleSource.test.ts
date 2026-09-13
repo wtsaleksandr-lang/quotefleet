@@ -503,7 +503,7 @@ describe('the mobile drawer overlays the page instead of displacing it', () => {
     expect(wave6).toMatch(/@media \(prefers-color-scheme: dark\)[\s\S]{0,400}--qf-menu-tint/);
   });
 
-  it('animates on two durations and returns to instant under reduced motion', () => {
+  it('animates on two durations and ONE easing, and is instant under reduced motion', () => {
     // The design law's two durations, used the conventional way round.
     expect(wave6).toMatch(/--qf-menu-dur-in: \.3s;/);
     expect(wave6).toMatch(/--qf-menu-dur-out: \.2s;/);
@@ -512,6 +512,33 @@ describe('the mobile drawer overlays the page instead of displacing it', () => {
     expect(NAV_UNIFY.slice(0, NAV_UNIFY.indexOf('WAVE 6')),
       'the emphasised curve must not leak outside the drawer')
       .not.toContain('--qf-menu-ease-emphasized');
+    /* ONE EASING, NOT TWO. The leak test above only says the curve stays IN the
+       drawer. It said nothing about the drawer also shipping `ease` alongside
+       it, and WAVE 6/7 did exactly that: the emphasised curve entered, and the
+       exits plus every small in-panel state change — the fold, the chevron, the
+       tile, the row tint — kept `ease`. Two easings on one surface is a design
+       law violation whichever one you prefer, so the scope is widened HERE
+       rather than left to a reviewer's eye: no `ease` keyword may ride a
+       transition anywhere in this drawer's CSS. */
+    const declarations = wave6
+      .replace(/\/\*[\s\S]*?\*\//g, '')                      // prose says `ease` a lot
+      .replace(/var\(--qf-menu-ease-emphasized\)/g, 'CURVE'); // the one we allow
+    const easeRiders = declarations.match(
+      /transition[^;{}]*\b(?:ease(?:-in|-out|-in-out)?|linear|steps|cubic-bezier)\b[^;{}]*/g) ?? [];
+    expect(easeRiders, `the drawer must ship ONE easing; found: ${easeRiders.join(' | ')}`).toEqual([]);
+    // And the two elements that carried the second easing must carry THIS one:
+    // .mm-fold is the motion a visitor watches most, .mm-tile the one they
+    // touch most, and both were `ease` when WAVE 7 shipped.
+    const ruleFor = (selector: string) => {
+      const at = wave6.indexOf(selector);
+      expect(at, `nav-unify.css has no \`${selector}\` rule`).toBeGreaterThan(-1);
+      return wave6.slice(at, wave6.indexOf('}', at));
+    };
+    const fold = ruleFor('[data-fold-js] .mm-fold {');
+    expect(fold).toMatch(/grid-template-rows var\(--qf-menu-dur-out\) var\(--qf-menu-ease-emphasized\)/);
+    expect(fold).toMatch(/opacity var\(--qf-menu-dur-out\) var\(--qf-menu-ease-emphasized\)/);
+    const tile = ruleFor('#site-mobile-menu .mm-tile {');
+    expect(tile).toMatch(/transition: background-color var\(--qf-menu-dur-out\) var\(--qf-menu-ease-emphasized\), color var\(--qf-menu-dur-out\) var\(--qf-menu-ease-emphasized\)/);
     const reduced = wave6.slice(wave6.indexOf('@media (prefers-reduced-motion: reduce)'));
     expect(reduced).toContain('#site-mobile-menu:not([hidden])');
     expect(reduced).toContain('#site-menu-scrim');

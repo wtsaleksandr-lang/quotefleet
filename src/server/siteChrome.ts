@@ -1230,13 +1230,35 @@ export const PREMIUM_FOOTER = `<footer class="premium-footer"><div class="premiu
 //    excludes it) puts back the scrollbar's width. `scrollTo(0, lockY)` on
 //    release is the half iOS needs.
 //
-// 2. THE ENTRANCE NEEDS A FRAME. `hidden` is removed first, so the panel is
-//    laid out in its "from" state, and `data-state="open"` is set two frames
-//    later: set in the same tick, the browser coalesces both into one style
-//    resolution and the transition never runs. The exit is the mirror — the
-//    attribute comes off immediately and `hidden` goes back on only after the
-//    exit duration, which is also when the lock is released, so nothing can
-//    scroll underneath a panel that is still on screen.
+// 2. THE ENTRANCE NEEDS A REFLOW, NOT TWO FRAMES. `hidden` comes off first so
+//    the panel resolves in its "from" state, and `data-state="open"` is set
+//    immediately after one forced reflow: set in the same tick with nothing
+//    between them, the browser coalesces both into a single style resolution
+//    and the transition never runs. This used to be two chained
+//    requestAnimationFrames, and those two frames of nothing were the largest
+//    part of the gap between the tap and the first painted change.
+//
+//    THE CLICK FRAME IS FOR WRITES ONLY, which is the other half. open() read
+//    the bar's height AFTER writing two custom properties onto the root, and a
+//    custom property on the root invalidates style for the whole inheriting
+//    tree — so that read was a full style recalculation plus a layout of a
+//    6,367px document, in front of the first frame. It also called stops(),
+//    which runs getClientRects() over every focusable in the panel, and then
+//    .focus(). The reads are now batched ahead of the first write and the
+//    focus is deferred by one frame.
+//
+//    MEASURED, /tools/oversize-permits at 375px, 8 runs, median. Tap to first
+//    painted change: 46.0ms -> 23.8ms unthrottled, 234.2ms -> 155.3ms at 6x
+//    CPU. Tap to fully open: 321.1ms -> 302.9ms unthrottled against a declared
+//    300ms, 509.2ms -> 422.0ms at 6x. The close path was already clean and is
+//    unchanged within noise: 204.5ms -> 203.7ms against a declared 200ms. What
+//    is left unthrottled is under two frames — one to commit the style change,
+//    and a transition's first interpolated value does not differ from its
+//    start value until the frame after that — so it is the floor, not slack.
+//
+//    The exit is the mirror — the attribute comes off immediately and `hidden`
+//    goes back on only after the exit duration, which is also when the lock is
+//    released, so nothing can scroll underneath a panel still on screen.
 //
 // 3. REDUCED MOTION SHORTENS THE TIMER, NOT JUST THE CSS. The CSS kills the
 //    transition; if the script still waited 200ms for it, the panel would sit
@@ -1278,19 +1300,33 @@ export const HEADER_SCRIPTS = `<script>
           bar.style.removeProperty('right');
         }
       };
-      var measure = function () {
-        var h = bar ? bar.offsetHeight : 0;
+      /* Takes the bar's height as an ARGUMENT so open() can read it inside its
+         own read batch; falls back to reading it for the resize handler, where
+         nothing has been written yet either. */
+      var measure = function (h) {
+        if (h == null) h = bar ? bar.offsetHeight : 0;
         root.style.setProperty('--qf-menu-top', Math.max(0, Math.round(h)) + 'px');
         root.style.setProperty('--qf-lock-pad', Math.round(basePad + h) + 'px');
       };
       var open = function () {
         if (isOpen) return;
         if (closeTimer) { clearTimeout(closeTimer); closeTimer = null; }
+        /* READ BATCH — every measurement this function needs, taken before the
+           first write. --qf-lock-y and --qf-sbw are custom properties on the
+           ROOT, and a custom property on the root invalidates style for every
+           element that could inherit it: the whole document. A read after one
+           of those writes is therefore not a cheap read, it is a full style
+           recalculation plus layout of a page that runs to 6,367px. That is
+           what measure() used to do one line later. (No backticks in here:
+           this whole controller is a template literal.) */
         lockY = window.scrollY || window.pageYOffset || 0;
         basePad = parseFloat(getComputedStyle(document.body).paddingTop) || 0;
-        root.style.setProperty('--qf-sbw', (window.innerWidth - root.clientWidth) + 'px');
+        var sbw = window.innerWidth - root.clientWidth;
+        var barH = bar ? bar.offsetHeight : 0;
+        /* WRITE BATCH — no reads from here to the end of the frame. */
+        root.style.setProperty('--qf-sbw', sbw + 'px');
         root.style.setProperty('--qf-lock-y', Math.round(lockY) + 'px');
-        measure();
+        measure(barH);
         isOpen = true;
         if (sc) sc.removeAttribute('hidden');
         m.removeAttribute('hidden');
@@ -1298,15 +1334,39 @@ export const HEADER_SCRIPTS = `<script>
         root.setAttribute('data-qf-menu', 'open');
         b.setAttribute('aria-expanded', 'true');
         b.setAttribute('aria-label', 'Close menu');
-        var paint = function () {
+        /* ONE FLUSH, NOT TWO FRAMES. The entrance still needs the panel's
+           "from" style resolved before the "to" style is set, or the browser
+           coalesces both into one style resolution and the transition never
+           runs. That used to be bought with a double requestAnimationFrame —
+           two frames in which nothing at all happens, and the largest single
+           slice of the gap between the tap and the first painted change. One
+           forced reflow buys the same guarantee in the same frame.
+
+           IT IS A LAYOUT READ, NOT A STYLE READ, AND THAT WAS MEASURED.
+           getComputedStyle(m).opacity is cheaper and resolves style, but the
+           panel was display:none one statement earlier and Chrome would not
+           start the transition off it until the box had actually been laid
+           out — the animation began a frame late. Over 8 runs on
+           /tools/oversize-permits at 375px: offsetWidth 28.4ms dead / 298.6ms
+           open, getComputedStyle 30.3 / 306.1, against a declared 300ms (both
+           measured on the same build, one after the other). The
+           layout is not extra work either; it is the layout the browser has to
+           do before it can paint the panel at all, pulled forward. */
+        void m.offsetWidth;
+        m.setAttribute('data-state', 'open');
+        if (sc) sc.setAttribute('data-state', 'open');
+        /* FOCUS IS THE EXPENSIVE PART, AND IT IS NOT URGENT. stops() calls
+           getClientRects() on every candidate in the panel — a forced layout
+           of the document that has just been re-laid-out by the lock — and
+           .focus() can add a scroll-into-view on top. On the click frame that
+           lands entirely in front of the first painted frame; one frame later
+           it is free, and no keyboard visitor can perceive 16ms. */
+        var giveFocus = function () {
           if (!isOpen) return;
-          m.setAttribute('data-state', 'open');
-          if (sc) sc.setAttribute('data-state', 'open');
+          var f = stops();
+          if (f.length) f[0].focus(); else m.focus();
         };
-        if (window.requestAnimationFrame) requestAnimationFrame(function () { requestAnimationFrame(paint); });
-        else paint();
-        var f = stops();
-        if (f.length) f[0].focus(); else m.focus();
+        if (window.requestAnimationFrame) requestAnimationFrame(giveFocus); else giveFocus();
       };
       var close = function (giveBackFocus) {
         if (!isOpen) return;
@@ -1376,7 +1436,22 @@ export const HEADER_SCRIPTS = `<script>
          inert goes on while it collapses. For those 200ms the rows are
          zero-height but still laid out (they are clipped, not removed), so
          without it Tab would stop on a link nobody can see — and can()
-         above skips anything inside an inert subtree for the same reason. */
+         above skips anything inside an inert subtree for the same reason.
+
+         ── IF YOU ARE HERE TO MEASURE THIS MENU, READ THIS FIRST ──────────
+         SETTING details.open = true FROM SCRIPT DOES NOT OPEN THE FOLD. The
+         <details> element is only the no-JS shell; the animated body is
+         .mm-fold, and its open state is the data-fold attribute, which
+         NOTHING but the summary click handler below ever writes. Set .open
+         and the fold stays at literally 0px for ever — with its rows present,
+         laid out and clipped to nothing. That is the trap, because the links
+         are all still in the DOM with boxes, so a script that walks them gets
+         numbers rather than an error: a contrast audit driven this way read a
+         perfect ~1.0 on every row in the menu, because it was sampling a
+         zero-height strip of the panel's own background against itself.
+         Drive a REAL click on the <summary> and wait out --qf-menu-dur-out.
+         The same warning, with the line-box version of it, is at the top of
+         tests/e2e/mobile-drawer.spec.ts. */
       var folds = Array.prototype.slice.call(m.querySelectorAll('.mm-group'));
       /* The flag the collapsed state is gated on. Set HERE, by the controller
          that owns data-fold, so a group can never be collapsed by CSS that
