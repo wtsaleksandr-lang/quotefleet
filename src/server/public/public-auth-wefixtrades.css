@@ -620,3 +620,65 @@ body.qf-auth-wft .btn-primary:active:not(:disabled) { transform: translateY(1px)
   body.qf-auth-wft .plan-opt:hover { transform: none !important; }
   body.qf-auth-wft .btn-primary:active:not(:disabled) { transform: none !important; }
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   THE AUTH BAR'S BRAND LOCKUP — the marketing header's change, restated here
+   because this is the only shared sheet /login, /signup and /reset-password
+   actually load. Verified by fetching the rendered /login <head>: it links
+   /style.css and this file and NOTHING else, so the block at the foot of
+   nav-unify.css never reaches these three pages. Full rationale for the
+   background-image approach and the three theme states is in that block.
+
+   THIS BAR'S GROUND IS NOT THE MARKETING HEADER'S, and that changes the
+   default. Sampled live on /login:
+     data-theme="dark"   rgb(34,40,42)
+     data-theme="light"  #FFFFFF
+     un-stamped, system dark   rgb(34,40,42)
+     un-stamped, system light  rgb(34,40,42)   <- still dark
+   The white bar is painted only by the html[data-theme="light"] rules above;
+   with scripting off nothing stamps the attribute, so the bar stays dark in
+   BOTH system schemes. So the dark cut is the default here and there is no
+   prefers-color-scheme rule at all — this surface does not answer to one.
+   Writing the marketing rule here instead would have put a white-outline mark
+   on a white bar for every visitor with scripting off.
+
+   SIZE. 39x26 is the 374x252 source at the auth bar's existing 26px mark
+   height (style.css:410 sets .brand-mark .logo .qf-brand-mark to height 26px),
+   which keeps the bar the 57px it already measured. The word sizes itself in
+   em off .brand-mark's 17px, so the two halves stay in proportion without a
+   second number.
+
+   THE FRAME COMES OFF, same as the marketing header's: a 1px
+   rgba(255,255,255,.30) box at 6px radius was drawn for a near-square keys
+   mark and crops a wide lockup. The important flag is matched, not escalated.
+   ═══════════════════════════════════════════════════════════════════════════ */
+body.qf-auth-wft .brand-mark .logo,
+.brand-mark .logo {
+  width: auto !important;
+  height: auto !important;
+  background: none !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+  overflow: visible !important;
+}
+
+.brand-mark .qf-brand-cut {
+  display: block;
+  flex: 0 0 auto;
+  width: 39px;
+  height: 26px;
+  background-repeat: no-repeat;
+  background-position: left center;
+  background-size: contain;
+  background-image: url("/brand/logo-full-ondark.png");
+}
+:root[data-theme="light"] .brand-mark .qf-brand-cut {
+  background-image: url("/brand/logo-full.png");
+}
+
+.brand-mark .qf-header-wordmark-svg {
+  display: block;
+  flex: 0 0 auto;
+}

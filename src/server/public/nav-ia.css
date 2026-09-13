@@ -753,7 +753,11 @@ html body.qf-wft .premium-footer .footer-bottom {
      it: 54px of top padding on the homepage footer where 24 was declared. */
   html body.qf-wft .premium-footer {
     padding-top: var(--space-3) !important;
-    padding-bottom: calc(80px + env(safe-area-inset-bottom, 0px)) !important;
+    /* 80 -> 24 with the rest of the launcher clearance: the button is a 56px
+       corner, so it is cleared by the two horizontal gutters at the foot of
+       nav-unify.css, not by a full-width band of air. Arithmetic and the
+       96-combination re-measurement are in that block. */
+    padding-bottom: calc(24px + env(safe-area-inset-bottom, 0px)) !important;
   }
 }
 

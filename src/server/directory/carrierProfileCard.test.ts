@@ -244,7 +244,14 @@ describe('carrier profile header — the Verified owner badge', () => {
     });
     expect(claimed).toContain('cp-badge-verified');
     expect(claimed).toContain('Verified owner</span>');
-    expect(claimed).not.toContain('42');
+    // The page ships a baked SVG wordmark in its header whose path data is
+    // full of coordinates like 422.78 and -42.50, so a bare '42' substring
+    // over the whole document now matches brand ART, not a leak. Inline
+    // graphics are scrubbed first — a tenant id cannot reach a <path d=> —
+    // and every other byte of the page still counts: attributes, text nodes,
+    // JSON-LD and scripts are all still searched for the raw id.
+    const scrubbed = claimed.replace(/<svg\b[\s\S]*?<\/svg>/g, '');
+    expect(scrubbed).not.toContain('42');
   });
 
   it('sits in the name line, beside the company name', () => {

@@ -25,7 +25,12 @@ describe('homepage final cleanup styles', () => {
     // The header + footer are injected now, so assert on the rendered page.
     const html = renderStaticPage('landing.html');
 
-    expect(html).toContain('/brand/mark-keys-ondark.png');
+    // The header lockup is the FULL keys+truck mark, matching the footer, and
+    // its cut is chosen by CSS (nav-unify.css) rather than baked into the src,
+    // so the markup carries the empty span and not a file name. The old
+    // keys-only /brand/mark-keys-ondark.png is gone from the header entirely.
+    expect(html).toContain('<span class="qf-brand-cut"></span>');
+    expect(html).toContain('class="qf-header-wordmark-svg"');
     expect(html).toContain('View demo <span class="arr">→</span>');
     // CRO hero: the finder is the primary action; "Start free" is the single
     // secondary hero CTA (was btn-primary btn-lg).

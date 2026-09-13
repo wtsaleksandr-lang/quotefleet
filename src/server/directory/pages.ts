@@ -90,6 +90,8 @@ import {
   SITE_NAV_HTML,
   SITE_MOBILE_MENU_HTML,
   THEME_TOGGLE_BTN,
+  HEADER_WORDMARK_SVG,
+  BRAND_CUT_SPAN,
   SITE_BURGER_BTN,
   HEADER_OOG_CTA,
   HEADER_SCRIPTS,
@@ -2488,12 +2490,21 @@ export const DIRECTORY_CSS = `
      right edge. Stretch it back to the track. */
   .site-footer .dirfoot-col > .qf-fdisc { align-self: stretch; width: 100%; }
   .site-footer .footer-bottom .qf-foot-links a { margin-left: 8px; }
-  /* THE FOOTER CLEARS THE CHAT LAUNCHER. .qf-mc-fab (marketing-chat.js) is
-     position:fixed, 56x56 at right/bottom 12px, z-index 2147483000 in the
-     ROOT stacking context — so where the sub-bar's claims run the full width
-     the last line rendered UNDERNEATH it. 12 + 56 + 12 = 80px is the button's
-     own footprint plus the gap it already keeps, and the safe-area inset adds
-     the iOS home indicator (0 everywhere else).
+  /* THE FOOTER CLEARS THE CHAT LAUNCHER — IN THE LAUNCHER'S OWN COLUMN.
+     .qf-mc-fab (marketing-chat.js) is position:fixed, 56x56 at right/bottom
+     12px, z-index 2147483000 in the ROOT stacking context, so footer content
+     that reaches the bottom-right corner renders underneath it. The clearance
+     used to be 12 + 56 + 12 = 80px of FULL-WIDTH bottom padding, which cleared
+     one corner by opening a band of air across the whole footer — measured
+     80px of nothing under the last line at 375px against 24px on desktop, and
+     that band is what the owner reported.
+
+     It is now the desktop 24px plus the same 80px gutter spent HORIZONTALLY on
+     the two elements that ever enter the button's column (the carrier-marks
+     note here, the pay row from 641px up). Re-measured worst case — every
+     disclosure open, scrolled to the bottom, 6 pages x 8 widths x 2 themes —
+     zero overlap and zero horizontal scroll. Full arithmetic: foot of
+     nav-unify.css.
 
      THE FOOTER MOVES, NOT THE BUTTON: a bottom lift was removed from the
      launcher after four content collisions, and PR #555 proved it was not the
@@ -2501,12 +2512,26 @@ export const DIRECTORY_CSS = `
      style.css because this sheet loads last and the <=900px block above sets
      padding-bottom: 32px, which would otherwise win. */
   @media (max-width: 900px) {
-    .site-footer { padding-bottom: calc(80px + env(safe-area-inset-bottom, 0px)); }
+    .site-footer { padding-bottom: calc(24px + env(safe-area-inset-bottom, 0px)); }
+    /* The note is the last element on the page and the only thing that reaches
+       the corner below 414px. Capped at 78ch and left-aligned, so the gutter
+       only re-flows its own last lines — it costs one 11px line at <=375, not
+       the 56px band it replaces. */
+    .site-footer .qf-foot-marks { padding-right: 80px; }
+  }
+  @media (min-width: 641px) and (max-width: 900px) {
+    /* Above 640 the pay row is still one horizontal run with
+       justify-content: space-between, so its LAST claim hugs a container edge
+       that reaches past the button — measured overlapping by 44px at 900.
+       Below 641 it stacks and never gets near the corner, and a phone has no
+       width to give (style.css:2422). Same 80px, same reason, one band lower
+       than the >=901px rule that already does this. */
+    .site-footer .qf-footer-payrow { padding-right: 80px; }
   }
   @media (max-width: 640px) {
     .site-footer {
       margin-top: 16px;
-      padding: 24px 16px calc(80px + env(safe-area-inset-bottom, 0px));
+      padding: 24px 16px calc(24px + env(safe-area-inset-bottom, 0px));
     }
     .site-footer .dirfoot { gap: 12px 16px; }
     /* A collapsed column is a control — give it a real target to tap. 44px is
@@ -2933,7 +2958,7 @@ export function layout({ title, description, canonicalPath, bodyHtml, jsonLd, re
 <body${bodyClass ? ` class="${esc(bodyClass)}"` : ''}>
   <header class="site-header">
     <div class="site-header-inner">
-      <a href="/" class="site-brand" aria-label="QuoteFleet home"><span class="site-logo" aria-hidden="true"><img class="qf-brand-mark" src="/brand/mark-keys-ondark.png" alt="QuoteFleet" width="28" height="30" decoding="async"></span>QuoteFleet</a>
+      <a href="/" class="site-brand" aria-label="QuoteFleet home"><span class="site-logo" aria-hidden="true">${BRAND_CUT_SPAN}</span>${HEADER_WORDMARK_SVG}</a>
       ${SITE_NAV_HTML}
       <div class="site-actions"><span class="nav-shipper" id="nav-shipper" hidden></span>${HEADER_OOG_CTA}${THEME_TOGGLE_BTN}<a class="signin" href="/login" data-nav-auth="anon">Sign in</a><a class="btn btn-secondary" href="/claim">Claim your listing<span class="tn-free"> — free</span> <span class="arr">→</span></a>${SITE_BURGER_BTN}</div>
     </div>

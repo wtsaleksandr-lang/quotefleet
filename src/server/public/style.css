@@ -2411,12 +2411,14 @@ html[data-theme="dark"],
   margin: 0 var(--space-0-5);
 }
 
-/* THE DIRECTORY FOOTER CLEARS THE CHAT LAUNCHER TOO. Same reasoning as the
-   marketing copy in nav-unify.css: `.qf-mc-fab` is fixed 56x56 at right/bottom
-   12px, so 12 + 56 + 12 = 80px of clearance keeps the sub-bar's last line out
-   from under it. The launcher does not move — its geometry is settled. */
+/* THE DIRECTORY FOOTER CLEARS THE CHAT LAUNCHER TOO — HORIZONTALLY NOW.
+   `.qf-mc-fab` is fixed 56x56 at right/bottom 12px. This used to buy its
+   clearance as a full-width 80px band, which is a corner's problem solved with
+   the whole footer's height; it is now the same 24px the desktop footer ends
+   on, with the 80px gutter moved onto the two elements that actually enter the
+   button's column. Measurement and reasoning: foot of nav-unify.css. */
 @media (max-width: 900px) {
-  .site-footer { padding-bottom: calc(80px + env(safe-area-inset-bottom, 0px)); }
+  .site-footer { padding-bottom: calc(24px + env(safe-area-inset-bottom, 0px)); }
 }
 
 /* ── ABOVE THE PHONE BAND, THE SUB-BAR GIVES UP WIDTH INSTEAD OF HEIGHT ──────

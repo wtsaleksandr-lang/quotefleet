@@ -265,8 +265,12 @@ describe('public static page smoke checks', () => {
     expect(html).toContain('/brand/favicon-32.png');
     expect(html).toContain('rel="apple-touch-icon"');
     expect(html).toContain('rel="manifest" href="/site.webmanifest"');
-    // brand mark image replaces the old inline route SVG (white-outline on-dark variant)
-    expect(html).toContain('/brand/mark-keys-ondark.png');
+    // The header lockup is the FULL keys+truck mark, same as the footer's, and
+    // the cut is picked by CSS off the theme instead of being swapped by
+    // script — so the markup is an empty span, not a file name, and the
+    // keys-only mark no longer appears in the header at all.
+    expect(html).toContain('<span class="qf-brand-cut"></span>');
+    expect(html).not.toContain('/brand/mark-keys-ondark.png');
     expect(html).not.toContain('qf-route-logo');
     // footer features the FULL logo lockup (calculator + truck, white-outline on-dark)
     expect(html).toContain('/brand/logo-full-ondark.png');
