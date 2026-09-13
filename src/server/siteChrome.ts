@@ -609,7 +609,21 @@ export const FOOTER_PAY_ROW = `<div class="qf-footer-payrow">`
   + `<li class="qf-paymark"><svg class="qf-pm" viewBox="0 0 32 16" role="img" aria-label="Google Pay"><text x="7" y="12.2" text-anchor="middle" font-size="12.5" font-weight="700">G</text><text x="12.5" y="11.7" font-size="9.5" font-weight="600" letter-spacing="-.1">Pay</text></svg></li>`
   + `<li class="qf-paymark"><svg class="qf-pm" viewBox="0 0 32 16" role="img" aria-label="Link"><text x="16" y="12" text-anchor="middle" font-size="11" font-weight="700" letter-spacing="-.2">link</text></svg></li>`
   + `</ul>`
-  + `<span class="qf-paymark qf-paymark--proc">${STRIPE_MARK}</span>`
+  /* THE PROCESSOR BADGE IS A LABELLED BAND, NOT A LOOSE SEVENTH TILE.
+     Below 720px `.qf-payrow-methods` is a COLUMN, so this span took a line of
+     its own — and because it wears the same 1px/6px/22px `.qf-paymark` tile as
+     the six marks above it, that line read as a 6+1 orphan wrap rather than as
+     the deliberate separation the STRIPE_MARK note above describes. Measured
+     6 + 1 at 320/375/390 in both themes.
+
+     The fix is NOT to fold it into `.qf-paymarks` for a 4+3 break: that list is
+     the answer to "what can I pay with" and Stripe is not a payment method
+     (see STRIPE_MARK). Instead the badge gets its own `.qf-payrow-label` — the
+     exact idiom "Accepted payments" already uses — so the line carries TWO
+     items and the separation is stated rather than inferred. One line, two
+     elements, no orphan, and the six-tile row keeps `flex-wrap: nowrap`. */
+  + `<span class="qf-proc-band"><span class="qf-payrow-label">Payment processor</span>`
+  + `<span class="qf-paymark qf-paymark--proc">${STRIPE_MARK}</span></span>`
   + `</div>`
   + `<ul class="qf-payrow-trust" role="list">`
   + `<li>Card details never touch our servers</li>`
@@ -920,6 +934,32 @@ export const CARRIER_MARKS_NOTE =
   'Carrier names and logos are the property of their owners, shown to identify carriers listed in our directory — not as endorsement or affiliation. '
   + 'Removal requests: <a href="mailto:legal@quotefleet.net">legal@quotefleet.net</a>.';
 
+/**
+ * THE SAME DISCLAIMER FOR THE DIRECTORY SUBSITE, WITHOUT A `mailto:`.
+ *
+ * /directory is the surface that ACTUALLY renders third-party carrier names and
+ * logos, so it is the one page where this nominative-use line does real work —
+ * and until now it was the one page that did not carry it. It was left off
+ * because of a genuine constraint, not an oversight: directoryContact policy
+ * forbids ANY `mailto:` in the directory chrome (carrierProfileContact.test.ts
+ * asserts a contact-hidden carrier profile contains no "mailto:" anywhere on
+ * the page, across ~334k profiles — a site-wide footer address would defeat
+ * that check on every one of them). Verified by reading that test, not assumed.
+ *
+ * So the CLAIM is byte-identical and only the ROUTE changes: the first
+ * sentence — the part that does the legal work — is the same string as
+ * CARRIER_MARKS_NOTE, and the removal contact is kept BOTH ways, as a working
+ * link to /support (the directory's sanctioned contact route, already the
+ * Company column's own destination for the same reason) and as the plain-text
+ * address so nothing is lost to a reader who prefers to mail us directly.
+ * Dropping the contact was never an option — a nominative-use disclaimer with
+ * no removal route is not a disclaimer.
+ */
+export const CARRIER_MARKS_NOTE_SUPPORT =
+  'Carrier names and logos are the property of their owners, shown to identify carriers listed in our directory — not as endorsement or affiliation. '
+  + 'Removal requests: <a href="/support">contact us</a> or email legal@quotefleet.net.';
+
+
 const FOOTER_LADDER = footerTrackLadder(FOOTER_COLUMNS.length);
 
 /**
@@ -1010,22 +1050,34 @@ const FOOTER_COLUMNS_HTML = FOOTER_COLUMNS.map(
  * one word of the sentence changed.
  *
  * TWO FLAGS, BOTH CONTENT DECISIONS THAT PREDATE THIS FUNCTION:
- *   • `marksNote` — the carrier names/marks line carries a mailto: removal
- *     address, and the directory chrome must contain NO mailto: anywhere
- *     (carrierProfileContact.test.ts asserts a contact-hidden carrier profile
- *     has none, on all ~334k profiles). So it stays on the marketing footer
- *     exactly where it already was, rather than the merge quietly planting a
- *     mailto on every directory page.
+ *   • `marksNote` — `true` renders the mailto variant, `'support'` the
+ *     no-mailto directory variant, and omitting it renders nothing.
+ *
+ *     IT USED TO BE MARKETING-ONLY, AND THAT WAS THE BUG. The directory chrome
+ *     must contain NO mailto: anywhere (carrierProfileContact.test.ts asserts a
+ *     contact-hidden carrier profile has none, on all ~334k profiles), so the
+ *     first cut of this merge kept the whole note off `.dirfoot` rather than
+ *     plant a mailto on every directory page. The cost of that was the exact
+ *     inversion of what the line is for: /directory is the surface that
+ *     actually RENDERS third-party carrier names and logos, so the one page
+ *     where a nominative-use disclaimer does real work was the one page without
+ *     it. The constraint was real; omitting the disclaimer was not the only way
+ *     to honour it. `'support'` keeps the claim word-for-word and swaps only
+ *     the removal ROUTE (see CARRIER_MARKS_NOTE_SUPPORT). Never regress this to
+ *     a boolean that drops the note — footerCarrierMarks.test.ts pins it.
  *   • `legalLinks` — the directory footer's only route to /terms and /privacy
  *     is this line, because it has no Legal column. PREMIUM_FOOTER does have
  *     one, and repeating them here would be the duplicate-destination defect
  *     the footer was regrouped to remove.
  */
 export function footerBottomHtml(opts: {
-  marksNote?: boolean;
+  marksNote?: boolean | 'support';
   legalLinks?: boolean;
   dataSources?: boolean;
 } = {}): string {
+  const marks = opts.marksNote === 'support'
+    ? CARRIER_MARKS_NOTE_SUPPORT
+    : opts.marksNote ? CARRIER_MARKS_NOTE : '';
   return `<div class="footer-bottom">`
     + `<p class="qf-foot-line"><span class="qf-foot-copy">© <span id="year"></span> QuoteFleet.</span> `
     + `<span class="qf-foot-operator">A product of MR Holdings &amp; Trade LLC.</span>`
@@ -1035,7 +1087,7 @@ export function footerBottomHtml(opts: {
     + `</div>`
     + (opts.dataSources ? DIRECTORY_DATA_SOURCES : '')
     + FOOTER_PAY_ROW
-    + (opts.marksNote ? `<div class="qf-foot-marks"><p class="qf-foot-marks-line">${CARRIER_MARKS_NOTE}</p></div>` : '');
+    + (marks ? `<div class="qf-foot-marks"><p class="qf-foot-marks-line">${marks}</p></div>` : '');
 }
 
 /**
@@ -1670,3 +1722,48 @@ export function renderMarketingShell(opts: MarketingShellOpts): string {
 </html>`;
   return applyFullSiteHeader(doc, `renderMarketingShell(${opts.canonicalPath})`);
 }
+
+/**
+ * THE DIRECTORY FOOTER'S BRAND LOCKUP.
+ *
+ * PREMIUM_FOOTER opens with a logo + wordmark + tagline; `.dirfoot` opened with
+ * nothing at all, so the directory subsite — the ~334k-page half of the site —
+ * shipped a footer with ZERO images and no mark of ours anywhere in it. This is
+ * the same lockup on one row, without the tagline: the directory footer is the
+ * SHORT one, and a marketing sentence is not what it was missing.
+ *
+ * NO `data-logo-fixed` HERE, and that is the whole difference from the
+ * marketing copy. The marketing band is `--footer-bg` = `--surface-dark`,
+ * declared once at :root and never re-declared per theme, so its ground is
+ * theme-invariant and its logo must NOT follow the theme. `.site-footer` paints
+ * `--surface-2`, which IS themed — near-white in light mode — so the
+ * white-outline `-ondark` truck would be a light mark on a light ground there.
+ * Leaving the attribute off lets theme-toggle.js#swapLogos do exactly what it
+ * was written for, the same way the directory's own header mark already does.
+ *
+ * THE WORD IS A TEXT NODE, NOT FOOTER_WORDMARK_SVG, and that is a directory
+ * decision rather than a shortcut. Three reasons, in order of weight:
+ *
+ *   • IT IS THE PATTERN THIS SUBSITE ALREADY USES. The directory HEADER sets
+ *     "QuoteFleet" as a text node beside `mark-keys-ondark.png` (see the
+ *     `.site-brand` anchor in directory/pages.ts#layout). A footer lockup that
+ *     drew the word as baked outlines would put two different renderings of the
+ *     same word on the same page.
+ *   • BYTES, ON THE ONE SURFACE WHERE BYTES ARE THE BINDING CONSTRAINT. The
+ *     outline set is ~1.0 KB of path data per page. DIRECTORY_CSS was pulled
+ *     out into a hashed external file specifically because per-page boilerplate
+ *     was costing ~22 GB of Googlebot's crawl of the ~330k carrier profiles;
+ *     adding a kilobyte of un-cacheable inline markup back to every one of them
+ *     would spend a slice of exactly the budget that change bought.
+ *   • IT DOES NOT COLLIDE WITH A PROFILE-PAGE SAFETY TEST.
+ *     carrierProfileCard.test.ts asserts a claimed profile's tenant id (42 in
+ *     the fixture) appears NOWHERE in the rendered page. The wordmark's glyph
+ *     transforms include `translate(422.7,0)`, so shipping it in directory
+ *     chrome makes a real leak check unfalsifiable on every profile. Keep the
+ *     text node; do not "upgrade" this to the outline asset.
+ */
+export const DIRECTORY_FOOTER_BRAND =
+  `<div class="dirfoot-brandrow">`
+  + `<a class="dirfoot-brand" href="/" aria-label="QuoteFleet home">`
+  + `<img class="dirfoot-logo" src="/brand/logo-full-ondark.png" alt="QuoteFleet — freight rate calculator" width="168" height="113" decoding="async">`
+  + `<span class="dirfoot-wordmark">QuoteFleet</span></a></div>`;

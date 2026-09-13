@@ -95,6 +95,7 @@ import {
   HEADER_SCRIPTS,
   FDISC_CHEVRON,
   footerBottomHtml,
+  DIRECTORY_FOOTER_BRAND,
 } from '../siteChrome.js';
 
 const SITE = 'https://quotefleet.net';
@@ -2508,9 +2509,116 @@ export const DIRECTORY_CSS = `
       padding: 24px 16px calc(80px + env(safe-area-inset-bottom, 0px));
     }
     .site-footer .dirfoot { gap: 12px 16px; }
-    /* A collapsed column is a control — give it a real target to tap. */
-    .site-footer .qf-fdisc-sum { min-height: 40px; padding: 8px 0; }
+    /* A collapsed column is a control — give it a real target to tap. 44px is
+       the target this codebase measures against (check-spacing.mjs TAP_TARGET);
+       40 was four short and is the whole cost of the fix on this element. */
+    .site-footer .qf-fdisc-sum { min-height: 44px; padding: 8px 0; }
+    /* AND SO IS EVERY LINK INSIDE AN OPENED COLUMN. They measured 28.14px —
+       13px type on 1.55 leading plus 4px either side — which is a fine reading
+       row and a poor thumb target.
+
+       SCOPED TO THE PHONE STEP ON PURPOSE, and the reason is arithmetic, not
+       laziness. Above 640px these columns do not collapse at all
+       (.qf-fdisc-sum { cursor: default }), so their links are permanently
+       open: paying 15.86px x 28 links there would add ~444px to a footer PR
+       #565-567 deliberately shortened. At <=640px the columns ship CLOSED, so
+       the taller rows live inside a panel that is not rendered until the reader
+       opens it — the collapsed footer height does not move by a pixel, and the
+       expanded panel is taller only while someone is actually reaching for it.
+       Measured both ways before shipping. */
+    .site-footer .qf-fdisc-body a {
+      display: flex;
+      align-items: center;
+      min-height: 44px;
+      padding: 4px 0;
+    }
   }
+
+  /* ══ THE FOOTER BRAND LOCKUP ════════════════════════════════════════════════
+     siteChrome.ts#DIRECTORY_FOOTER_BRAND. The marketing footer opens with a
+     logo; this one opened with the site map and carried no image at all, so the
+     ~334k-page half of the site had no mark of ours anywhere below the fold.
+
+     ONE ROW, NOT THE MARKETING THREE-PART BLOCK. .site-footer is the SHORT
+     footer (PRs #565-567 cut it ~60%) and the tagline is the part of the
+     marketing lockup that is marketing rather than identity, so it is left off.
+
+     TWO BOXES, for the same reason .qf-foot-marks uses two. The OUTER div takes
+     the 1120px + auto-margin geometry every other band in this footer takes, so
+     the lockup's left edge lines up with .dirfoot, the pay row and the
+     disclaimer. The INNER anchor is inline-flex and hugs its content, so the
+     clickable box is the mark and the word — not a 1120px-wide invisible strip
+     across the footer. A single auto-margined fit-content box cannot do both:
+     it centres, which is what the first cut of this did (measured x=123.92 at
+     375 against a 16px gutter, and x=651 against 160 at 1440).
+
+     text-align: left and the margin reset are stated because .site-footer
+     declares text-align: center for its old centred legal row, and
+     .site-footer a adds 8px of horizontal margin for the same reason. */
+  .site-footer .dirfoot-brandrow {
+    max-width: 1120px;
+    margin: 0 auto 16px;
+    text-align: left;
+  }
+  .site-footer .dirfoot-brand {
+    display: inline-flex;
+    align-items: center;
+    gap: 12px;
+    margin: 0;
+    padding: 0;
+    color: var(--ink);
+    text-decoration: none;
+  }
+  .site-footer .dirfoot-brand:hover { color: var(--accent); }
+  .site-footer .dirfoot-logo { height: 32px; width: auto; display: block; }
+  /* The word takes the .site-brand treatment this subsite's HEADER already
+     uses — 800 / -0.03em, currentColor — one step down in size so the footer
+     lockup reads as the quieter sibling of the header one rather than a second
+     masthead. Not the baked outline asset: see DIRECTORY_FOOTER_BRAND. */
+  .site-footer .dirfoot-wordmark {
+    font-weight: 800;
+    letter-spacing: -0.03em;
+    font-size: 17px;
+    line-height: 1;
+    white-space: nowrap;
+  }
+  @media (max-width: 640px) {
+    .site-footer .dirfoot-brandrow { margin-bottom: 12px; }
+    .site-footer .dirfoot-brand { gap: 8px; }
+    .site-footer .dirfoot-logo { height: 28px; }
+  }
+
+  /* ══ THE CARRIER-MARKS DISCLAIMER ON THE DIRECTORY FOOTER ═══════════════════
+     Geometry, size, weight and left alignment all come from the shared
+     .qf-foot-marks rules in style.css — this footer re-declares NONE of them,
+     which is the point: one disclaimer, one set of type rules, both surfaces.
+     The only thing left to undo is .site-footer a, which carries
+     display: inline-block; margin: 0 8px for the old centred one-line legal
+     row. That 8px either side would punch a visible gap into the middle of a
+     running sentence, and inline-block would let the address break as a unit.
+     The underline is declared for the same reason it is on the marketing copy:
+     the removal route must read as a link without being the brightest run in
+     the block. Colour is INHERITED, not restated, so the note tracks the
+     footer's own ink in every theme. */
+  /* THE ONE GEOMETRY OVERRIDE: this footer's container is 1120px, not
+     --container-max. The shared rule caps the note at --container-max (1328px)
+     because on the marketing footer that IS the container — .premium-footer,
+     .footer-bottom and .qf-footer-payrow all measure 1328 there, and all four
+     boxes start at x=56 at 1440. Every band in THIS footer is 1120 instead
+     (.dirfoot, .site-footer .footer-bottom, the brand row above), so inheriting
+     1328 put the note's left edge at x=56 against their x=160 — a 104px step
+     visible on any viewport past ~1168px. Measured, not assumed. */
+  .site-footer .qf-foot-marks { max-width: 1120px; }
+  .site-footer .qf-foot-marks .qf-foot-marks-line a {
+    display: inline;
+    margin: 0;
+    padding: 0;
+    font-weight: 400;
+    color: inherit;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+  }
+  .site-footer .qf-foot-marks .qf-foot-marks-line a:hover { color: var(--accent); }
 `;
 
 /**
@@ -2833,13 +2941,14 @@ export function layout({ title, description, canonicalPath, bodyHtml, jsonLd, re
   </header>
   ${bodyHtml}
   <footer class="site-footer">
+    ${DIRECTORY_FOOTER_BRAND}
     <nav class="dirfoot" aria-label="Footer">
       <div class="dirfoot-col"><details class="qf-fdisc" open><summary class="qf-fdisc-sum"><h2 class="dirfoot-head">For Carriers &amp; Brokers</h2>${FDISC_CHEVRON}</summary><div class="qf-fdisc-body"><a href="/w/demo">See a Live Demo</a><a href="/compare">Why QuoteFleet</a><a href="/pricing">Pricing</a><a href="/signup">Start Free</a><a href="/claim">Claim your listing — free</a><a href="/importers">Importers Directory</a></div></details></div>
       <div class="dirfoot-col"><details class="qf-fdisc" open><summary class="qf-fdisc-sum"><h2 class="dirfoot-head">For Shippers</h2>${FDISC_CHEVRON}</summary><div class="qf-fdisc-body"><a href="/directory">Carrier Directory</a><a href="/guides">Carrier Market Guides</a><a href="/compliance">Compliance Tools</a><a href="/services">Carriers by Capability</a><a href="/directory/join">Directory Pro</a><a href="/directory/rfq?sort=featured">Request Freight Quotes</a><a href="/drayage-rates">Port Drayage Rates</a><a href="/manifest-privacy">Manifest Privacy</a></div></details></div>
       <div class="dirfoot-col"><details class="qf-fdisc" open><summary class="qf-fdisc-sum"><h2 class="dirfoot-head">Free Tools</h2>${FDISC_CHEVRON}</summary><div class="qf-fdisc-body"><a href="/tools">Freight Rate Calculator</a><a href="/tools/oversize-permits">Oversize Permit Calculator</a><a href="/tools/bridge-formula">Bridge Formula Calculator</a><a href="/tools/axle-weights">Axle Weight Checker</a><a href="/tools/heavy-haul-quote">Heavy-Haul Quote Tool</a><a href="/tools/seasonal-weight-restrictions">Frost Law Restrictions</a><a href="/oversize">Oversize Permit Guide</a><a href="/pilot-cars">Pilot Car &amp; Escort Directory</a><a href="/glossary">Freight Glossary</a></div></details></div>
       <div class="dirfoot-col"><details class="qf-fdisc" open><summary class="qf-fdisc-sum"><h2 class="dirfoot-head">Company</h2>${FDISC_CHEVRON}</summary><div class="qf-fdisc-body"><a href="/partners">Partners &amp; Affiliates</a><a href="/support">Support</a><a href="/pricing#faq">FAQ</a><a href="/security">Security</a><a href="/login">Sign In</a></div></details></div>
     </nav>
-    ${footerBottomHtml({ legalLinks: true, dataSources: rendersCarrierData(canonicalPath) })}
+    ${footerBottomHtml({ legalLinks: true, dataSources: rendersCarrierData(canonicalPath), marksNote: 'support' })}
   </footer>
   ${HEADER_SCRIPTS}
   <script src="/marketing-chat.js" defer></script>

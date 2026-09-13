@@ -2763,4 +2763,31 @@ html[data-theme="dark"],
     --hero-cta-rim:        var(--hero-wash-ink);
     --hero-toggle-rim:     var(--hero-wash-line);
   }
+/* ══ THE PROCESSOR BADGE'S OWN LABELLED BAND ═════════════════════════════════
+   siteChrome.ts#FOOTER_PAY_ROW. Measured defect: at 320/375/390/414 in both
+   themes the strip wrapped SIX marks then the Stripe badge alone — a 6+1 break,
+   which is exactly the no-orphan rule ("a pill/badge group never wraps leaving
+   a single item alone") the six-tile list's own `flex-wrap: nowrap` exists to
+   honour. It was never a wrap in the CSS sense: `.qf-payrow-methods` is a
+   COLUMN below 720px and the badge simply took the third line. It READ as an
+   orphan because the badge wears the same 1px/6px/22px `.qf-paymark` tile as
+   the six above it, so the eye counts seven identical tiles and sees one left
+   behind.
+
+   THE FIX IS A LABEL, NOT A 4+3 BREAK. Folding the badge into `.qf-paymarks`
+   for a 4+3 wrap would put the PROCESSOR inside the list that answers "what can
+   I pay with", which is the one thing STRIPE_MARK's note argues at length that
+   we must not say — Stripe is not a payment method. So the badge keeps its
+   place outside the list and gains the strip's own `.qf-payrow-label` idiom,
+   the same treatment "Accepted payments" already has. The line now carries TWO
+   elements, the separation is STATED rather than inferred from a gap, and the
+   six-tile row keeps nowrap. Verified 6 / 1+1 at 320, 375, 390 and 414 and
+   7 on one row at 768 and 1440, in dark, light and both system states.
+
+   No new tokens, no new radius, no shadow: the band is pure layout. */
+.qf-proc-band {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  min-width: 0;
 }

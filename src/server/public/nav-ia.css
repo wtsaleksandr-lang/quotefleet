@@ -691,7 +691,23 @@ html body.qf-wft .premium-footer .footer-bottom {
   html body.qf-wft .premium-footer .premium-footer-inner { row-gap: var(--space-1-5); }
   html body.qf-wft .premium-footer .footer-brand { gap: var(--space-1); }
   html body.qf-wft .premium-footer .footer-brand .qf-footer-logo { height: 28px; }
-  html body.qf-wft .premium-footer .qf-fdisc-sum { min-height: 40px; padding: var(--space-1) 0; }
+  html body.qf-wft .premium-footer .qf-fdisc-sum { min-height: 44px; padding: var(--space-1) 0; }
+  /* TAP TARGETS FOR THE LINKS INSIDE AN OPENED COLUMN. They measured 28.14px
+     (13px on 1.55 leading + 4px either side) — a good reading row, a poor thumb
+     target. 44px is the number check-spacing.mjs measures against.
+
+     THE PHONE STEP IS THE ONLY PLACE THIS IS AFFORDABLE, and the reason is
+     arithmetic. Above 640px the columns never collapse, so their 38 links are
+     permanently rendered and 38 x 15.86px would add ~602px to a 613px footer —
+     it would undo most of the ~60% cut PRs #565-567 bought. Here the columns
+     ship CLOSED, so these rows sit inside a panel the browser does not render
+     until the reader opens it: the collapsed footer height is unchanged and the
+     opened panel is taller only while a thumb is on its way. */
+  html body.qf-wft .premium-footer .qf-fdisc-body a {
+    display: flex;
+    align-items: center;
+    min-height: 44px;
+  }
   /* Same correction as nav-unify.css: the full-bleed last column must
      paginate its LINKS, not the <details> that now wraps them.
 
