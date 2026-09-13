@@ -1484,14 +1484,29 @@ body:has(#site-burger[aria-expanded="true"]) .qf-mc-fab { display: none; }
      the longer one enters, the shorter one exits. */
   --qf-menu-dur-in: .3s;
   --qf-menu-dur-out: .2s;
-  /* THE ONE NEW CURVE, AND WHY IT IS NOT `ease`. The system ships a single
-     easing (`ease` = cubic-bezier(.25,.1,.25,1)), which is symmetric: it
-     starts slowly, and a panel that starts slowly reads as one being dragged
-     rather than one arriving. Material's "emphasised decelerate" is the
-     opposite shape — most of the distance is covered in the first third, then
-     it settles — and that snap IS what the report calls a premium Android
-     effect. Scoped to the drawer, the scrim and the burger and used nowhere
-     else; every exit keeps the system `ease`. */
+  /* THE ONE CURVE IN THIS DRAWER, AND WHY IT IS NOT `ease`. The system ships a
+     single easing (`ease` = cubic-bezier(.25,.1,.25,1)), which is symmetric:
+     it starts slowly, and a panel that starts slowly reads as one being
+     dragged rather than one arriving. Material's "emphasised decelerate" is
+     the opposite shape — most of the distance is covered in the first third,
+     then it settles — and that snap IS what the report calls a premium Android
+     effect. Scoped to the drawer, the scrim and the burger, and used nowhere
+     else on the site: the leak test below is what holds that.
+
+     IT IS NOW THE ONLY CURVE IN HERE. WAVE 6 introduced it for the entrances
+     and left `ease` on the exits and on every small in-panel state change —
+     the fold, the chevron, the tile, the row tint — which shipped the drawer
+     with two easings against a law that allows one. Unified on this one, and
+     the fold is the motion worth checking because it is the one a visitor
+     watches most. SAMPLED FRAME BY FRAME at 375px on the nine-row "For
+     Carriers & Brokers" group (600px of travel), driven by a real summary
+     click: both curves move on the same frame and both settle in the same 9
+     frames, the emphasised one at 205ms and `ease` at 232ms against a declared
+     200ms. The difference is the distribution — four frames in, the emphasised
+     curve has covered 82% of the height against 58% — which is the arrival
+     shape it was chosen for, at the size where it is least disruptive.
+     Nothing about it reads wrong at 0.2s, so there is no second curve and no
+     deviation to declare. */
   --qf-menu-ease-emphasized: cubic-bezier(0.2, 0, 0, 1);
 }
 html[data-theme="dark"] {
@@ -1513,10 +1528,47 @@ html[data-theme="dark"] {
   }
 }
 
-/* ── The scroll lock, and why it is the three-part one ───────────────────
+/* ── THE ROOT HEIGHT RULE, AND WHY BODY IS `min-height` ──────────────────
+   style.css used to say `html, body { height: 100% }`. The `body` half of that
+   was a nav-killing bug, because BODY IS THE STICKY HEADER'S CONTAINING BLOCK:
+   `.site-header` is a direct child of body, and a sticky box may never travel
+   past the bottom edge of its containing block, whatever the scrollport does.
+   A body pinned to one viewport therefore gave the header a travel budget of
+   `bodyHeight - headerHeight` and then cut it loose.
+
+   MEASURED AT 375px WIDE, ON /, /directory AND /tools/oversize-permits, the
+   header's top went negative at exactly `innerHeight - 64` on all three —
+   568 -> 505, 667 -> 604, 720 -> 657, 800 -> 737, 844 -> 781, 1024 -> 961 —
+   and the burger cleared the top of the screen 54px after that. The permits
+   page is 6,367px of scroll at 800px tall: the nav was gone for 88% of it, and
+   a tap on the burger at scrollY 1400 could not land at all.
+
+   `min-height: 100%` gives the same guarantee the rule was written for — a
+   short page still fills the window, so the footer does not float in the
+   middle of the screen and the body background still covers it — while
+   letting body grow to the document on a long one. `html` KEEPS `height:
+   100%`: it is what the percentage in `min-height: 100%` resolves against,
+   and it is not a containing block for anything sticky.
+
+   WHAT THIS DOES NOT CHANGE, RE-MEASURED AFTER:
+     • The homepage is still the odd one out. `.landing-v2 { overflow-x:
+       hidden }` is what makes body's computed `overflow-y` `auto` there (a
+       hidden axis forces the visible axis to `auto`) — it is a derived value,
+       not a declaration, and it does not depend on the height rule at all.
+       The lock below still has to survive it.
+     • The lock itself already overrode the height rule: the open state sets
+       `height: auto !important; min-height: 0 !important` on body, so it was
+       written against an auto-height body from the start.
+     • Every `height: 100%` in the codebase resolves inside a parent with its
+       own definite height (tiles, logos, media, `.qf-cz-frame`); none of them
+       chain up to body. The whole-site box fingerprint — 9 pages x 5 widths x
+       all three theme states — is byte-identical before and after except for
+       body's own height on pages shorter than the viewport.
+
+   ── The scroll lock, and why it is the three-part one ───────────────────
    MEASURED, because the cheap version was tried first and both cheap versions
-   fail on THIS document. `html, body { height: 100% }` is in force site-wide,
-   and on the homepage `body` additionally carries `overflow-y: auto`, so the
+   fail on THIS document. `html { height: 100% }` is in force site-wide, and on
+   the homepage `body` additionally carries `overflow-y: auto`, so the
    viewport's scroller is propagated from BODY there and from the ROOT
    elsewhere — two different scroll containers on two pages of the same site:
 
@@ -1602,7 +1654,7 @@ html[data-qf-menu="open"] body {
   /* Inert while it is fading OUT, so a second tap lands on the page rather
      than on a scrim the visitor can no longer see. */
   pointer-events: none;
-  transition: opacity var(--qf-menu-dur-out) ease;
+  transition: opacity var(--qf-menu-dur-out) var(--qf-menu-ease-emphasized);
 }
 #site-menu-scrim[data-state="open"] {
   opacity: 1;
@@ -1701,8 +1753,8 @@ html[data-qf-menu="open"] body {
     transform: translateY(calc(var(--space-1-5) * -1)) scale(0.98);
     transform-origin: top center;
     transition:
-      opacity var(--qf-menu-dur-out) ease,
-      transform var(--qf-menu-dur-out) ease;
+      opacity var(--qf-menu-dur-out) var(--qf-menu-ease-emphasized),
+      transform var(--qf-menu-dur-out) var(--qf-menu-ease-emphasized);
     will-change: transform, opacity;
   }
   #site-mobile-menu[data-state="open"] {
@@ -1837,7 +1889,7 @@ html[data-qf-menu="open"] body {
     flex: 0 0 auto;
     opacity: .7;
     color: var(--ink);
-    transition: transform var(--qf-menu-dur-out) ease;
+    transition: transform var(--qf-menu-dur-out) var(--qf-menu-ease-emphasized);
   }
   /* `[open]` is on for the whole exit (the script holds it so the collapse can
      be seen), so it leads the fold by a frame and trails it by 200ms. Where
@@ -1867,8 +1919,8 @@ html[data-qf-menu="open"] body {
     grid-template-rows: 0fr;
     opacity: 0;
     transition:
-      grid-template-rows var(--qf-menu-dur-out) ease,
-      opacity var(--qf-menu-dur-out) ease;
+      grid-template-rows var(--qf-menu-dur-out) var(--qf-menu-ease-emphasized),
+      opacity var(--qf-menu-dur-out) var(--qf-menu-ease-emphasized);
   }
   #site-mobile-menu[data-fold-js] .mm-fold[data-fold="open"] {
     grid-template-rows: 1fr;
@@ -1922,7 +1974,7 @@ html[data-qf-menu="open"] body {
     border-radius: var(--radius-sm) !important;
     color: var(--ink) !important;
     text-decoration: none;
-    transition: background-color var(--qf-menu-dur-out) ease;
+    transition: background-color var(--qf-menu-dur-out) var(--qf-menu-ease-emphasized);
   }
   #site-mobile-menu .mm-tile {
     flex: 0 0 auto;
@@ -1935,7 +1987,7 @@ html[data-qf-menu="open"] body {
     background: var(--qf-menu-tile);
     border: 1px solid var(--qf-menu-tile-edge);
     color: var(--ink);
-    transition: background-color var(--qf-menu-dur-out) ease, color var(--qf-menu-dur-out) ease;
+    transition: background-color var(--qf-menu-dur-out) var(--qf-menu-ease-emphasized), color var(--qf-menu-dur-out) var(--qf-menu-ease-emphasized);
   }
   /* 20-in-36, drawn at 1:1 — the ratio that stops the glyphs reading as
      scaled-down clip art. Same 24px box and 1.3px stroke as the homepage tool
@@ -2076,8 +2128,8 @@ html[data-qf-menu="open"] body {
   border-radius: var(--radius-pill);
   background-color: currentColor;
   transition:
-    transform var(--qf-menu-dur-out) ease,
-    opacity var(--qf-menu-dur-out) ease;
+    transform var(--qf-menu-dur-out) var(--qf-menu-ease-emphasized),
+    opacity var(--qf-menu-dur-out) var(--qf-menu-ease-emphasized);
 }
 #site-burger[aria-expanded="true"] .qf-burger-bar {
   transition:
