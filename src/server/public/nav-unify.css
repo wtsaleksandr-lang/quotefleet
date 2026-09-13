@@ -1312,6 +1312,28 @@ body:has(#site-burger[aria-expanded="true"]) .qf-mc-fab { display: none; }
       footer owns — 12 + 56 + 12 = 80px, the button's own footprint plus the
       gap it already keeps, on the 8px ramp — plus the iOS home-indicator
       inset, which is 0 on every other platform.
+
+      …AND THE CLEARANCE IS NOW SHAPED LIKE THE BUTTON, NOT LIKE THE FOOTER.
+      The 80px above was reserved as FULL-WIDTH bottom padding for a 56px
+      button in ONE corner, so it bought its corner by opening a band of air
+      across the whole footer: 80px of nothing under the last line at 375,
+      against 24px on desktop. Owner, 2026-09: "too big empty space gap at the
+      very bottom of the footer."
+
+      Measured with the band dropped to the desktop 24px, worst case (every
+      disclosure open, scrolled to the bottom), 6 pages x 8 widths x 2 themes:
+      exactly TWO things ever enter the button's 56px column — the carrier-
+      marks note, the last element on the page, at <=414px; and the pay row's
+      last claim at 900px. Nothing else, at any width, in either theme.
+
+      So the clearance is spent on those two and nowhere else, and it is spent
+      HORIZONTALLY — which is the currency style.css:2422 already chose for
+      >900px, with the same 80px number. The note is capped at 78ch and stays
+      left-aligned, so a right gutter only re-flows its own last lines; the pay
+      row gets the gutter from 641px up, where it is still a single horizontal
+      run that reaches the corner (below that it stacks and never gets near).
+      Re-measured across the same 96 combinations: zero overlap, zero
+      horizontal scroll, and the bottom gap is 24px at every width.
    ═══════════════════════════════════════════════════════════════════════════ */
 @media (max-width: 640px) {
   /* row-gap rides the SAME [data-cols="5"] selector, not a bare
@@ -1336,7 +1358,11 @@ body:has(#site-burger[aria-expanded="true"]) .qf-mc-fab { display: none; }
   .premium-footer .footer-brand { margin-bottom: var(--space-1); }
 }
 @media (max-width: 900px) {
-  .premium-footer { padding-bottom: calc(80px + env(safe-area-inset-bottom, 0px)); }
+  /* The band is now the same 24px the desktop footer already ended on; the
+     launcher's column is bought by the two horizontal gutters at the foot of
+     this file. The safe-area inset stays — it is the iOS home indicator, not
+     the button, and it is 0 everywhere else. */
+  .premium-footer { padding-bottom: calc(24px + env(safe-area-inset-bottom, 0px)); }
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -2167,4 +2193,159 @@ html[data-qf-menu="open"] body {
     animation: none !important;
   }
   #site-mobile-menu:not([hidden]) { transform: none !important; }
+}
+
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   THE HEADER BRAND LOCKUP — THE FULL MARK, THE FOOTER'S WORDMARK, AND A CUT
+   THAT IS CHOSEN BY CSS RATHER THAN BY SCRIPT.
+
+   Owner, 2026-09: "you didn't update the top bar business logo with our latest
+   one, but ensure that dark and bright versions of the website have correct
+   logos."
+
+   WHAT WAS ACTUALLY SHIPPING, measured on all four page/theme combinations
+   before this block existed:
+     • the mark was /brand/mark-keys-ondark.png at 28x30 — the calculator keys
+       ALONE, no truck — while the footer had moved to the full keys+truck
+       lockup in #567/#568. Two marks for one brand, often in one scroll.
+     • the word beside it was a plain Inter 800 / 19px text node, against the
+       footer's baked Instrument Sans 600 outline. Two faces for one word.
+     • the cut WAS theme-paired, but only by JavaScript: theme-toggle.js
+       rewrites any /brand/*-ondark src to its light cut when data-theme is
+       "light". With scripting off nothing stamps data-theme and nothing
+       rewrites the src, so the page took its COLOURS from prefers-color-scheme
+       while the mark stayed frozen on the on-dark cut. Measured in that state
+       on a light system: white-outline mark on the #F8FAFC header, 1.06:1.
+
+   THE CUT IS A BACKGROUND-IMAGE ON AN EMPTY SPAN, and that is what makes the
+   three theme states expressible at all. CSS is render-blocking, so the
+   winning rule is settled before first paint and there is no wrong-cut flash;
+   the browser fetches ONLY the cut whose rule won, so this is one request
+   rather than the two an <img> pair would cost (and one FEWER than the old
+   path, which fetched the on-dark cut from markup and then the light cut again
+   from script). width/height are declared on the span and background-size is
+   "contain", so the box is known before the bytes land and the 374x252 source
+   letterboxes inside 45x30 (44.52x30 painted) instead of distorting.
+
+   THE TWO HEADERS DO NOT SHARE A GROUND, so they do not share a default.
+   Sampled from the live pages, not assumed:
+     .site-header   data-theme=dark  #0C111D · light #F8FAFC · un-stamped:
+                    follows prefers-color-scheme, because --chrome-bg is --bg.
+     .topnav (auth) data-theme=dark  rgb(34,40,42) · light #FFFFFF ·
+                    un-stamped: rgb(34,40,42) in BOTH system schemes — the
+                    white bar is painted only under an explicit
+                    data-theme="light".
+   So the marketing/directory header defaults to the LIGHT cut and darkens
+   under [data-theme="dark"] or a dark system scheme; the auth bar defaults to
+   the DARK cut and lightens only under [data-theme="light"]. Copying one rule
+   to both would have put a white mark on a white bar on /login for every
+   visitor with scripting off.
+
+   THE THREE STATES ARE ALL DECLARED. The bare-:root rule is the un-stamped
+   default, the prefers-color-scheme block is guarded with
+   :not([data-theme="…"]) so an explicit choice always wins, and the
+   [data-theme] rules state the toggle's answer in both directions. No cut has
+   its only definition inside a media query.
+
+   THE WORDMARK IS currentColor and inherits the anchor's ink, which is already
+   correct in all three states (--ink resolves per scheme), so the word's
+   contrast is exactly what the text node it replaces had. Asset, kerning trap
+   and the accessible-name split: HEADER_WORDMARK_SVG in siteChrome.ts.
+
+   HEIGHT IS UNCHANGED ON PURPOSE. The mark keeps the old 30px height, so the
+   brand box stays 30-32px tall against a --chrome-h of 83px (64px compact) and
+   the header measures the same 83/64px it always did. This is in the header of
+   every page; a shift here is a Core Web Vitals regression, not a cosmetic one.
+
+   Appended at EOF, like every wave in this file: check-spacing.mjs and
+   check-hardcoded-colors.mjs baseline by FILE:LINE. NOTE that neither guard
+   reads CSS or SVG inside .ts template literals, which is where the header
+   markup and the wordmark live — this block was hand-audited against the
+   design law, not signed off by a green guard run.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* THE WRAPPER IS A BOX, NOT A TILE. landing-conversion.css:32 gives a bare
+   .site-logo a 32px accent plate and landing-wefixtrades-cleanup.css:43 gives
+   `body.qf-wft .site-logo` a 1px rgba(255,255,255,.30) frame at 8px radius.
+   Both were written for a near-square 28x30 keys mark; around the wide
+   keys+truck lockup the frame reads as a crop, the footer's copy of the same
+   lockup has no frame, and /directory never had one — so the homepage and the
+   directory were showing the same brand two different ways.
+
+   It was also already theme-broken: a white-at-30% frame is visible on the
+   #0C111D dark header and invisible on the #F8FAFC light one, so the "box"
+   only existed in one theme.
+
+   `!important` is MATCHED here, not escalated — both declarations this
+   replaces carry it. The specificity is NOT matched, because a tie would be
+   settled by load order: `body.qf-wft .site-logo` is (0,2,1) in TWO sheets
+   (landing-home-fixes.css turns the frame off, landing-wefixtrades-cleanup.css
+   turns it back on and wins by loading later), and a plain `.site-brand
+   .site-logo` at (0,2,0) lost to both — measured, the frame was still painting
+   after the first attempt. `.site-header .site-brand .site-logo` is (0,3,0),
+   which beats them by class count rather than by luck, and reaches the
+   directory shell too since both headers are `.site-header`. */
+.site-header .site-brand .site-logo {
+  width: auto !important;
+  height: auto !important;
+  background: none !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+  overflow: visible !important;
+}
+
+/* 45x30 is the 374x252 source at the mark's existing 30px height (44.52
+   painted, letterboxed by `contain`). The height is the number that matters:
+   it is what the old 28x30 <img> occupied, so the brand box and therefore the
+   header measure exactly what they measured before. */
+.site-brand .qf-brand-cut {
+  display: block;
+  flex: 0 0 auto;
+  width: 45px;
+  height: 30px;
+  background-repeat: no-repeat;
+  background-position: left center;
+  background-size: contain;
+}
+
+/* Marketing + directory header: ground follows the theme in all three states. */
+.site-brand .qf-brand-cut { background-image: url("/brand/logo-full.png"); }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .site-brand .qf-brand-cut {
+    background-image: url("/brand/logo-full-ondark.png");
+  }
+}
+:root[data-theme="dark"] .site-brand .qf-brand-cut {
+  background-image: url("/brand/logo-full-ondark.png");
+}
+:root[data-theme="light"] .site-brand .qf-brand-cut {
+  background-image: url("/brand/logo-full.png");
+}
+
+/* The auth bar's copy of all of this lives in public-auth-wefixtrades.css:
+   /login, /signup and /reset-password load ONLY style.css and that sheet — no
+   nav-unify.css — so a rule written here would never reach them. Verified by
+   fetching the rendered /login head, not assumed from the injector.
+
+   The word. Block display kills the inline baseline gap that would otherwise
+   make the lockup taller than the mark; both axes come from the asset's own
+   em sizing off the anchor's font-size, so nothing is pinned twice. */
+.site-brand .qf-header-wordmark-svg {
+  display: block;
+  flex: 0 0 auto;
+}
+
+/* ═══ THE MARKETING FOOTER'S LAUNCHER GUTTERS ═══════════════════════════════
+   The pair that replaces the full-width 80px band; reasoning and the
+   96-combination measurement are in the block above the <=900px padding rule
+   earlier in this file. Stated at (0,2,0) so they clear the bare-class rules
+   in style.css that carry the same idiom above 900px. */
+@media (max-width: 900px) {
+  .premium-footer .qf-foot-marks { padding-right: 80px; }
+}
+@media (min-width: 641px) and (max-width: 900px) {
+  .premium-footer .qf-footer-payrow { padding-right: 80px; }
 }

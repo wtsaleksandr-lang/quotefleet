@@ -410,10 +410,92 @@ export const THEME_TOGGLE_BTN = `<button type="button" class="qf-theme-btn" aria
  */
 export const SITE_BURGER_BTN = `<button type="button" class="site-burger" id="site-burger" aria-label="Open menu" aria-expanded="false" aria-controls="site-mobile-menu"><span class="qf-burger-box" aria-hidden="true"><span class="qf-burger-bar"></span><span class="qf-burger-bar"></span><span class="qf-burger-bar"></span></span></button>`;
 
+/**
+ * THE HEADER WORDMARK — THE FOOTER'S TREATMENT, RE-CUT AT THE HEADER'S SIZE.
+ *
+ * #568 replaced the footer's Inter-850 text node with a baked Instrument Sans
+ * 600 outline. The header kept its Inter 800 text node, so the two chromes ran
+ * two different faces for the same word — and they are frequently on screen in
+ * the same scroll. This is that asset again at the header's 19px, not the
+ * footer's 15px scaled up.
+ *
+ * WHY RE-CUT RATHER THAN REUSE. Chromium resolves advances and applies GPOS at
+ * the used px size and rounds there, so a 19px run is not a 15px run times
+ * 19/15. The per-pair differences are sub-pixel; across ten glyphs they add up,
+ * and a baked mark only earns its place if it is indistinguishable from the
+ * live face.
+ *
+ * THE KERNING TRAP THAT ALREADY BIT US ONCE. Instrument Sans ships its kerning
+ * in GPOS and carries NO legacy 'kern' table, so opentype.js's
+ * getKerningValue() returns 0 for every pair. The first cut of the footer asset
+ * was silently unkerned: -0.63% of drift across the string and 19.8% of its ink
+ * pixels wrong. A warning comment was left at the call site and it did not stop
+ * the next person, so the comment is no longer the control:
+ *   • scripts/build-wordmark.mjs is the ONLY supported way to cut this asset.
+ *     It takes glyph POSITIONS from Chromium's own shaping of the whole string
+ *     (Range prefix widths on a single text node) and never from advance maths.
+ *   • src/server/wordmarkKerning.test.ts fails if either shipped asset ever
+ *     matches the unkerned layout. Measured 9 of 10 glyphs move under kerning,
+ *     so an unkerned regeneration cannot pass by accident.
+ *
+ * ACCESSIBLE NAME. The graphic is aria-hidden/focusable=false exactly like the
+ * footer's, so the name has to come from the anchor. `.site-brand` already
+ * carries aria-label="QuoteFleet home" and keeps it. authSiteHeader's
+ * `.brand-mark` had NO label and was named by the text node this SVG replaces —
+ * it gains aria-label="QuoteFleet", the same name it had before, so no auth
+ * page ships a nameless home link.
+ *
+ * Design size is 1em = 100 units and the viewBox is the face's own
+ * ascender/descender box, so height 1.22em is exactly the content box a 19px
+ * Instrument Sans run would have occupied. Both axes are declared: this is in
+ * the header of every page and a shift here is a Core Web Vitals regression.
+ */
+export const HEADER_WORDMARK_SVG = `<svg class="qf-header-wordmark-svg" viewBox="0 -97 517.38 122" width="5.174em" height="1.22em" aria-hidden="true" focusable="false" xmlns="http://www.w3.org/2000/svg"><g fill="currentColor"><path transform="translate(0,0)" d="M52.90-5L40.30 1Q29.40 1 21.15-3.75Q12.90-8.50 8.30-16.90Q3.70-25.30 3.70-36.30Q3.70-47.20 8.30-55.45Q12.90-63.70 21.05-68.35Q29.20-73 39.60-73Q50.20-73 58.35-68.35Q66.50-63.70 71.10-55.40Q75.70-47.10 75.70-36.20Q75.70-28.90 73.30-22.45Q70.90-16 65.90-11.50Q60.90-7 52.90-5M39.60-9.10Q46.40-9.10 51.55-12.45Q56.70-15.80 59.60-22Q62.50-28.20 62.50-36.40Q62.50-44.20 59.65-50.05Q56.80-55.90 51.65-59.15Q46.50-62.40 39.60-62.40Q32.80-62.40 27.65-59.15Q22.50-55.90 19.70-50.10Q16.90-44.30 16.90-36.40Q16.90-28.10 19.75-21.95Q22.60-15.80 27.75-12.45Q32.90-9.10 39.60-9.10M40.30 1L39.70-8L79.10-10.30L79.10 0Q72.80 0 68.05 0.15Q63.30 0.30 59.15 0.50Q55 0.70 50.50 0.85Q46 1 40.30 1"/><path transform="translate(78.87,0)" d="M23.20 1Q17.90 1 14.05-1.25Q10.20-3.50 8.15-7.40Q6.10-11.30 6.10-16.20L6.10-51L18.70-51L18.70-18.80Q18.70-14.10 21.05-11.70Q23.40-9.30 27.70-9.30Q31.60-9.30 34.55-11.10Q37.50-12.90 39.25-16.15Q41-19.40 41-23.50L42.30-11.30Q39.80-5.70 34.85-2.35Q29.90 1 23.20 1M53.70 0L41.40 0L41.40-12L41-12L41-51L53.70-51"/><path transform="translate(136.92,0)" d="M29.90 1Q21.80 1 15.65-2.40Q9.50-5.80 6.10-11.85Q2.70-17.90 2.70-25.70Q2.70-33.50 6.10-39.40Q9.50-45.30 15.65-48.65Q21.80-52 29.90-52Q38.10-52 44.20-48.65Q50.30-45.30 53.70-39.40Q57.10-33.50 57.10-25.70Q57.10-17.90 53.65-11.85Q50.20-5.80 44.10-2.40Q38 1 29.90 1M29.90-9.10Q33.90-9.10 37.10-11.15Q40.30-13.20 42.10-16.95Q43.90-20.70 43.90-25.80Q43.90-33.30 39.95-37.60Q36-41.90 29.90-41.90Q23.80-41.90 19.80-37.60Q15.80-33.30 15.80-25.80Q15.80-20.70 17.65-16.95Q19.50-13.20 22.65-11.15Q25.80-9.10 29.90-9.10"/><path transform="translate(193.42,0)" d="M29.60 1Q20.20 1 15.75-3.45Q11.30-7.90 11.30-16.80L11.30-62.60L24-67.30L24-16.50Q24-12.80 26-11Q28-9.20 32.30-9.20Q34-9.20 35.35-9.45Q36.70-9.70 37.90-10.10L37.90-0.30Q36.70 0.30 34.50 0.65Q32.30 1 29.60 1M37.90-41.10L1.50-41.10L1.50-51L37.90-51"/><path transform="translate(230.43,0)" d="M29.60 1Q21.50 1 15.45-2.40Q9.40-5.80 6.05-11.80Q2.70-17.80 2.70-25.60Q2.70-33.40 6.05-39.35Q9.40-45.30 15.40-48.65Q21.40-52 29.40-52Q37-52 42.60-48.85Q48.20-45.70 51.30-40Q54.40-34.30 54.40-26.70Q54.40-25.30 54.30-24.10Q54.20-22.90 54-21.70L10.50-21.70L10.50-30.50L44.30-30.50L41.70-28.10Q41.70-35.30 38.40-38.90Q35.10-42.50 29.20-42.50Q22.80-42.50 19.05-38.10Q15.30-33.70 15.30-25.40Q15.30-17.20 19.05-12.85Q22.80-8.50 29.70-8.50Q33.70-8.50 36.70-10Q39.70-11.50 41.10-14.60L53-14.60Q50.50-7.40 44.55-3.20Q38.60 1 29.60 1"/><path transform="translate(285.53,0)" d="M19.20 0L6.20 0L6.20-72L19.20-72L19.20 0M52.90-28.90L12.40-28.90L12.40-39.20L52.90-39.20L52.90-28.90M55.30-61.70L12.40-61.70L12.40-72L55.30-72"/><path transform="translate(342.93,0)" d="M19.30 0L6.70 0L6.70-72L19.30-72"/><path transform="translate(366.94,0)" d="M29.60 1Q21.50 1 15.45-2.40Q9.40-5.80 6.05-11.80Q2.70-17.80 2.70-25.60Q2.70-33.40 6.05-39.35Q9.40-45.30 15.40-48.65Q21.40-52 29.40-52Q37-52 42.60-48.85Q48.20-45.70 51.30-40Q54.40-34.30 54.40-26.70Q54.40-25.30 54.30-24.10Q54.20-22.90 54-21.70L10.50-21.70L10.50-30.50L44.30-30.50L41.70-28.10Q41.70-35.30 38.40-38.90Q35.10-42.50 29.20-42.50Q22.80-42.50 19.05-38.10Q15.30-33.70 15.30-25.40Q15.30-17.20 19.05-12.85Q22.80-8.50 29.70-8.50Q33.70-8.50 36.70-10Q39.70-11.50 41.10-14.60L53-14.60Q50.50-7.40 44.55-3.20Q38.60 1 29.60 1"/><path transform="translate(422.78,0)" d="M29.60 1Q21.50 1 15.45-2.40Q9.40-5.80 6.05-11.80Q2.70-17.80 2.70-25.60Q2.70-33.40 6.05-39.35Q9.40-45.30 15.40-48.65Q21.40-52 29.40-52Q37-52 42.60-48.85Q48.20-45.70 51.30-40Q54.40-34.30 54.40-26.70Q54.40-25.30 54.30-24.10Q54.20-22.90 54-21.70L10.50-21.70L10.50-30.50L44.30-30.50L41.70-28.10Q41.70-35.30 38.40-38.90Q35.10-42.50 29.20-42.50Q22.80-42.50 19.05-38.10Q15.30-33.70 15.30-25.40Q15.30-17.20 19.05-12.85Q22.80-8.50 29.70-8.50Q33.70-8.50 36.70-10Q39.70-11.50 41.10-14.60L53-14.60Q50.50-7.40 44.55-3.20Q38.60 1 29.60 1"/><path transform="translate(476.73,0)" d="M29.60 1Q20.20 1 15.75-3.45Q11.30-7.90 11.30-16.80L11.30-62.60L24-67.30L24-16.50Q24-12.80 26-11Q28-9.20 32.30-9.20Q34-9.20 35.35-9.45Q36.70-9.70 37.90-10.10L37.90-0.30Q36.70 0.30 34.50 0.65Q32.30 1 29.60 1M37.90-41.10L1.50-41.10L1.50-51L37.90-51"/></g></svg>`;
+
+/**
+ * THE BRAND CUT IS PAINTED BY CSS, NOT SWAPPED BY SCRIPT.
+ *
+ * The mark used to be an `<img src="/brand/mark-keys-ondark.png">` that
+ * theme-toggle.js#swapLogos rewrote to the light cut whenever data-theme was
+ * "light". Two things were wrong with that.
+ *
+ * 1. IT WAS THE WRONG MARK. It is the calculator keys ALONE. The footer moved
+ *    to the full lockup — keys plus truck — in #567/#568, so the two chromes
+ *    showed two different marks in the same scroll.
+ *
+ * 2. IT NEEDED JAVASCRIPT TO BE RIGHT. `data-theme` is stamped by the no-flash
+ *    head script, so with scripting ON the attribute is always there before
+ *    first paint. With scripting OFF nothing stamps it and nothing swaps the
+ *    src either, so the page fell back to `prefers-color-scheme` for its
+ *    COLOURS while the mark stayed frozen on the on-dark cut. Measured: the
+ *    white-outline mark on the #F8FAFC light header — 1.06:1, invisible.
+ *
+ * An empty `<span>` with a themed `background-image` fixes both. CSS is
+ * render-blocking, so the winning rule is known before first paint and there
+ * is no wrong-cut flash to avoid; the browser fetches ONLY the cut whose rule
+ * won, so this is one request, not two; and the three theme states are stated
+ * declaratively in nav-unify.css instead of being inferred by a script that
+ * may never run. `width`/`height` are on the span and `background-size:
+ * contain` letterboxes inside it, so the box is known before the image lands
+ * and the aspect ratio cannot distort.
+ *
+ * WHICH CUT SITS ON WHICH GROUND IS MEASURED, NOT ASSUMED — and the two
+ * headers do NOT agree, which is exactly why this is not a single rule. The
+ * marketing/directory header paints `--chrome-bg` = `--bg`, which follows the
+ * theme in all three states. The auth bar (`.topnav`) paints rgb(34,40,42) in
+ * BOTH un-stamped states and only goes white under an explicit
+ * data-theme="light". So `.site-brand` defaults to the light cut and
+ * `.brand-mark` defaults to the dark one. Ratios in the nav-unify.css block.
+ *
+ * The span is inside the existing aria-hidden `.site-logo` wrapper, so it adds
+ * nothing to the accessibility tree — the old `<img>` `alt` was already dead
+ * for the same reason.
+ */
+export const BRAND_CUT_SPAN = '<span class="qf-brand-cut"></span>';
 // ── Canonical full site header + mobile menu ────────────────────────────────
 export const FULL_SITE_HEADER = `<header class="site-header">
     <div class="site-header-inner">
-      <a href="/" class="site-brand" aria-label="QuoteFleet home"><span class="site-logo" aria-hidden="true"><img class="qf-brand-mark" src="/brand/mark-keys-ondark.png" alt="QuoteFleet" width="28" height="30" decoding="async"></span>QuoteFleet</a>
+      <a href="/" class="site-brand" aria-label="QuoteFleet home"><span class="site-logo" aria-hidden="true">${BRAND_CUT_SPAN}</span>${HEADER_WORDMARK_SVG}</a>
       ${SITE_NAV_HTML}
       <div class="site-actions">${HEADER_OOG_CTA}${THEME_TOGGLE_BTN}<a class="signin" href="/login">Sign in</a><a class="btn btn-secondary" href="/w/demo" data-aud-cta>View demo <span class="arr">→</span></a>${SITE_BURGER_BTN}</div>
     </div>
@@ -445,7 +527,7 @@ export interface AuthChromeLink {
 export function authSiteHeader(link: AuthChromeLink): string {
   return `<header class="topnav">
     <div class="topnav-inner">
-      <a href="/" class="brand-mark"><span class="logo"><img class="qf-brand-mark" src="/brand/mark-keys-ondark.png" alt="QuoteFleet" width="28" height="30" decoding="async"></span>QuoteFleet</a>
+      <a href="/" class="brand-mark" aria-label="QuoteFleet"><span class="logo" aria-hidden="true">${BRAND_CUT_SPAN}</span>${HEADER_WORDMARK_SVG}</a>
       <span class="topnav-spacer"></span>
       ${THEME_TOGGLE_BTN}
       <a class="nav-link" href="${link.href}">${link.label}</a>

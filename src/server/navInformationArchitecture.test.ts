@@ -1058,13 +1058,41 @@ describe('the footer states a trust claim ONCE, in one strip', () => {
     // The footer owns the clearance; the launcher does not move (a bottom lift
     // was removed from it after four content collisions, and PR #555 proved it
     // was not the cause of the directory-listing overlap).
-    const CLEAR = /padding-bottom: calc\(80px \+ env\(safe-area-inset-bottom, 0px\)\)/;
-    expect(NAV_UNIFY_CSS, 'marketing footer clearance').toMatch(CLEAR);
-    expect(NAV_IA_CSS, 'homepage footer clearance').toMatch(CLEAR);
+    //
+    // THE CLEARANCE IS SHAPED LIKE THE BUTTON, NOT LIKE THE FOOTER. It used to
+    // be 80px of FULL-WIDTH bottom padding for a 56px corner, which cleared the
+    // corner by opening a band of air across the whole footer — 80px of nothing
+    // under the last line at 375px against 24px on desktop, and that band is
+    // what the owner reported. Measured with the band at the desktop 24px,
+    // worst case (all disclosures open, scrolled to the bottom), 6 pages x 8
+    // widths x 2 themes: exactly two things enter the button's column — the
+    // carrier-marks note at <=414px and the pay row's last claim at 900px. So
+    // the band is 24px and the 80px is spent as a right gutter on those two.
+    //
+    // BOTH HALVES ARE PINNED, because either one alone is a regression: a 24px
+    // band with no gutters puts text under the button, and gutters with the
+    // 80px band back is the empty band again.
+    const BAND = /padding-bottom: calc\(24px \+ env\(safe-area-inset-bottom, 0px\)\)/;
+    expect(NAV_UNIFY_CSS, 'marketing footer band').toMatch(BAND);
+    expect(NAV_IA_CSS, 'homepage footer band').toMatch(BAND);
     // The directory declares it in DIRECTORY_CSS, which loads last and would
     // otherwise re-win with its own padding shorthand.
-    expect(DIRECTORY_CSS, 'directory footer clearance')
-      .toMatch(/calc\(80px \+ env\(safe-area-inset-bottom, 0px\)\)/);
+    expect(DIRECTORY_CSS, 'directory footer band')
+      .toMatch(/calc\(24px \+ env\(safe-area-inset-bottom, 0px\)\)/);
+    // Nothing anywhere may re-open the full-width band.
+    for (const [name, css] of [...NAV_SHEETS, ['DIRECTORY_CSS', DIRECTORY_CSS] as const]) {
+      expect(css.replace(/\/\*[\s\S]*?\*\//g, ''), `${name} must not restore the 80px band`)
+        .not.toMatch(/padding-bottom: calc\(80px \+ env/);
+    }
+    // The gutters that replace it, on the two elements that actually reach the
+    // corner. 80px is the button's own 56px plus the 12px gap it keeps on each
+    // side — the same number style.css already spends above 900px.
+    expect(NAV_UNIFY_CSS, 'marks-note gutter').toMatch(/\.qf-foot-marks \{ padding-right: 80px; \}/);
+    expect(NAV_UNIFY_CSS, 'pay-row gutter').toMatch(/\.qf-footer-payrow \{ padding-right: 80px; \}/);
+    expect(DIRECTORY_CSS, 'directory marks-note gutter')
+      .toMatch(/\.qf-foot-marks \{ padding-right: 80px; \}/);
+    expect(DIRECTORY_CSS, 'directory pay-row gutter')
+      .toMatch(/\.qf-footer-payrow \{ padding-right: 80px; \}/);
     // And nobody "fixed" it by MOVING the launcher. Scoped to geometry: the
     // sheets legitimately stand the launcher down while the mobile drawer is
     // open (`body:has(#site-burger[aria-expanded="true"]) .qf-mc-fab`), which
