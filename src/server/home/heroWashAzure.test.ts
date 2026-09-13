@@ -383,15 +383,23 @@ describe('the hero CTA is the band, stepped away from itself', () => {
 });
 
 /**
- * THE AUDIENCE TOGGLE IS TWO OUTLINED RECTANGLES (Wave 10).
+ * THE AUDIENCE TOGGLE IS A SLIDING SWITCH (Wave 11).
  *
- * It was a white pill: 9999px radius, a #FFFFFF flood on the selected side, a
- * 0px border and a near-black label — and the block that built it cited
- * design-system §4 as its justification while doing the exact thing §4
- * forbids ("Selected/focused row visual = subtle outline, NEVER a bright
- * fill"). The owner asked for it to go; these tests stop it coming back.
+ * History, because both previous shapes are things this file has to keep out:
+ *  • it was a WHITE PILL — 9999px radius, a #FFFFFF flood on the selected side,
+ *    a 0px border and a near-black label — while citing design-system §4
+ *    ("Selected/focused row visual = subtle outline, NEVER a bright fill") as
+ *    its justification for doing the exact thing §4 forbids;
+ *  • Wave 10 replaced it with two outlined rectangles, which fixed the fill and
+ *    left the GRAMMAR wrong: two identical peers side by side is how you draw a
+ *    filter, and the owner reported that nobody could tell it swapped the page.
+ *
+ * It is now one pill track containing one capsule that SLIDES. These tests pin
+ * the three things that are load-bearing rather than decorative: the selected
+ * side is never flooded, the control cannot reflow when you switch it, and the
+ * tablist semantics underneath are untouched.
  */
-describe('the audience toggle selects with a rim and a tint, never a fill', () => {
+describe('the audience toggle is a sliding switch, not a filter', () => {
   const V2 = read('src/server/public/landing-hero-fixes-v2.css');
   const rule = (sel: string) => {
     const at = V2.indexOf(sel);
@@ -401,41 +409,85 @@ describe('the audience toggle selects with a rim and a tint, never a fill', () =
   const SEG = 'html body.landing-v2.qf-wft .qf-aud-toggle .qf-aud-seg {';
   const SEG_ON = 'html body.landing-v2.qf-wft .qf-aud-toggle .qf-aud-seg.is-active {';
   const TRACK = 'html body.landing-v2.qf-wft .qf-aud-toggle {';
+  const CAPSULE = 'html body.landing-v2.qf-wft .qf-aud-toggle::before {';
+  const CAPSULE_ON =
+    'html body.landing-v2.qf-wft .qf-aud-hero[data-audience="shippers"] .qf-aud-toggle::before {';
 
-  it('keeps the border at 2px in BOTH states so switching cannot reflow', () => {
-    expect(rule(SEG)).toContain('border: 2px solid var(--hero-toggle-rim) !important;');
-    // The selected rule swaps the COLOUR only — it must not restate `border`.
-    expect(rule(SEG_ON)).toContain('border-color: var(--hero-toggle-rim-on) !important;');
-    expect(rule(SEG_ON)).not.toMatch(/border:\s/);
+  it('slides ONE capsule rather than lighting up one of two boxes', () => {
+    // The capsule is a pseudo-element on the track, so it is out of flow and
+    // cannot move anything; the travel is exactly one column.
+    expect(rule(CAPSULE)).toContain('position: absolute !important;');
+    expect(rule(CAPSULE)).toContain('width: calc(50% - 4px) !important;');
+    expect(rule(CAPSULE)).toContain('background: var(--hero-switch-thumb) !important;');
+    expect(rule(CAPSULE_ON)).toContain('transform: translateX(100%) !important;');
   });
 
-  it('is a rectangle on the radius ramp, not a pill', () => {
-    expect(rule(SEG)).toContain('border-radius: var(--radius-btn) !important;');
-    expect(rule(SEG)).not.toContain('--radius-pill');
-    expect(STYLE).toContain('--radius-btn: 8px;');
+  it('cannot reflow: equal fixed columns, zero border, colour is the only state', () => {
+    // 1fr columns mean the two halves are identical whichever is selected —
+    // the Wave 10 property (identical box metrics) now holds structurally.
+    expect(rule(TRACK)).toContain('grid-auto-columns: 1fr !important;');
+    expect(rule(SEG)).toContain('border: 0 !important;');
+    // The selected rule may change colour. It must not touch the box.
+    expect(rule(SEG_ON)).toContain('color: var(--hero-switch-ink-on) !important;');
+    expect(rule(SEG_ON)).not.toMatch(/border:\s|padding:\s|min-height:\s|font-size:\s/);
   });
 
-  it('never floods the selected side — tint only, and the tint is capped', () => {
-    expect(rule(SEG_ON)).toContain('background: var(--hero-toggle-tint) !important;');
+  it('never floods the selected side, and never borrows the hero CTA', () => {
+    // No white pill, and no reaching for the one opaque fill in the hero —
+    // this is a mode control, not a second call to action.
+    expect(rule(SEG_ON)).toContain('background: none !important;');
     expect(rule(SEG_ON)).not.toContain('var(--surface)');
-    expect(STYLE).toContain('--hero-toggle-tint:    rgba(var(--hero-wash-ink-rgb), 0.10);');
-    // 14% (`--hero-wash-wipe`) takes the white label under AA on this band;
-    // 10% is the measured ceiling. If someone raises it, this fails.
-    const tint = Number(
-      STYLE.match(/--hero-toggle-tint:\s*rgba\(var\(--hero-wash-ink-rgb\),\s*([\d.]+)\)/)![1],
+    for (const r of [rule(TRACK), rule(SEG), rule(SEG_ON), rule(CAPSULE)]) {
+      expect(r).not.toContain('--hero-cta-fill');
+      expect(r).not.toContain('--accent-fill');
+    }
+  });
+
+  it('derives track and capsule from the band, stepped per theme', () => {
+    // Light band is a mid azure so the step is DOWN; dark is near-black so it
+    // is UP. Same derivation as --hero-cta-fill two blocks above it.
+    expect(STYLE).toContain('--hero-switch-step-rgb: 0, 0, 0;');
+    expect(STYLE).toContain('--hero-switch-thumb:    rgba(var(--hero-switch-step-rgb), 0.22);');
+    expect(STYLE).toContain('--hero-switch-step-rgb: var(--hero-wash-ink-rgb);');
+    // The rim is what identifies the control (WCAG 1.4.11); the capsule
+    // measures ~1.7:1 on the band and is not asked to carry it.
+    expect(rule(TRACK)).toContain('border: 1px solid var(--hero-switch-rim) !important;');
+    expect(STYLE).toContain('--hero-switch-rim:      var(--hero-wash-line);');
+  });
+
+  it('keeps the inactive label above AA — quieter, never greyed out', () => {
+    expect(STYLE).toContain('--hero-switch-ink:      rgba(var(--hero-wash-ink-rgb), 0.86);');
+    const ink = Number(
+      STYLE.match(/--hero-switch-ink:\s*rgba\(var\(--hero-wash-ink-rgb\),\s*([\d.]+)\)/)![1],
     );
-    expect(tint).toBeLessThanOrEqual(0.10);
+    // Pixel-sampled worst case at 0.86 is 5.03:1 (light/375/idle). Dropping the
+    // ink toward the reference's grey takes the word under 4.5:1 on this band.
+    expect(ink).toBeGreaterThanOrEqual(0.86);
   });
 
-  it('keeps the track out of the way — no glass, no pill, no padding', () => {
-    expect(rule(TRACK)).toContain('background: none !important;');
-    expect(rule(TRACK)).toContain('border: 0 !important;');
-    expect(rule(TRACK)).toContain('padding: 0 !important;');
+  it('animates the slide on the site durations, and skips it for reduced motion', () => {
+    expect(rule(CAPSULE)).toContain('transition: var(--motion-state) !important;');
+    expect(STYLE).toContain('--motion-state:  all .2s ease;');
+    const rm = V2.indexOf('@media (prefers-reduced-motion: reduce) {', V2.indexOf(CAPSULE));
+    expect(rm).toBeGreaterThan(-1);
+    const block = V2.slice(rm, V2.indexOf('\n}', rm));
+    expect(block).toContain('.qf-aud-toggle::before');
+    expect(block).toContain('transition: none !important;');
   });
 
-  it('keeps both labels on the hero ink, so selection never swaps ink colour', () => {
-    expect(rule(SEG)).toContain('color: var(--hero-wash-ink) !important;');
-    expect(rule(SEG_ON)).toContain('color: var(--hero-wash-ink) !important;');
+  it('takes the pill as a SCOPED exception — the ramp is untouched elsewhere', () => {
+    // 6/8/12 "plus the pill idiom" (style.css radius ramp). A two-up track at
+    // radius 8 reads as a segmented picker; the pill is what makes it a switch.
+    expect(rule(TRACK)).toContain('border-radius: var(--radius-pill) !important;');
+    expect(rule(CAPSULE)).toContain('border-radius: var(--radius-pill) !important;');
+    expect(STYLE).toContain('--radius-pill: 9999px;');
+    // Scoped: no raw 9999px / 50% radius anywhere in the hero sheet, and no
+    // radius literal off the 6/8/12 ramp either.
+    for (const m of V2.matchAll(/border-radius:\s*([^;!]+)/g)) {
+      const v = m[1].trim();
+      if (v.startsWith('var(')) continue;
+      expect(v).toMatch(/^(0|2px|6px|8px|12px)$/);
+    }
   });
 
   it('is still a real tablist with a 44px tap target', () => {
@@ -447,6 +499,8 @@ describe('the audience toggle selects with a rim and a tint, never a fill', () =
     // Roving tabindex — the arrow-key behaviour in landing-audience-toggle.js
     // depends on exactly one segment being tabbable.
     expect(landing).toContain('aria-selected="false" tabindex="-1"');
+    // It is a tablist, NOT role="switch": two named destinations, not a binary.
+    expect(landing).not.toContain('role="switch"');
     expect(rule(SEG)).toContain('min-height: 44px !important;');
   });
 });
