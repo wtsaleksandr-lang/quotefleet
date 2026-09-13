@@ -383,21 +383,33 @@ describe('the hero CTA is the band, stepped away from itself', () => {
 });
 
 /**
- * THE AUDIENCE TOGGLE IS A SLIDING SWITCH (Wave 11).
+ * THE AUDIENCE TOGGLE IS A SLIDING SWITCH, DRAWN AS ONE OPAQUE KNOB (Wave 12).
  *
- * History, because both previous shapes are things this file has to keep out:
+ * History, because every previous shape is something this file has to keep out:
  *  • it was a WHITE PILL — 9999px radius, a #FFFFFF flood on the selected side,
  *    a 0px border and a near-black label — while citing design-system §4
  *    ("Selected/focused row visual = subtle outline, NEVER a bright fill") as
  *    its justification for doing the exact thing §4 forbids;
  *  • Wave 10 replaced it with two outlined rectangles, which fixed the fill and
  *    left the GRAMMAR wrong: two identical peers side by side is how you draw a
- *    filter, and the owner reported that nobody could tell it swapped the page.
+ *    filter, and the owner reported that nobody could tell it swapped the page;
+ *  • Wave 11 made it a sliding capsule — right grammar, wrong substance. Every
+ *    layer of it was TRANSLUCENT (a 10% track, a 22% capsule, a 70% rim) on a
+ *    raster with visible film grain, so nothing had a hard edge. The owner:
+ *    "It doesn't look crisp and minimalistic. Do something with it."
  *
- * It is now one pill track containing one capsule that SLIDES. These tests pin
- * the three things that are load-bearing rather than decorative: the selected
- * side is never flooded, the control cannot reflow when you switch it, and the
- * tablist semantics underneath are untouched.
+ * Wave 12 keeps Wave 11's grammar and deletes its haze: the track and rim are
+ * gone and the one remaining element is an OPAQUE knob. These tests pin what is
+ * load-bearing rather than decorative — the knob is opaque and is the ink ramp
+ * rather than the band or the CTA, nothing else in the control is painted, the
+ * box cannot reflow when you switch it, both labels stay at full hero ink, and
+ * the tablist semantics underneath are untouched.
+ *
+ * The Wave 11 assertions this replaces were not deleted for convenience. Each
+ * pinned a value that no longer exists — `--hero-switch-track`,
+ * `--hero-switch-rim`, `--hero-switch-thumb`, the 0.86 inactive ink and the
+ * `calc(50% - 4px)` that assumed a 4px track padding — and each is superseded
+ * below by an assertion on what replaced it.
  */
 describe('the audience toggle is a sliding switch, not a filter', () => {
   const V2 = read('src/server/public/landing-hero-fixes-v2.css');
@@ -413,13 +425,37 @@ describe('the audience toggle is a sliding switch, not a filter', () => {
   const CAPSULE_ON =
     'html body.landing-v2.qf-wft .qf-aud-hero[data-audience="shippers"] .qf-aud-toggle::before {';
 
-  it('slides ONE capsule rather than lighting up one of two boxes', () => {
-    // The capsule is a pseudo-element on the track, so it is out of flow and
-    // cannot move anything; the travel is exactly one column.
+  it('slides ONE knob rather than lighting up one of two boxes', () => {
+    // The knob is a pseudo-element on the track, so it is out of flow and
+    // cannot move anything; the travel is exactly one column. With the track
+    // padding now 0 the column is a plain 50% — no magic number.
     expect(rule(CAPSULE)).toContain('position: absolute !important;');
-    expect(rule(CAPSULE)).toContain('width: calc(50% - 4px) !important;');
-    expect(rule(CAPSULE)).toContain('background: var(--hero-switch-thumb) !important;');
+    expect(rule(CAPSULE)).toContain('width: 50% !important;');
+    expect(rule(CAPSULE)).toContain('background: var(--hero-switch-knob) !important;');
     expect(rule(CAPSULE_ON)).toContain('transform: translateX(100%) !important;');
+  });
+
+  it('draws the knob and NOTHING else — no track fill, no rim', () => {
+    // Wave 11's defect was three translucent layers on a grainy raster. The
+    // track is now an unpainted box that exists only to hold the two tabs.
+    expect(rule(TRACK)).toContain('background: none !important;');
+    expect(rule(TRACK)).toContain('border: 0 !important;');
+    expect(rule(TRACK)).toContain('padding: 0 !important;');
+    // The runtime glass sheet paints this control; it must stay zeroed.
+    expect(rule(TRACK)).toContain('backdrop-filter: none !important;');
+    expect(rule(TRACK)).toContain('box-shadow: none !important;');
+    // And the rim is gone rather than restyled.
+    expect(rule(TRACK)).not.toContain('--hero-switch-rim');
+    expect(V2).not.toContain('--hero-switch-track');
+  });
+
+  it('shrink-wraps to one size at every width instead of stretching', () => {
+    // The base sheet sets `width: 100%` below 640px, which made the control
+    // 333.5px at 375 and 226.69 at 1440. It is 184.69 x 44 everywhere now.
+    expect(rule(TRACK)).toContain('width: auto !important;');
+    // 44px of tap target carried by padding, not by drawn height: 54 -> 44.
+    expect(rule(SEG)).toContain('min-height: 44px !important;');
+    expect(rule(SEG)).toContain('padding: 8px 16px !important;');
   });
 
   it('cannot reflow: equal fixed columns, zero border, colour is the only state', () => {
@@ -443,26 +479,54 @@ describe('the audience toggle is a sliding switch, not a filter', () => {
     }
   });
 
-  it('derives track and capsule from the band, stepped per theme', () => {
-    // Light band is a mid azure so the step is DOWN; dark is near-black so it
-    // is UP. Same derivation as --hero-cta-fill two blocks above it.
-    expect(STYLE).toContain('--hero-switch-step-rgb: 0, 0, 0;');
-    expect(STYLE).toContain('--hero-switch-thumb:    rgba(var(--hero-switch-step-rgb), 0.22);');
-    expect(STYLE).toContain('--hero-switch-step-rgb: var(--hero-wash-ink-rgb);');
-    // The rim is what identifies the control (WCAG 1.4.11); the capsule
-    // measures ~1.7:1 on the band and is not asked to carry it.
-    expect(rule(TRACK)).toContain('border: 1px solid var(--hero-switch-rim) !important;');
-    expect(STYLE).toContain('--hero-switch-rim:      var(--hero-wash-line);');
+  it('takes the knob from the INK ramp, per theme, and keeps it opaque', () => {
+    // Not the band stepped down (that is what capped Wave 11 at 22% and made
+    // it mushy) and not the accent: the page's own near-neutral ink ramp, so
+    // the knob is separated from the saturated hue-198 CTA by hue and chroma
+    // rather than by an alpha it cannot afford. Measured CIEDE2000 knob-vs-CTA
+    // 19.25 light / 18.24 dark; knob-vs-band 3.62-3.71 light, 3.08-3.24 dark,
+    // which is what lets the knob carry WCAG 1.4.11 with the rim deleted.
+    expect(STYLE).toContain('--hero-switch-knob:     var(--ink);');
+    expect(STYLE).toContain('--hero-switch-knob:     var(--muted-soft);');
+    // OPAQUE is the whole point — no alpha anywhere in the switch tokens.
+    const block = STYLE.slice(STYLE.indexOf('Wave 12: THE AUDIENCE SWITCH'));
+    for (const m of block.matchAll(/--hero-switch-[\w-]+:\s*([^;]+);/g)) {
+      expect(m[1]).not.toContain('rgba(');
+    }
   });
 
-  it('keeps the inactive label above AA — quieter, never greyed out', () => {
-    expect(STYLE).toContain('--hero-switch-ink:      rgba(var(--hero-wash-ink-rgb), 0.86);');
-    const ink = Number(
-      STYLE.match(/--hero-switch-ink:\s*rgba\(var\(--hero-wash-ink-rgb\),\s*([\d.]+)\)/)![1],
-    );
-    // Pixel-sampled worst case at 0.86 is 5.03:1 (light/375/idle). Dropping the
-    // ink toward the reference's grey takes the word under 4.5:1 on this band.
-    expect(ink).toBeGreaterThanOrEqual(0.86);
+  it('never lets the knob reach for the hero CTA fill', () => {
+    const block = STYLE.slice(STYLE.indexOf('Wave 12: THE AUDIENCE SWITCH'));
+    for (const m of block.matchAll(/--hero-switch-[\w-]+:\s*([^;]+);/g)) {
+      expect(m[1]).not.toContain('--hero-cta-fill');
+      expect(m[1]).not.toContain('--accent-fill');
+    }
+  });
+
+  it('gives BOTH labels the full hero ink — an opacity step fails AA here', () => {
+    // Wave 11's 0.86 inactive label measured 5.03:1 only because it sat on the
+    // track's own 10% black ground. On the BARE band the same 0.86 is 4.35:1
+    // at 375/light and 0.88 is exactly 4.50, so there is no room for a step.
+    // Pure white rather than `--hero-wash-ink`: that token is #F8FAFC in dark,
+    // which measures 4.48:1 on the knob — under AA by two hundredths.
+    expect(STYLE).toContain('--hero-switch-ink:      rgb(var(--hero-wash-ink-rgb));');
+    expect(STYLE).toContain('--hero-switch-ink-on:   rgb(var(--hero-wash-ink-rgb));');
+    expect(STYLE).not.toMatch(/--hero-switch-ink(-on)?:\s*rgba\(/);
+  });
+
+  it('closes every block in style.css — the media query #572 left open', () => {
+    // #572 opened `@media (prefers-color-scheme: light)` and never closed it,
+    // so `.qf-proc-band` (#573) and BOTH hero-switch token blocks were nested
+    // inside it and did not exist for a visitor with no `data-theme` and a dark
+    // OS. Wave 12's knob resolved to nothing at all in that state, which is how
+    // it was found. Counting braces is crude and it is exactly what catches it.
+    let depth = 0;
+    let stray = 0;
+    for (const ch of STYLE) {
+      if (ch === '{') depth++;
+      else if (ch === '}') { depth--; if (depth < 0) { stray++; depth = 0; } }
+    }
+    expect({ depth, stray }).toEqual({ depth: 0, stray: 0 });
   });
 
   it('animates the slide on the site durations, and skips it for reduced motion', () => {

@@ -575,55 +575,99 @@ html body.qf-wft .qf-aud-panel[data-aud-panel="carriers"] .hero-cta .btn-seconda
    ═══════════════════════════════════════════════════════════════════════════ */
 
 /* ═══════════════════════════════════════════════════════════════════════════
-   AUDIENCE TOGGLE — SINGLE consolidated definition (A1), REBUILT AS A SLIDING
-   SWITCH (owner, 2026-09: "we must improve it further, so the users know it
-   will switch between website versions. What if we convert it to a toggle
-   switch, something like an attached reference, but adapted to our website
-   design and vibe").
+   AUDIENCE TOGGLE — SINGLE consolidated definition (A1). A SLIDING SWITCH
+   (Wave 11), now CRISP (Wave 12).
 
-   WHAT CHANGED AND WHY. Wave 10's two outlined rectangles were correct about
-   fill and wrong about GRAMMAR: two identical peers side by side, one tinted,
-   is how you draw a filter. A switch is one track containing one moving thing.
-   So the two rectangles become the two halves of a single pill track, and a
-   filled capsule slides between them. The travel IS the message — it is the
-   only part of the control that says "this swaps the page", which is exactly
-   what the owner reported was missing.
+   WAVE 12 — THE OWNER ON WAVE 11: "It doesn't look crisp and minimalistic.
+   Do something with it."
 
-   THE LABELS RIDE INSIDE THE TRACK, NOT OUTSIDE IT. The reference puts its two
-   words either side of the track. Measured, that FITS: "Carriers" is 54.89px
-   and "Shippers" 60.34px at 14/600, so an outside-label layout needs ~223px of
-   the 279.59px the hero column offers at 320. It was rejected on behaviour,
-   not width. Outside labels leave the track — the most switch-looking part of
-   the control, and the biggest — dead to the pointer, because the two tappable
-   things have to stay the two `role="tab"` buttons that carry the accessible
-   names. Inside, every pixel of the control hits a tab, both halves are a full
-   44px target, and the words sit on the track's own ground rather than on the
-   raw grain of the wash. It also stops the control asserting the iOS on/off
-   idiom, which is the one meaning it must NOT have: these are two named
-   destinations, not a binary, which is also why it stays a tablist and never
-   becomes role="switch".
+   He is right, and the cause is measurable rather than a matter of taste.
+   Wave 11 drew the whole control out of TRANSLUCENCY: a 10% black track, a
+   22% black capsule and a 70% white rim, all of it sitting on a generated
+   raster with visible film grain. Nothing had a hard edge. Pixel-sampled on
+   the band, the capsule measured 1.45:1 (light) / 1.63:1 (dark) against the
+   ground it abuts — it read as a smudge of shadow, not as an object — and the
+   "white" rim composited to #B6D1DD, a hazy blue-grey line, not a clean one.
+   Three translucent layers over grain is the definition of muddy.
+
+   So Wave 12 removes two of the three layers and makes the third OPAQUE:
+
+     • the track is gone — no fill, no rim, nothing drawn;
+     • the capsule is one flat, opaque, hard-edged knob;
+     • the geometry is tighter — 54px tall becomes 44px, 8px/24px becomes
+       8px/16px, and the control shrink-wraps its labels at every width
+       (184.69px, down from 226.69 at 1440 and 333.5 at 375).
+
+   ONE DRAWN ELEMENT IS THE MINIMAL READING. The control still has to be a
+   track containing one moving thing — that grammar is what Wave 11 was asked
+   for and it is not in question. But a track does not have to be PAINTED to
+   exist: the element is still there, still holds both `role="tab"` buttons,
+   and every pixel of it still hits a tab. What is gone is only the ink used
+   to outline it, which was never doing the work of the control — the knob
+   was. Removing it leaves exactly one shape on the band, which is as few as
+   this object can have and still slide.
+
+   THE KNOB IS OPAQUE, AND IT IS NOT A COLOUR OF ITS OWN. Wave 11's capsule
+   was capped at 22% because 32% composited to #003D59 — 1.01:1 from the hero
+   CTA #003E5A, i.e. a second dark button. The escape from that cap is not a
+   different alpha, it is dropping alpha altogether and stepping OUT of the
+   band's hue: the knob is the page's own INK ramp (`--ink` in light,
+   `--muted-soft` in dark; see the token block at the foot of style.css), a
+   near-neutral at Lab chroma 9.8/14.5, while the CTA is a saturated hue-198
+   fill at chroma 22.5/43.4. They cannot be read as the same object. The full
+   derivation is in the token block; the short version is CIEDE2000 dE 19.25
+   (light) / 18.24 (dark) between knob and CTA fill, against the 1.01:1
+   near-identity Wave 11 was avoiding.
+
+   OPAQUE ALSO MEANS THE KNOB CAN CARRY WCAG 1.4.11 ON ITS OWN, which is what
+   pays for deleting the rim. Wave 11 had to keep a rim precisely because a
+   22% capsule measures ~1.5:1 and cannot identify a control; the opaque knob
+   measures 3.0-3.7:1 against the band it sits on, pixel-sampled at every
+   tested width in both themes. The rim is not removed and hoped for — it is
+   removed because the thing it was covering for now clears the bar itself.
+
+   BOTH LABELS ARE THE FULL HERO INK. Wave 11 stepped the inactive label down
+   to 86% white, which worked only because it sat on the track's own 10% black
+   ground. On the BARE band that same 86% measures 4.35:1 at 375/light — an AA
+   failure — and even 88% lands on exactly 4.50. There is no room for an
+   opacity step here, and there is no need for one: an opaque black knob is
+   not a subtle state indicator that needs a second voice backing it up. One
+   signal, measured, instead of two, one of which was failing.
+
+   WHAT IS UNCHANGED FROM WAVE 11: the labels ride INSIDE the control (outside
+   labels leave the biggest part of it dead to the pointer — see the Wave 11
+   note in git history), it stays a `tablist` and never `role="switch"`, the
+   travel is still `translateX(100%)` on an out-of-flow `::before`, and the
+   two halves are still `1fr` grid columns so nothing can reflow on switch.
 
    THE PILL IS DECLARED, AND IT IS NOT A FOURTH RADIUS. The ramp is 6/8/12
    "plus the pill idiom" (style.css:1862; RADIUS_ALLOWED in check-spacing.mjs
-   lists 9999). Radius 8 on a two-up track reads as a segmented picker; the
+   lists 9999). Radius 8 on a two-up control reads as a segmented picker; the
    pill is what makes the object read as a switch at a glance, and it is the
    shape the owner pointed at. Scoped to this one control — nothing else in the
    hero moves off 8/12.
 
-   NOTHING CAN REFLOW. The capsule is `::before` on the track — absolutely
+   NOTHING CAN REFLOW. The knob is `::before` on the track — absolutely
    positioned, out of flow, and therefore incapable of moving anything. The two
    buttons are grid columns at `1fr` each, so they are equal and fixed no matter
    which is selected, and the only thing that changes between states is one
-   `color` and one `transform`. No border grows, no padding changes, no markup
-   moves. (Wave 10 got this right the hard way, with a 2px rim in both states;
-   this gets it structurally.)
+   `transform`. No border grows, no padding changes, no markup moves. With the
+   track padding now 0 the arithmetic is also simpler than Wave 11's: one column
+   is exactly `50%` of the padding box and one column of travel is exactly
+   `translateX(100%)`, with no magic number anywhere.
 
-   WHAT THE REFERENCE HAS THAT THIS DELIBERATELY DOES NOT: a brushed-metal
+   GEOMETRY IS CARRIED BY PADDING, NOT BY HEIGHT. `min-height: 44px` on the
+   button is the whole tap target, so dropping the track's 4px padding and 1px
+   rim takes 54px of drawn control down to 44px without touching what a thumb
+   can hit. Horizontal padding goes 24px -> 16px (both on the 8px ramp) and the
+   track shrink-wraps (`width: auto`, beating the base sheet's mobile
+   `width: 100%`), so the object is the same 184.69 x 44 at 320, 375 and 1440
+   instead of stretching to whatever the column offers.
+
+   WHAT A HARDWARE SWITCH HAS THAT THIS DELIBERATELY DOES NOT: a brushed-metal
    knob. It is a radial gradient with three stacked shadows, and the house
-   rules allow zero gradients and three shadows total for the whole system. A
-   flat knob on a capsule that already carries a word is a third object in a
-   48px box saying nothing the capsule does not already say — so the capsule IS
-   the knob. Motion, not ornament, carries the affordance.
+   rules allow zero gradients and three shadows total for the whole system. So
+   the knob is flat, and motion rather than ornament carries the affordance.
 
    MOTION. `--motion-state` (`all .2s ease`, style.css:1875) — the site's
    state-change duration and its one easing, the same pair every other
@@ -633,11 +677,12 @@ html body.qf-wft .qf-aud-panel[data-aud-panel="carriers"] .hero-cta .btn-seconda
    CASCADE. landing-glass.css is injected at RUNTIME by landing-motion.js
    (AFTER every static <link>, this file included) and paints both the track
    (0,2,2) and the active segment (0,3,2) with a translucent `--glass-thin-bg`
-   plus a backdrop blur. These rules stay at (0,3,2)/(0,4,2)/(0,5,2) with
-   !important so they still win; the active segment's glass chip, its inset
-   `--accent` ring and its shadow are all explicitly zeroed, because selection
-   is now the capsule underneath and a second selected-looking box on top of it
-   would read as two things being on at once.
+   plus a backdrop blur. That glass is the third translucent layer this wave is
+   removing, so the rules below stay at (0,3,2)/(0,4,2)/(0,5,2) with !important
+   and zero it explicitly — background, blur, inset `--accent` ring and shadow —
+   on the track AND on the active segment. A glass chip on top of an opaque knob
+   would be two things being on at once, and a blurred edge is the exact defect
+   the owner reported.
    ═══════════════════════════════════════════════════════════════════════════ */
 html body.landing-v2.qf-wft .qf-aud-toggle {
   position: relative !important;
@@ -646,28 +691,29 @@ html body.landing-v2.qf-wft .qf-aud-toggle {
   grid-auto-columns: 1fr !important;
   align-items: center !important;
   gap: 0 !important;
-  padding: 4px !important;
-  background: var(--hero-switch-track) !important;
-  border: 1px solid var(--hero-switch-rim) !important;
+  width: auto !important;
+  padding: 0 !important;
+  background: none !important;
+  border: 0 !important;
   border-radius: var(--radius-pill) !important;
   box-shadow: none !important;
   backdrop-filter: none !important;
   -webkit-backdrop-filter: none !important;
 }
-/* THE SLIDING CAPSULE. Percentages on an absolutely-positioned box resolve
-   against the track's PADDING box, so `calc(50% - 4px)` is exactly one column
-   and `translateX(100%)` is exactly one column of travel — the capsule lands
-   on the second half at every width without a single magic number. */
+/* THE SLIDING KNOB — the only drawn element in the control. Percentages on an
+   absolutely-positioned box resolve against the track's PADDING box, which is
+   now the whole control, so `50%` is exactly one column and `translateX(100%)`
+   is exactly one column of travel at every width. */
 html body.landing-v2.qf-wft .qf-aud-toggle::before {
   content: "" !important;
   position: absolute !important;
   z-index: 0 !important;
-  top: 4px !important;
-  bottom: 4px !important;
-  left: 4px !important;
-  width: calc(50% - 4px) !important;
+  top: 0 !important;
+  bottom: 0 !important;
+  left: 0 !important;
+  width: 50% !important;
   border-radius: var(--radius-pill) !important;
-  background: var(--hero-switch-thumb) !important;
+  background: var(--hero-switch-knob) !important;
   transition: var(--motion-state) !important;
 }
 html body.landing-v2.qf-wft .qf-aud-hero[data-audience="shippers"] .qf-aud-toggle::before {
@@ -681,15 +727,17 @@ html body.landing-v2.qf-wft .qf-aud-toggle .qf-aud-seg {
   background: none !important;
   color: var(--hero-switch-ink) !important;
   font-size: 14px !important;
-  padding: 8px 24px !important;
+  padding: 8px 16px !important;
   min-height: 44px !important;
   box-shadow: none !important;
   backdrop-filter: none !important;
   -webkit-backdrop-filter: none !important;
   transition: var(--motion-state) !important;
 }
-/* Selected: the capsule is already under it, so the button itself does exactly
-   one thing — it comes up to full hero ink. */
+/* Selected: the knob is already under it, so the button itself does NOTHING to
+   the box. Both labels are the same full hero ink (see the header note — an
+   opacity step measures below AA on the bare band), so this rule exists to
+   hold the state hook and to keep the runtime glass chip off. */
 html body.landing-v2.qf-wft .qf-aud-toggle .qf-aud-seg.is-active {
   background: none !important;
   color: var(--hero-switch-ink-on) !important;
@@ -701,10 +749,13 @@ html body.landing-v2.qf-wft .qf-aud-toggle .qf-aud-seg.is-active:hover {
 }
 /* The base sheet rings focus in `--accent`, an indigo that measures ~1:1 on
    this band — the same blind spot #570 found on the CTA's fill. Hero ink.
-   Offset 2px keeps the ring inside the track rim rather than straddling it. */
+   The offset is NEGATIVE now: with the track rim gone there is nothing for an
+   outset ring to sit inside, so it would straddle the control's silhouette and
+   overlap the neighbouring half. Inset, it is a clean pill on the knob when the
+   selected half is focused and a clean pill on the band when the other is. */
 html body.landing-v2.qf-wft .qf-aud-toggle .qf-aud-seg:focus-visible {
   outline: 2px solid var(--hero-wash-ink) !important;
-  outline-offset: 2px !important;
+  outline-offset: -2px !important;
 }
 /* THE SLIDE IS THE WHOLE POINT, SO REDUCED MOTION GETS THE STATE WITHOUT THE
    TRAVEL — the capsule is simply already there. */
