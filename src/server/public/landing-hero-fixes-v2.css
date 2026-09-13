@@ -575,85 +575,144 @@ html body.qf-wft .qf-aud-panel[data-aud-panel="carriers"] .hero-cta .btn-seconda
    ═══════════════════════════════════════════════════════════════════════════ */
 
 /* ═══════════════════════════════════════════════════════════════════════════
-   AUDIENCE TOGGLE — SINGLE consolidated definition (A1), REBUILT AS TWO
-   OUTLINED RECTANGLES (owner, 2026-09: "let's make it minimal, without white
-   fill color. Just wrap them into a square shaped 2 rectangular buttons with
-   rounded corners and thin subtle outline").
+   AUDIENCE TOGGLE — SINGLE consolidated definition (A1), REBUILT AS A SLIDING
+   SWITCH (owner, 2026-09: "we must improve it further, so the users know it
+   will switch between website versions. What if we convert it to a toggle
+   switch, something like an attached reference, but adapted to our website
+   design and vibe").
 
-   WHAT THIS REPLACES, AND WHY IT WAS WRONG BEFORE THE OWNER SAID SO. The
-   previous version of this block called a white `--surface` flood "design-
-   system §4: selected = fill + subtle 1px border". §4 says the opposite —
-   "Selected/focused row visual = subtle outline, NEVER a bright fill" — so the
-   white pill was a straight violation that had been written up as compliance.
-   Measured, the selected segment was #FFFFFF at 9999px radius with a 0px
-   border and a near-black label; this is a correction, not a preference.
+   WHAT CHANGED AND WHY. Wave 10's two outlined rectangles were correct about
+   fill and wrong about GRAMMAR: two identical peers side by side, one tinted,
+   is how you draw a filter. A switch is one track containing one moving thing.
+   So the two rectangles become the two halves of a single pill track, and a
+   filled capsule slides between them. The travel IS the message — it is the
+   only part of the control that says "this swaps the page", which is exactly
+   what the owner reported was missing.
 
-   THE BORDER IS 2px IN BOTH STATES AND ONLY ITS COLOUR CHANGES. That is the
-   hard rule (border always 2px, selection is a colour swap) and it is also
-   what stops the row twitching: with a 0px/1px border on one side the two
-   segments change box size as you switch, and the whole hero copy block below
-   them shifts. Verified live — the same segment's border-box is identical
-   selected vs unselected at 1440/768/375/320 in both themes.
+   THE LABELS RIDE INSIDE THE TRACK, NOT OUTSIDE IT. The reference puts its two
+   words either side of the track. Measured, that FITS: "Carriers" is 54.89px
+   and "Shippers" 60.34px at 14/600, so an outside-label layout needs ~223px of
+   the 279.59px the hero column offers at 320. It was rejected on behaviour,
+   not width. Outside labels leave the track — the most switch-looking part of
+   the control, and the biggest — dead to the pointer, because the two tappable
+   things have to stay the two `role="tab"` buttons that carry the accessible
+   names. Inside, every pixel of the control hits a tab, both halves are a full
+   44px target, and the words sit on the track's own ground rather than on the
+   raw grain of the wash. It also stops the control asserting the iOS on/off
+   idiom, which is the one meaning it must NOT have: these are two named
+   destinations, not a binary, which is also why it stays a tablist and never
+   becomes role="switch".
 
-   SELECTION = RIM + TINT, HOVER = RIM ONLY. Both labels are `--hero-wash-ink`
-   in both states, so the toggle never swaps ink colour (that was the other
-   half of the white pill: a near-black label appearing and disappearing over
-   a blue band). The selected segment is the one with the 10% tint; hover
-   brightens the rim alone, so it is an affordance rather than a second
-   selected-looking state.
+   THE PILL IS DECLARED, AND IT IS NOT A FOURTH RADIUS. The ramp is 6/8/12
+   "plus the pill idiom" (style.css:1862; RADIUS_ALLOWED in check-spacing.mjs
+   lists 9999). Radius 8 on a two-up track reads as a segmented picker; the
+   pill is what makes the object read as a switch at a glance, and it is the
+   shape the owner pointed at. Scoped to this one control — nothing else in the
+   hero moves off 8/12.
 
-   THE TINT CEILING IS MEASURED, NOT CHOSEN. See the Wave 10 block at the foot
-   of style.css: 14% (`--hero-wash-wipe`) takes the selected ground to 4.26:1
-   for the white label — an AA failure — and 10% lands at 4.61:1.
+   NOTHING CAN REFLOW. The capsule is `::before` on the track — absolutely
+   positioned, out of flow, and therefore incapable of moving anything. The two
+   buttons are grid columns at `1fr` each, so they are equal and fixed no matter
+   which is selected, and the only thing that changes between states is one
+   `color` and one `transform`. No border grows, no padding changes, no markup
+   moves. (Wave 10 got this right the hard way, with a 2px rim in both states;
+   this gets it structurally.)
+
+   WHAT THE REFERENCE HAS THAT THIS DELIBERATELY DOES NOT: a brushed-metal
+   knob. It is a radial gradient with three stacked shadows, and the house
+   rules allow zero gradients and three shadows total for the whole system. A
+   flat knob on a capsule that already carries a word is a third object in a
+   48px box saying nothing the capsule does not already say — so the capsule IS
+   the knob. Motion, not ornament, carries the affordance.
+
+   MOTION. `--motion-state` (`all .2s ease`, style.css:1875) — the site's
+   state-change duration and its one easing, the same pair every other
+   selected/unselected transition on the page uses. The reduced-motion block at
+   the foot of this section drops it to an instant swap.
 
    CASCADE. landing-glass.css is injected at RUNTIME by landing-motion.js
    (AFTER every static <link>, this file included) and paints both the track
    (0,2,2) and the active segment (0,3,2) with a translucent `--glass-thin-bg`
    plus a backdrop blur. These rules stay at (0,3,2)/(0,4,2)/(0,5,2) with
-   !important so they still win, and they explicitly zero the track's
-   background, border, radius and padding — the track is no longer a container,
-   it is just the flex row that spaces the two buttons.
+   !important so they still win; the active segment's glass chip, its inset
+   `--accent` ring and its shadow are all explicitly zeroed, because selection
+   is now the capsule underneath and a second selected-looking box on top of it
+   would read as two things being on at once.
    ═══════════════════════════════════════════════════════════════════════════ */
 html body.landing-v2.qf-wft .qf-aud-toggle {
-  display: inline-flex !important;
-  gap: 8px !important;
-  padding: 0 !important;
-  background: none !important;
-  border: 0 !important;
-  border-radius: 0 !important;
+  position: relative !important;
+  display: inline-grid !important;
+  grid-auto-flow: column !important;
+  grid-auto-columns: 1fr !important;
+  align-items: center !important;
+  gap: 0 !important;
+  padding: 4px !important;
+  background: var(--hero-switch-track) !important;
+  border: 1px solid var(--hero-switch-rim) !important;
+  border-radius: var(--radius-pill) !important;
   box-shadow: none !important;
   backdrop-filter: none !important;
   -webkit-backdrop-filter: none !important;
 }
+/* THE SLIDING CAPSULE. Percentages on an absolutely-positioned box resolve
+   against the track's PADDING box, so `calc(50% - 4px)` is exactly one column
+   and `translateX(100%)` is exactly one column of travel — the capsule lands
+   on the second half at every width without a single magic number. */
+html body.landing-v2.qf-wft .qf-aud-toggle::before {
+  content: "" !important;
+  position: absolute !important;
+  z-index: 0 !important;
+  top: 4px !important;
+  bottom: 4px !important;
+  left: 4px !important;
+  width: calc(50% - 4px) !important;
+  border-radius: var(--radius-pill) !important;
+  background: var(--hero-switch-thumb) !important;
+  transition: var(--motion-state) !important;
+}
+html body.landing-v2.qf-wft .qf-aud-hero[data-audience="shippers"] .qf-aud-toggle::before {
+  transform: translateX(100%) !important;
+}
 html body.landing-v2.qf-wft .qf-aud-toggle .qf-aud-seg {
-  border: 2px solid var(--hero-toggle-rim) !important;
-  border-radius: var(--radius-btn) !important;
+  position: relative !important;
+  z-index: 1 !important;
+  border: 0 !important;
+  border-radius: var(--radius-pill) !important;
   background: none !important;
-  color: var(--hero-wash-ink) !important;
+  color: var(--hero-switch-ink) !important;
   font-size: 14px !important;
-  padding: 8px 16px !important;
+  padding: 8px 24px !important;
   min-height: 44px !important;
   box-shadow: none !important;
   backdrop-filter: none !important;
   -webkit-backdrop-filter: none !important;
+  transition: var(--motion-state) !important;
 }
-/* Selected: the SAME 2px box, a brighter rim, and the tint. */
+/* Selected: the capsule is already under it, so the button itself does exactly
+   one thing — it comes up to full hero ink. */
 html body.landing-v2.qf-wft .qf-aud-toggle .qf-aud-seg.is-active {
-  border-color: var(--hero-toggle-rim-on) !important;
-  background: var(--hero-toggle-tint) !important;
-  color: var(--hero-wash-ink) !important;
+  background: none !important;
+  color: var(--hero-switch-ink-on) !important;
   box-shadow: none !important;
 }
 html body.landing-v2.qf-wft .qf-aud-toggle .qf-aud-seg:hover,
 html body.landing-v2.qf-wft .qf-aud-toggle .qf-aud-seg.is-active:hover {
-  border-color: var(--hero-toggle-rim-on) !important;
-  color: var(--hero-wash-ink) !important;
+  color: var(--hero-switch-ink-on) !important;
 }
 /* The base sheet rings focus in `--accent`, an indigo that measures ~1:1 on
-   this band — the same blind spot #570 found on the CTA's fill. Hero ink. */
+   this band — the same blind spot #570 found on the CTA's fill. Hero ink.
+   Offset 2px keeps the ring inside the track rim rather than straddling it. */
 html body.landing-v2.qf-wft .qf-aud-toggle .qf-aud-seg:focus-visible {
   outline: 2px solid var(--hero-wash-ink) !important;
   outline-offset: 2px !important;
+}
+/* THE SLIDE IS THE WHOLE POINT, SO REDUCED MOTION GETS THE STATE WITHOUT THE
+   TRAVEL — the capsule is simply already there. */
+@media (prefers-reduced-motion: reduce) {
+  html body.landing-v2.qf-wft .qf-aud-toggle::before,
+  html body.landing-v2.qf-wft .qf-aud-toggle .qf-aud-seg {
+    transition: none !important;
+  }
 }
 @media (min-width: 981px) {
   html body.landing-v2.qf-wft .qf-aud-toggle {

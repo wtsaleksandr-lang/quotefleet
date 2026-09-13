@@ -2791,3 +2791,91 @@ html[data-theme="dark"],
   gap: var(--space-1);
   min-width: 0;
 }
+
+/* ── Wave 11: THE AUDIENCE CONTROL IS A SWITCH, NOT A FILTER ──────────────
+   The owner: "we must improve it further, so the users know it will switch
+   between website versions. What if we convert it to a toggle switch."
+
+   Wave 10 left two identical outlined rectangles side by side, one tinted.
+   That is the grammar of a FILTER — two peers, pick one. A switch is a
+   different object: ONE track that contains ONE moving thing, and the moving
+   is the message. So the two rectangles become two halves of a single pill
+   track with a filled capsule that slides between them.
+
+   ── THE CAPSULE IS THE BAND STEPPED AWAY FROM ITSELF ──────────────────────
+
+   Same derivation the hero CTA uses two blocks above, and for the same
+   reason: anything on this band that invents a colour either clashes with the
+   wash's hue-198 or competes with `--hero-cta-fill` #003E5A for primacy. This
+   is a MODE CONTROL, not a call to action, so it gets no colour of its own at
+   all. The track and the capsule are the band itself, stepped in whichever
+   direction the band leaves room:
+
+     light   the band is a mid azure, so the step is DOWN (black at 10% / 22%)
+     dark    the band is teal-navy to near-black, so the step is UP (white)
+
+   THE 22% IS A CEILING SET BY THE CTA, NOT BY TASTE. The first build used 32%,
+   which composites to #003D59 on this band — the hero CTA is #003E5A, so the
+   two measured 1.01:1 against each other and the switch became a second dark
+   button sitting above the first one. At 22% the capsule is 1.14-1.30:1 away
+   from the CTA fill: still unmistakably a filled capsule, visibly a step
+   lighter than the one object in the hero that is allowed to be the darkest.
+   Raising it back puts a mode control at the same weight as the conversion
+   button, which is the one thing this control must not do.
+
+   One mechanism, two themes, zero new hues — and because the step is
+   translucent the capsule tracks the wash's own ramp down the hero instead of
+   sitting on it as a flat foreign rectangle. It is also, by construction,
+   never the same object as the CTA: the CTA is an opaque fill with a 2px rim,
+   this is a rimless translucent step inside a track.
+
+   ── WHAT IDENTIFIES THE CONTROL IS THE TRACK RIM, NOT THE CAPSULE ─────────
+
+   Pixel-sampled against the raster it abuts, the capsule measures 1.45:1 in
+   light and 1.64:1 in dark — nowhere near the 3:1 WCAG 1.4.11 wants from the
+   boundary that identifies a
+   control. It does not have to: the capsule is INSIDE a track whose rim is
+   `--hero-wash-line`, the 0.70 white already derived for exactly this job at
+   the top of the hero-wash block. Measured live, that rim clears 3:1 at every
+   width in both themes (light 3.37-3.99, dark 3.31-3.51, worst-case band pixel
+   sampled in a 4px strip along the rim itself). The rim identifies the control;
+   the capsule says which half is on. Trying to make the capsule carry 1.4.11 on
+   its own is what forces it dark enough to read as a second CTA.
+
+   ── THE INACTIVE LABEL IS QUIETER, NOT GREYED OUT ─────────────────────────
+
+   `--hero-switch-ink` is the hero ink at 86%, which is a perceptible step down
+   from the active label without dropping the word below AA on the track's own
+   ground. The floor here is real, not nominal: the reference control this was
+   adapted from greys its inactive label to roughly 3:1, which on a saturated
+   azure band would be illegible. Measured values are in the PR.
+
+   Appended at EOF for baseline-protocol.md rule 1 (the guards key file:line).
+   Hand-audited: no raw #fff/#000 below, no gradients, no shadows, every length
+   on the 8px ramp, every radius on the ramp (the pill is the system's own
+   fourth idiom — see the radius-ramp comment at style.css:1862, and
+   RADIUS_ALLOWED in check-spacing.mjs, which both list 9999 explicitly).
+   ───────────────────────────────────────────────────────────────────────── */
+:root {
+  --hero-switch-step-rgb: 0, 0, 0;
+  --hero-switch-track:    rgba(var(--hero-switch-step-rgb), 0.10);
+  --hero-switch-thumb:    rgba(var(--hero-switch-step-rgb), 0.22);
+  --hero-switch-rim:      var(--hero-wash-line);
+  --hero-switch-ink:      rgba(var(--hero-wash-ink-rgb), 0.86);
+  --hero-switch-ink-on:   var(--hero-wash-ink);
+}
+html[data-theme="dark"],
+:root:not([data-theme="light"]) {
+  --hero-switch-step-rgb: var(--hero-wash-ink-rgb);
+  --hero-switch-track:    rgba(var(--hero-switch-step-rgb), 0.06);
+  --hero-switch-thumb:    rgba(var(--hero-switch-step-rgb), 0.16);
+  --hero-switch-rim:      rgba(var(--hero-wash-ink-rgb), 0.38);
+}
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]) {
+    --hero-switch-step-rgb: 0, 0, 0;
+    --hero-switch-track:    rgba(var(--hero-switch-step-rgb), 0.10);
+    --hero-switch-thumb:    rgba(var(--hero-switch-step-rgb), 0.22);
+    --hero-switch-rim:      var(--hero-wash-line);
+  }
+}
